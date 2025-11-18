@@ -1,25 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkCoachingAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
-import { getActiveCoachingPackages } from '../store/slices/coachingSlice';
+import { getActiveCoachingPackages, getMyPackagePurchases, createPackagePurchase } from '../store/slices/coachingSlice';
 
 function CoachingBooking() {
     const dispatch = useAppDispatch();
     const { availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
-    const { packages } = useAppSelector((state) => state.coaching);
+    const { packages, purchases, purchaseSubmitting, purchasesLoading } = useAppSelector((state) => state.coaching);
     
+    const DEFAULT_DURATION = 60;
     const [date, setDate] = useState('');
-    const [duration, setDuration] = useState(60); // Duration in minutes
+    const [duration, setDuration] = useState(DEFAULT_DURATION); // Duration in minutes
     const [selectedPackage, setSelectedPackage] = useState(null);
     const [selectedCoach, setSelectedCoach] = useState(null);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
     const [coaches, setCoaches] = useState([]);
+    const [toast, setToast] = useState({ show: false, message: '' });
+    
+    const selectedPackageData = selectedPackage
+        ? packages.find((pkg) => pkg.id === selectedPackage)
+        : null;
+    // Sum up all remaining sessions from all purchases for this package
+    const sessionsRemaining = selectedPackage
+        ? purchases
+            .filter((purchase) => purchase.package === selectedPackage)
+            .reduce((total, purchase) => total + (purchase.sessions_remaining || 0), 0)
+        : 0;
+    const hasSessions = selectedPackage ? sessionsRemaining > 0 : false;
+    const packageSessionDuration = selectedPackageData?.session_duration_minutes || DEFAULT_DURATION;
 
     useEffect(() => {
-        // Load active coaching packages
+        // Load active coaching packages and current purchases
         dispatch(getActiveCoachingPackages());
+        dispatch(getMyPackagePurchases());
     }, [dispatch]);
 
     useEffect(() => {
@@ -30,7 +45,28 @@ function CoachingBooking() {
         } else {
             setCoaches([]);
         }
-    }, [selectedPackage, packages]);
+        setSelectedSlot(null);
+        dispatch(clearAvailability());
+    }, [selectedPackage, packages, dispatch]);
+
+    useEffect(() => {
+        setDuration(packageSessionDuration);
+    }, [packageSessionDuration]);
+
+    const handlePurchasePackage = async () => {
+        if (!selectedPackage) {
+            alert('Select a coaching package first.');
+            return;
+        }
+
+        const result = await dispatch(createPackagePurchase({ packageId: selectedPackage }));
+        if (createPackagePurchase.fulfilled.match(result)) {
+            dispatch(getMyPackagePurchases());
+            alert('Package sessions added. You can now book your coaching session.');
+        } else {
+            alert('Unable to add package sessions: ' + (result.payload?.error || 'Unknown error'));
+        }
+    };
 
     const checkAvailability = async () => {
         if (!date) {
@@ -42,19 +78,40 @@ function CoachingBooking() {
             alert('Please select a coaching package');
             return;
         }
+        
+        if (!hasSessions) {
+            alert('You are out of sessions for this package. Please purchase another package to continue.');
+            return;
+        }
 
         // Clear selected slot and reset availability before checking
         setSelectedSlot(null);
         dispatch(clearAvailability()); // Clear previous availability slots
+        setToast({ show: false, message: '' }); // Clear any existing toast
         
         setLoading(true);
-        await dispatch(checkCoachingAvailability({
+        const result = await dispatch(checkCoachingAvailability({
             date,
             packageId: selectedPackage,
             coachId: selectedCoach,
             duration: duration
         }));
         setLoading(false);
+        
+        // Check if no slots are available
+        if (checkCoachingAvailability.fulfilled.match(result)) {
+            const slots = result.payload || [];
+            if (slots.length === 0) {
+                setToast({
+                    show: true,
+                    message: 'No available time slots found for the selected date and package. Please try a different date or package.'
+                });
+                // Auto-hide toast after 5 seconds
+                setTimeout(() => {
+                    setToast({ show: false, message: '' });
+                }, 5000);
+            }
+        }
     };
 
     const handleSlotSelect = (slot) => {
@@ -138,24 +195,38 @@ function CoachingBooking() {
             alert('No coach available for this slot');
             return;
         }
+        
+        if (!hasSessions) {
+            alert('You are out of sessions for this package.');
+            return;
+        }
 
         const selectedCoachData = selectedSlot.available_coaches[0];
 
-        try {
-            const bookingData = {
-                booking_type: 'coaching',
-                start_time: selectedSlot.start_time,
-                end_time: selectedSlot.end_time,
-                duration_minutes: duration,
-                coaching_package: selectedPackage,
-                coach: selectedCoachData.id,
-                total_price: selectedPackage ? packages.find(p => p.id === selectedPackage)?.price || 0 : 0
-            };
+        const bookingData = {
+            booking_type: 'coaching',
+            start_time: selectedSlot.start_time,
+            end_time: selectedSlot.end_time,
+            duration_minutes: duration,
+            coaching_package: selectedPackage,
+            coach: selectedCoachData.id,
+        };
 
-            await dispatch(createBooking(bookingData));
+        const result = await dispatch(createBooking(bookingData));
+        if (createBooking.fulfilled.match(result)) {
+            await dispatch(getMyPackagePurchases());
             setBookingSuccess(true);
-        } catch (error) {
-            alert('Error creating booking: ' + (error.message || 'Unknown error'));
+        } else {
+            const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
+            if (typeof errorMessage === 'object') {
+                // Handle validation errors object
+                const errorText = Object.entries(errorMessage)
+                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                    .join('\n');
+                alert('Error creating booking:\n' + errorText);
+            } else {
+                alert('Error creating booking: ' + errorMessage);
+            }
         }
     };
 
@@ -187,6 +258,33 @@ function CoachingBooking() {
 
     return (
         <div className="space-y-6">
+            {/* Toast Notification */}
+            {toast.show && (
+                <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg shadow-lg max-w-md">
+                        <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3 flex-1">
+                                <p className="text-sm text-yellow-700">{toast.message}</p>
+                            </div>
+                            <div className="ml-4 flex-shrink-0">
+                                <button
+                                    onClick={() => setToast({ show: false, message: '' })}
+                                    className="inline-flex text-yellow-400 hover:text-yellow-600 focus:outline-none"
+                                >
+                                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Book Coaching Session</h2>
                 <div className="space-y-4">
@@ -205,22 +303,21 @@ function CoachingBooking() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Duration
+                            Session Duration
                         </label>
-                        <select 
-                            value={duration} 
-                            onChange={(e) => {
-                                setDuration(parseInt(e.target.value));
-                                setSelectedSlot(null); // Reset selected slot when duration changes
-                            }}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                        >
-                            <option value={30} className="text-gray-900">30 minutes</option>
-                            <option value={60} className="text-gray-900">1 hour</option>
-                            <option value={90} className="text-gray-900">1.5 hours</option>
-                            <option value={120} className="text-gray-900">2 hours</option>
-                            <option value={180} className="text-gray-900">3 hours</option>
-                        </select>
+                        <input
+                            type="text"
+                            value={
+                                selectedPackageData
+                                    ? `${packageSessionDuration} minutes`
+                                    : 'Select a package to see session length'
+                            }
+                            disabled
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Duration is locked to your package and consumes one session.
+                        </p>
                     </div>
 
                     <div>
@@ -240,11 +337,37 @@ function CoachingBooking() {
                             </option>
                             {packages.map((pkg) => (
                                 <option key={pkg.id} value={pkg.id} className="text-gray-900">
-                                    {pkg.title} - ${pkg.price}
+                                    {pkg.title}
                                 </option>
                             ))}
                         </select>
                     </div>
+
+                    {selectedPackage && (
+                        <div className="border border-gray-200 rounded-lg bg-gray-50 p-4 space-y-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                    <p className="text-sm text-gray-600">Sessions remaining</p>
+                                    <p className={`text-2xl font-bold ${hasSessions ? 'text-green-700' : 'text-red-600'}`}>
+                                        {purchasesLoading ? 'Checking…' : sessionsRemaining}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handlePurchasePackage}
+                                    disabled={purchaseSubmitting}
+                                    className="px-4 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 transition duration-200"
+                                >
+                                    {purchaseSubmitting ? 'Adding…' : hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
+                                </button>
+                            </div>
+                            {!hasSessions && (
+                                <p className="text-sm text-red-600">
+                                    You are out of sessions. Add another package bundle before booking.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {selectedPackage && (
                         <div>
@@ -272,7 +395,7 @@ function CoachingBooking() {
                     
                     <button 
                         onClick={checkAvailability} 
-                        disabled={loading || bookingLoading}
+                        disabled={loading || bookingLoading || (selectedPackage && !hasSessions)}
                         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
                     >
                         {loading || bookingLoading ? 'Checking Availability...' : 'Check Availability'}
@@ -398,16 +521,27 @@ function CoachingBooking() {
                                     </div>
                                 )}
                                 {selectedPackage && (
-                                    <p className="text-gray-700 mt-2">
-                                        <span className="font-medium">Price:</span> ${packages.find(p => p.id === selectedPackage)?.price || 0}
+                                    <p className="text-gray-700">
+                                        <span className="font-medium">Sessions left after booking:</span> {Math.max(sessionsRemaining - 1, 0)}
                                     </p>
                                 )}
                             </div>
                             <button 
-                                onClick={handleBooking} 
-                                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+                                onClick={handleBooking}
+                                disabled={bookingLoading}
+                                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2"
                             >
-                                Confirm Booking
+                                {bookingLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Processing...</span>
+                                    </>
+                                ) : (
+                                    'Confirm Booking'
+                                )}
                             </button>
                         </div>
                     )}

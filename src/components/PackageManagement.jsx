@@ -12,13 +12,16 @@ function PackageManagement() {
     
     const [showForm, setShowForm] = useState(false);
     const [editingPackage, setEditingPackage] = useState(null);
-    const [formData, setFormData] = useState({
+    const emptyForm = {
         title: '',
         description: '',
         price: '',
         staff_members: [],
+        session_count: 5,
+        session_duration_minutes: 60,
         is_active: true
-    });
+    };
+    const [formData, setFormData] = useState(emptyForm);
 
     useEffect(() => {
         dispatch(getPackages());
@@ -31,7 +34,7 @@ function PackageManagement() {
             if (modalRef.current && !modalRef.current.contains(event.target)) {
                 setShowForm(false);
                 setEditingPackage(null);
-                setFormData({ title: '', description: '', price: '', staff_members: [], is_active: true });
+                setFormData(emptyForm);
             }
         };
 
@@ -63,7 +66,7 @@ function PackageManagement() {
         }
         setShowForm(false);
         setEditingPackage(null);
-        setFormData({ title: '', description: '', price: '', staff_members: [], is_active: true });
+        setFormData(emptyForm);
         // No need to refetch - Redux already updates the state optimistically
     };
 
@@ -83,6 +86,8 @@ function PackageManagement() {
             description: pkg.description,
             price: pkg.price,
             staff_members: staffMemberIds,
+            session_count: pkg.session_count || 1,
+            session_duration_minutes: pkg.session_duration_minutes || 60,
             is_active: pkg.is_active
         });
         setShowForm(true);
@@ -126,7 +131,7 @@ function PackageManagement() {
                     <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(3px)' }} onClick={() => {
                         setShowForm(false);
                         setEditingPackage(null);
-                        setFormData({ title: '', description: '', price: '', staff_members: [], is_active: true });
+                        setFormData(emptyForm);
                     }}>
                         <div ref={modalRef} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
@@ -170,6 +175,35 @@ function PackageManagement() {
                                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Sessions Included
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={formData.session_count}
+                                                onChange={(e) => setFormData({...formData, session_count: parseInt(e.target.value, 10) || 1})}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Session Duration (minutes)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="15"
+                                                step="15"
+                                                value={formData.session_duration_minutes}
+                                                onChange={(e) => setFormData({...formData, session_duration_minutes: parseInt(e.target.value, 10) || 60})}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -215,7 +249,7 @@ function PackageManagement() {
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingPackage(null);
-                                                setFormData({ title: '', description: '', price: '', staff_members: [], is_active: true });
+                                                setFormData(emptyForm);
                                             }}
                                         >
                                             Cancel
@@ -251,6 +285,12 @@ function PackageManagement() {
                                                 Price
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Sessions
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Session Length
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Staff Members
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -272,6 +312,12 @@ function PackageManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                     ${pkg.price}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {pkg.session_count}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {pkg.session_duration_minutes} min
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <div className="flex flex-wrap gap-1">

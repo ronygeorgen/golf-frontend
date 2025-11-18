@@ -4,7 +4,7 @@ import { checkSimulatorAvailability, createBooking, clearAvailability } from '..
 
 function SimulatorBooking() {
     const dispatch = useAppDispatch();
-    const { availability } = useAppSelector((state) => state.booking);
+    const { availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
     
     const [date, setDate] = useState('');
     const [duration, setDuration] = useState(60);
@@ -109,24 +109,31 @@ function SimulatorBooking() {
             return;
         }
 
-        try {
-            const bookingData = {
-                booking_type: 'simulator',
-                start_time: selectedSlot.start_time,
-                end_time: selectedSlot.end_time,
-                duration_minutes: duration,
-                simulator: selectedSlot.assigned_simulator?.id || selectedSlot.available_simulators?.[0]?.id,
-                total_price: 0 // Will be calculated on backend based on duration
-            };
+        const bookingData = {
+            booking_type: 'simulator',
+            start_time: selectedSlot.start_time,
+            end_time: selectedSlot.end_time,
+            duration_minutes: duration,
+            // total_price will be calculated on backend based on duration
+        };
 
-            const result = await dispatch(createBooking(bookingData));
-            if (createBooking.fulfilled.match(result)) {
-                setBookingSuccess(true);
+        const result = await dispatch(createBooking(bookingData));
+        if (createBooking.fulfilled.match(result)) {
+            // Clear availability slots and selected slot after successful booking
+            dispatch(clearAvailability());
+            setSelectedSlot(null);
+            setBookingSuccess(true);
+        } else {
+            const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
+            if (typeof errorMessage === 'object') {
+                // Handle validation errors object
+                const errorText = Object.entries(errorMessage)
+                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                    .join('\n');
+                alert('Error creating booking:\n' + errorText);
             } else {
-                alert('Error creating booking: ' + (result.payload?.error || 'Unknown error'));
+                alert('Error creating booking: ' + errorMessage);
             }
-        } catch (error) {
-            alert('Error creating booking: ' + (error.message || 'Unknown error'));
         }
     };
 
@@ -153,7 +160,10 @@ function SimulatorBooking() {
     return (
         <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Book Simulator Session</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Book Simulator Session</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                    We’ll automatically assign the optimal bay at confirmation so you can focus on picking the best time.
+                </p>
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -240,11 +250,9 @@ function SimulatorBooking() {
                                     <div className={`text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
                                         {slot.duration_minutes || duration} minutes
                                     </div>
-                                    {slot.assigned_simulator && (
-                                        <div className="text-xs text-gray-400 mt-1">
-                                            Bay {slot.assigned_simulator.bay_number}
-                                        </div>
-                                    )}
+                                    <div className="text-xs text-gray-400 mt-1">
+                                        Bay assigned automatically at confirmation
+                                    </div>
                                     {isDisabled && (
                                         <div className="mt-2 pt-2 border-t border-red-200">
                                             <div className="text-xs text-red-600 font-medium">
@@ -278,10 +286,21 @@ function SimulatorBooking() {
                                 </p>
                             </div>
                             <button 
-                                onClick={handleBooking} 
-                                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+                                onClick={handleBooking}
+                                disabled={bookingLoading}
+                                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2"
                             >
-                                Confirm Booking
+                                {bookingLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Processing...</span>
+                                    </>
+                                ) : (
+                                    'Confirm Booking'
+                                )}
                             </button>
                         </div>
                     )}

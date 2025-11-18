@@ -29,11 +29,44 @@ export const getActivePackages = createAsyncThunk(
 
 export const getActiveCoachingPackages = getActivePackages; // Alias for consistency
 
+export const getMyPackagePurchases = createAsyncThunk(
+    'coaching/getMyPackagePurchases',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.myPurchases);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const createPackagePurchase = createAsyncThunk(
+    'coaching/createPackagePurchase',
+    async ({ packageId, notes }, { rejectWithValue }) => {
+        try {
+            const payload = {
+                package: packageId,
+            };
+            if (notes) {
+                payload.notes = notes;
+            }
+            const response = await apiClient.post(endpoints.coaching.purchases, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Initial state
 const initialState = {
     packages: [],
     activePackages: [],
+    purchases: [],
     loading: false,
+    purchasesLoading: false,
+    purchaseSubmitting: false,
     error: null,
 };
 
@@ -71,6 +104,30 @@ const coachingSlice = createSlice({
             })
             .addCase(getActivePackages.rejected, (state, action) => {
                 state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(getMyPackagePurchases.pending, (state) => {
+                state.purchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getMyPackagePurchases.fulfilled, (state, action) => {
+                state.purchasesLoading = false;
+                state.purchases = action.payload;
+            })
+            .addCase(getMyPackagePurchases.rejected, (state, action) => {
+                state.purchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(createPackagePurchase.pending, (state) => {
+                state.purchaseSubmitting = true;
+                state.error = null;
+            })
+            .addCase(createPackagePurchase.fulfilled, (state, action) => {
+                state.purchaseSubmitting = false;
+                state.purchases = [action.payload, ...state.purchases];
+            })
+            .addCase(createPackagePurchase.rejected, (state, action) => {
+                state.purchaseSubmitting = false;
                 state.error = action.payload;
             });
     },

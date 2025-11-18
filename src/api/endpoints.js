@@ -82,6 +82,8 @@ export const endpoints = {
     coaching: {
         packages: '/coaching/packages/',
         active: '/coaching/packages/active_packages/',
+        purchases: '/coaching/purchases/',
+        myPurchases: '/coaching/purchases/my/',
     },
 };
 
