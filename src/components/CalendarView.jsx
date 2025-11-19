@@ -4,16 +4,26 @@ import moment from 'moment';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getCalendarBookings } from '../store/slices/bookingSlice';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 const localizer = momentLocalizer(moment);
 
 function CalendarView({ isUserView = false }) {
     const dispatch = useAppDispatch();
     const { calendarEvents: events, loading } = useAppSelector((state) => state.booking);
+    const { popup, openPopup, closePopup } = usePopup();
     
     const [view, setView] = useState('week');
     const [date, setDate] = useState(new Date());
     const [calendarType, setCalendarType] = useState('simulator'); // 'simulator' or 'coaching'
+    const handlePopupConfirm = async () => {
+        const action = popup.onConfirm;
+        closePopup();
+        if (action) {
+            await action();
+        }
+    };
 
     useEffect(() => {
         const startOfWeek = moment(date).startOf('week').toDate();
@@ -54,24 +64,52 @@ function CalendarView({ isUserView = false }) {
     };
 
     const handleSelectEvent = (event) => {
-        if (isUserView) {
-            // User view - show their own booking details
-            alert(`My Booking Details:
-Type: ${event.type === 'simulator' ? 'Simulator' : 'Coaching'}
-Time: ${moment(event.start).format('MMM Do YYYY, h:mm a')} - ${moment(event.end).format('h:mm a')}
-Status: ${event.status}
-${event.type === 'simulator' ? `Bay: ${event.simulator?.bay_number || 'N/A'}` : `Coach: ${event.coach?.first_name || 'Any'} ${event.coach?.last_name || ''}`}
-${event.package ? `Package: ${event.package.title || 'N/A'}` : ''}
-Price: $${event.total_price || '0'}`);
-        } else {
-            // Admin view - show all booking details
-            alert(`Booking Details:
-Client: ${event.client?.first_name || 'N/A'} ${event.client?.last_name || ''}
-Type: ${event.type === 'simulator' ? 'Simulator' : 'Coaching'}
-Time: ${moment(event.start).format('MMM Do YYYY, h:mm a')} - ${moment(event.end).format('h:mm a')}
-Status: ${event.status}
-${event.type === 'simulator' ? `Simulator: Bay ${event.simulator?.bay_number || 'N/A'}` : `Coach: ${event.coach?.first_name || 'Any'} ${event.coach?.last_name || ''}`}`);
-        }
+        const details = (
+            <div className="space-y-1 text-sm leading-5">
+                {!isUserView && (
+                    <p>
+                        <span className="font-semibold">Client:</span>{' '}
+                        {event.client?.first_name || 'N/A'} {event.client?.last_name || ''}
+                    </p>
+                )}
+                <p>
+                    <span className="font-semibold">Type:</span> {event.type === 'simulator' ? 'Simulator' : 'Coaching'}
+                </p>
+                <p>
+                    <span className="font-semibold">Time:</span>{' '}
+                    {moment(event.start).format('MMM Do YYYY, h:mm a')} - {moment(event.end).format('h:mm a')}
+                </p>
+                <p>
+                    <span className="font-semibold">Status:</span> {event.status}
+                </p>
+                {event.type === 'simulator' ? (
+                    <p>
+                        <span className="font-semibold">Simulator:</span> Bay {event.simulator?.bay_number || 'N/A'}
+                    </p>
+                ) : (
+                    <p>
+                        <span className="font-semibold">Coach:</span> {event.coach?.first_name || 'Any'} {event.coach?.last_name || ''}
+                    </p>
+                )}
+                {event.package && (
+                    <p>
+                        <span className="font-semibold">Package:</span> {event.package.title || 'N/A'}
+                    </p>
+                )}
+                {event.total_price !== undefined && (
+                    <p>
+                        <span className="font-semibold">Price:</span> ${event.total_price || 0}
+                    </p>
+                )}
+            </div>
+        );
+
+        openPopup({
+            type: 'info',
+            title: isUserView ? 'My Booking Details' : 'Booking Details',
+            message: details,
+            confirmText: 'Close',
+        });
     };
 
     const handleNavigate = (newDate) => {
@@ -217,6 +255,17 @@ ${event.type === 'simulator' ? `Simulator: Bay ${event.simulator?.bay_number || 
                     </div>
                 </div>
             </div>
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
+                onClose={closePopup}
+            />
         </div>
     );
 }

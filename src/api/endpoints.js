@@ -47,10 +47,15 @@ export const endpoints = {
             detail: (id) => `/admin/bookings/${id}/`,
             updateStatus: (id) => `/admin/bookings/${id}/update_status/`,
             cancel: (id) => `/admin/bookings/${id}/cancel/`,
+            reschedule: (id) => `/admin/bookings/${id}/reschedule/`,
             today: '/admin/bookings/today/',
             upcoming: '/admin/bookings/upcoming/',
             calendarEvents: '/admin/bookings/calendar_events/',
             stats: '/admin/bookings/stats/',
+        },
+        overrides: {
+            coachingSessions: '/admin/overrides/coaching-sessions/',
+            simulatorCredits: '/admin/overrides/simulator-credits/',
         },
     },
     
@@ -65,6 +70,7 @@ export const endpoints = {
         today: '/bookings/today/',
         updateStatus: (id) => `/bookings/${id}/update_status/`,
         cancel: (id) => `/bookings/${id}/cancel/`,
+        reschedule: (id) => `/bookings/${id}/reschedule/`,
         calendarEvents: '/bookings/calendar_events/',
         stats: '/bookings/stats/',
         checkSimulatorAvailability: '/bookings/check_simulator_availability/',
@@ -76,6 +82,7 @@ export const endpoints = {
         list: '/simulators/simulators/',
         active: '/simulators/simulators/active_simulators/',
         durationPrices: '/simulators/duration-prices/',
+        credits: '/simulators/credits/',
     },
     
     // Coaching endpoints (public)

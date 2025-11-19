@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getStaff, createStaff, updateStaff, deleteStaff } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 function StaffManagement() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const { popup, openPopup, closePopup } = usePopup();
     const { list: staff, loading } = useAppSelector((state) => state.admin.staff);
     const modalRef = useRef(null);
     
@@ -19,6 +22,14 @@ function StaffManagement() {
         phone: '',
         role: 'staff'
     });
+    const [submitLoading, setSubmitLoading] = useState(false);
+    const handlePopupConfirm = async () => {
+        const action = popup.onConfirm;
+        closePopup();
+        if (action) {
+            await action();
+        }
+    };
 
     useEffect(() => {
         dispatch(getStaff());
@@ -45,15 +56,20 @@ function StaffManagement() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingStaff) {
-            await dispatch(updateStaff({ id: editingStaff.id, staffData: formData }));
-        } else {
-            await dispatch(createStaff(formData));
+        setSubmitLoading(true);
+        try {
+            if (editingStaff) {
+                await dispatch(updateStaff({ id: editingStaff.id, staffData: formData }));
+            } else {
+                await dispatch(createStaff(formData));
+            }
+            setShowForm(false);
+            setEditingStaff(null);
+            setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
+            // No need to refetch - Redux already updates the state optimistically
+        } finally {
+            setSubmitLoading(false);
         }
-        setShowForm(false);
-        setEditingStaff(null);
-        setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
-        // No need to refetch - Redux already updates the state optimistically
     };
 
     const handleEdit = (staffMember) => {
@@ -69,13 +85,21 @@ function StaffManagement() {
     };
 
     const handleDelete = async (staffId) => {
-        if (window.confirm('Are you sure you want to delete this staff member?')) {
-            await dispatch(deleteStaff(staffId));
-            // No need to refetch - Redux already updates the state optimistically
-        }
+        openPopup({
+            type: 'warning',
+            title: 'Delete staff?',
+            message: 'This will permanently remove the staff member and their availability.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: async () => {
+                await dispatch(deleteStaff(staffId));
+            },
+        });
     };
 
     return (
+        <>
         <div className="max-w-7xl mx-auto">
                 <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -167,9 +191,12 @@ function StaffManagement() {
                                     <div className="flex gap-4 pt-4">
                                         <button 
                                             type="submit" 
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            disabled={submitLoading}
+                                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                                         >
-                                            {editingStaff ? 'Update' : 'Create'} Staff
+                                            {submitLoading
+                                                ? (editingStaff ? 'Updating...' : 'Creating...')
+                                                : `${editingStaff ? 'Update' : 'Create'} Staff`}
                                         </button>
                                         <button 
                                             type="button" 
@@ -272,6 +299,18 @@ function StaffManagement() {
                     </div>
                 )}
             </div>
+        <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
+                onClose={closePopup}
+            />
+        </>
     );
 }
 

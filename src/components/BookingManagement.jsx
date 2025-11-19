@@ -1,29 +1,81 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getBookings, updateBookingStatus } from '../store/slices/adminSlice';
+import { getBookings, updateBookingStatus, adminCancelBooking } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 function BookingManagement() {
     const dispatch = useAppDispatch();
-    const { list: bookings, loading } = useAppSelector((state) => state.admin.bookings);
+    const { popup, openPopup, closePopup } = usePopup();
+    const { list: bookings, loading, pagination } = useAppSelector((state) => state.admin.bookings);
     
     const [filter, setFilter] = useState('all');
     const [dateRange, setDateRange] = useState({
         start_date: '',
         end_date: ''
     });
+    const [bookingType, setBookingType] = useState('all');
+    const [page, setPage] = useState(1);
+    const pageSize = pagination?.pageSize || 10;
+    const totalCount = pagination?.count ?? bookings.length;
+    const totalPages = pagination?.totalPages || 1;
+    const handlePopupConfirm = async () => {
+        const action = popup.onConfirm;
+        closePopup();
+        if (action) {
+            await action();
+        }
+    };
 
     useEffect(() => {
-        dispatch(getBookings({ filter, dateRange }));
-    }, [dispatch, filter, dateRange]);
+        dispatch(getBookings({ filter, dateRange, page, bookingType }));
+    }, [dispatch, filter, dateRange, page, bookingType]);
 
-    const handleStatusUpdate = async (bookingId, newStatus) => {
-        await dispatch(updateBookingStatus({ bookingId, status: newStatus }));
-        // No need to refetch - Redux already updates the state optimistically
+    useEffect(() => {
+        if (page > totalPages) {
+            setPage(totalPages);
+        }
+    }, [totalPages]);
+
+    const handleStatusUpdate = async (booking, newStatus) => {
+        if (newStatus === booking.status) {
+            return;
+        }
+        if (newStatus === 'cancelled') {
+            openPopup({
+                type: 'warning',
+                title: 'Cancel booking?',
+                message: 'This will apply the 24-hour override and issue the appropriate credit to the client.',
+                confirmText: 'Yes, cancel',
+                cancelText: 'Keep booking',
+                showCancel: true,
+                onConfirm: async () => {
+                    const result = await dispatch(adminCancelBooking({ bookingId: booking.id, forceOverride: true }));
+                    if (adminCancelBooking.rejected.match(result)) {
+                        openPopup({
+                            type: 'error',
+                            title: 'Cancellation failed',
+                            message: result.payload?.error || 'Unable to cancel booking.',
+                        });
+                    } else {
+                        dispatch(getBookings({ filter, dateRange, page, bookingType }));
+                        openPopup({
+                            type: 'success',
+                            title: 'Booking cancelled',
+                            message: result.payload?.message || 'The booking was cancelled successfully.',
+                        });
+                    }
+                },
+            });
+            return;
+        }
+        await dispatch(updateBookingStatus({ bookingId: booking.id, status: newStatus }));
     };
 
     const handleDateFilterChange = () => {
-        dispatch(getBookings({ filter, dateRange }));
+        setPage(1);
+        dispatch(getBookings({ filter, dateRange, page: 1, bookingType }));
     };
 
     const formatDateTime = (dateTimeStr) => {
@@ -50,6 +102,26 @@ function BookingManagement() {
             : 'bg-indigo-100 text-indigo-800';
     };
 
+    const formatCurrency = (value) => {
+        if (value === null || value === undefined) {
+            return null;
+        }
+        const numberValue = Number(value);
+        if (Number.isNaN(numberValue)) {
+            return null;
+        }
+        return `$${numberValue.toFixed(2)}`;
+    };
+
+    const renderPrice = (booking) => {
+        if (booking.booking_type === 'simulator' && booking.uses_simulator_credit) {
+            return <span className="text-purple-700 font-semibold">Credit Applied</span>;
+        }
+        const price = booking.total_price ?? booking.coaching_session_price;
+        const formatted = formatCurrency(price);
+        return formatted || '—';
+    };
+
     return (
         <div className="max-w-7xl mx-auto">
                 <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
@@ -57,7 +129,10 @@ function BookingManagement() {
                     <div className="flex flex-col md:flex-row gap-4">
                         <select 
                             value={filter} 
-                            onChange={(e) => setFilter(e.target.value)}
+                            onChange={(e) => {
+                                setFilter(e.target.value);
+                                setPage(1);
+                            }}
                             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                         >
                             <option value="all" className="text-gray-900">All Bookings</option>
@@ -71,13 +146,19 @@ function BookingManagement() {
                             <input
                                 type="date"
                                 value={dateRange.start_date}
-                                onChange={(e) => setDateRange({...dateRange, start_date: e.target.value})}
+                                onChange={(e) => {
+                                    setDateRange({...dateRange, start_date: e.target.value});
+                                    setPage(1);
+                                }}
                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                             <input
                                 type="date"
                                 value={dateRange.end_date}
-                                onChange={(e) => setDateRange({...dateRange, end_date: e.target.value})}
+                                onChange={(e) => {
+                                    setDateRange({...dateRange, end_date: e.target.value});
+                                    setPage(1);
+                                }}
                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                             <button 
@@ -95,6 +176,27 @@ function BookingManagement() {
                     <TableSkeleton rows={5} cols={8} />
                 ) : (
                     <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+                            <span className="text-sm font-medium text-gray-700">Booking Type</span>
+                            <div className="inline-flex rounded-full border border-gray-300 bg-white shadow-sm text-xs font-medium">
+                                {['all', 'simulator', 'coaching'].map((type) => (
+                                    <button
+                                        key={type}
+                                        onClick={() => {
+                                            setBookingType(type);
+                                            setPage(1);
+                                        }}
+                                        className={`px-3 py-1 rounded-full transition ${
+                                            bookingType === type
+                                                ? 'bg-blue-600 text-white'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         {bookings.length === 0 ? (
                             <div className="text-center py-12">
                                 <p className="text-gray-500 text-lg">No bookings found.</p>
@@ -157,7 +259,9 @@ function BookingManagement() {
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {booking.booking_type === 'simulator' ? (
-                                                    `Bay ${booking.simulator_details?.bay_number}`
+                                                    <div className="space-y-1">
+                                                        <div>{`Bay ${booking.simulator_details?.bay_number}`}</div>
+                                                    </div>
                                                 ) : (
                                                     booking.coach_details ? 
                                                         `${booking.coach_details.first_name} ${booking.coach_details.last_name}` :
@@ -165,12 +269,12 @@ function BookingManagement() {
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                ${booking.total_price}
+                                                {renderPrice(booking)}
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <select
                                                     value={booking.status}
-                                                    onChange={(e) => handleStatusUpdate(booking.id, e.target.value)}
+                                                    onChange={(e) => handleStatusUpdate(booking, e.target.value)}
                                                     className={`text-xs font-semibold rounded px-2 py-1 border ${getStatusColor(booking.status)} focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white`}
                                                 >
                                                     <option value="confirmed" className="text-gray-900">Confirmed</option>
@@ -204,6 +308,45 @@ function BookingManagement() {
                         )}
                     </div>
                 )}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-4">
+                    <p className="text-sm text-gray-600">
+                        Showing{' '}
+                        {totalCount === 0
+                            ? '0'
+                            : `${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, totalCount)}`}
+                        {' '}of {totalCount} bookings
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                            disabled={page <= 1}
+                            className="px-3 py-1 rounded-lg border border-gray-300 text-gray-700 bg-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-sm font-medium text-gray-700">
+                            Page {pagination?.page || page} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setPage((prev) => prev + 1)}
+                            disabled={page >= totalPages}
+                            className="px-3 py-1 rounded-lg border border-gray-300 text-gray-700 bg-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+                <PopupMessage
+                    open={popup.open}
+                    type={popup.type}
+                    title={popup.title}
+                    message={popup.message}
+                    confirmText={popup.confirmText}
+                    cancelText={popup.cancelText}
+                    showCancel={popup.showCancel}
+                    onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
+                    onClose={closePopup}
+                />
             </div>
     );
 }

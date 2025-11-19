@@ -12,7 +12,8 @@ import {
     LogOut, 
     Menu, 
     X,
-    User
+    User,
+    ShieldCheck
 } from 'lucide-react';
 
 function AdminLayout() {
@@ -38,6 +39,7 @@ function AdminLayout() {
         { path: '/admin/packages', label: 'Manage Packages', icon: Package },
         { path: '/admin/bookings', label: 'View Bookings', icon: Calendar },
         { path: '/admin/calendar', label: 'Calendar View', icon: CalendarDays },
+        { path: '/admin/overrides', label: 'Admin Overrides', icon: ShieldCheck },
     ];
 
     const isActive = (path) => {

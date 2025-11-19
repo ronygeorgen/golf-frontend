@@ -16,6 +16,7 @@ import PackageManagement from './components/PackageManagement';
 import CalendarView from './components/CalendarView';
 import AdminLayout from './components/AdminLayout';
 import UserLayout from './components/UserLayout';
+import AdminOverrides from './components/AdminOverrides';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -111,6 +112,7 @@ function App() {
                         <Route path="packages" element={<PackageManagement />} />
                         <Route path="bookings" element={<BookingManagement />} />
                         <Route path="calendar" element={<CalendarView />} />
+                        <Route path="overrides" element={<AdminOverrides />} />
                     </Route>
 
                     <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center"><div className="text-red-500 text-xl">Unauthorized Access</div></div>} />

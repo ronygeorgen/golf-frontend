@@ -72,9 +72,16 @@ export const deleteBooking = createAsyncThunk(
 
 export const getUpcomingBookings = createAsyncThunk(
     'booking/getUpcomingBookings',
-    async (_, { rejectWithValue }) => {
+    async ({ page = 1, bookingType = 'all' } = {}, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get(endpoints.bookings.upcoming);
+            const params = new URLSearchParams();
+            if (bookingType && bookingType !== 'all') params.append('booking_type', bookingType);
+            if (page) params.append('page', page);
+            const queryString = params.toString();
+            const url = queryString
+                ? `${endpoints.bookings.upcoming}?${queryString}`
+                : endpoints.bookings.upcoming;
+            const response = await apiClient.get(url);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -111,9 +118,22 @@ export const updateBookingStatus = createAsyncThunk(
 
 export const cancelBooking = createAsyncThunk(
     'booking/cancelBooking',
-    async (bookingId, { rejectWithValue }) => {
+    async ({ bookingId, forceOverride = false }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.post(endpoints.bookings.cancel(bookingId));
+            const payload = forceOverride ? { force_override: true } : {};
+            const response = await apiClient.post(endpoints.bookings.cancel(bookingId), payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const rescheduleBooking = createAsyncThunk(
+    'booking/rescheduleBooking',
+    async ({ bookingId, payload }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.bookings.reschedule(bookingId), payload);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -189,11 +209,31 @@ export const checkCoachingAvailability = createAsyncThunk(
     }
 );
 
+export const getSimulatorCredits = createAsyncThunk(
+    'booking/getSimulatorCredits',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.simulators.credits, {
+                params: { status: 'available' },
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Initial state
 const initialState = {
     bookings: [],
     selectedBooking: null,
     upcomingBookings: [],
+    upcomingPagination: {
+        count: 0,
+        page: 1,
+        totalPages: 1,
+        pageSize: 5, // 5 items per page for upcoming bookings
+    },
     todayBookings: [],
     calendarEvents: [],
     stats: null,
@@ -203,6 +243,8 @@ const initialState = {
     },
     loading: false,
     error: null,
+    simulatorCredits: [],
+    creditsLoading: false,
 };
 
 // Booking slice
@@ -282,7 +324,19 @@ const bookingSlice = createSlice({
             })
             .addCase(getUpcomingBookings.fulfilled, (state, action) => {
                 state.loading = false;
-                state.upcomingBookings = action.payload;
+                const results = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
+                state.upcomingBookings = results;
+                const count = action.payload?.count ?? results.length ?? 0;
+                const pageSize = 5; // Fixed page size for upcoming bookings
+                const currentPage = action.meta?.arg?.page || 1;
+                state.upcomingPagination = {
+                    count,
+                    pageSize,
+                    page: currentPage,
+                    totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
+                };
             })
             .addCase(getUpcomingBookings.rejected, (state, action) => {
                 state.loading = false;
@@ -307,9 +361,27 @@ const bookingSlice = createSlice({
         // Cancel Booking
         builder
             .addCase(cancelBooking.fulfilled, (state, action) => {
-                const index = state.bookings.findIndex(b => b.id === action.payload.id);
-                if (index !== -1) {
-                    state.bookings[index] = action.payload;
+                const bookingData = action.payload?.booking || action.payload;
+                if (bookingData?.id) {
+                    const index = state.bookings.findIndex(b => b.id === bookingData.id);
+                    if (index !== -1) {
+                        state.bookings[index] = bookingData;
+                    }
+                    state.upcomingBookings = state.upcomingBookings.map(b =>
+                        b.id === bookingData.id ? bookingData : b
+                    );
+                }
+            })
+            .addCase(rescheduleBooking.fulfilled, (state, action) => {
+                const bookingData = action.payload?.booking || action.payload;
+                if (bookingData?.id) {
+                    const index = state.bookings.findIndex(b => b.id === bookingData.id);
+                    if (index !== -1) {
+                        state.bookings[index] = bookingData;
+                    }
+                    state.upcomingBookings = state.upcomingBookings.map(b =>
+                        b.id === bookingData.id ? bookingData : b
+                    );
                 }
             });
 
@@ -355,6 +427,20 @@ const bookingSlice = createSlice({
             })
             .addCase(checkCoachingAvailability.rejected, (state, action) => {
                 state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Simulator Credits
+        builder
+            .addCase(getSimulatorCredits.pending, (state) => {
+                state.creditsLoading = true;
+            })
+            .addCase(getSimulatorCredits.fulfilled, (state, action) => {
+                state.creditsLoading = false;
+                state.simulatorCredits = action.payload || [];
+            })
+            .addCase(getSimulatorCredits.rejected, (state, action) => {
+                state.creditsLoading = false;
                 state.error = action.payload;
             });
     },

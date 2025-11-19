@@ -1,20 +1,40 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { checkSimulatorAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
+import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits } from '../store/slices/bookingSlice';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 function SimulatorBooking() {
     const dispatch = useAppDispatch();
-    const { availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
+    const { popup, openPopup, closePopup } = usePopup();
+    const { availability, loading: bookingLoading, simulatorCredits, creditsLoading } = useAppSelector((state) => state.booking);
     
     const [date, setDate] = useState('');
     const [duration, setDuration] = useState(60);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [loading, setLoading] = useState(false);
     const [bookingSuccess, setBookingSuccess] = useState(false);
+    const [useCredit, setUseCredit] = useState(false);
+    
+    const availableCredits = simulatorCredits?.length || 0;
+    
+    useEffect(() => {
+        dispatch(getSimulatorCredits());
+    }, [dispatch]);
+    
+    useEffect(() => {
+        if (availableCredits === 0 && useCredit) {
+            setUseCredit(false);
+        }
+    }, [availableCredits, useCredit]);
 
     const checkAvailability = async () => {
         if (!date) {
-            alert('Please select a date');
+            openPopup({
+                type: 'warning',
+                title: 'Select a date',
+                message: 'Please choose a date before checking availability.',
+            });
             return;
         }
 
@@ -99,13 +119,21 @@ function SimulatorBooking() {
 
     const handleBooking = async () => {
         if (!selectedSlot) {
-            alert('Please select a time slot');
+            openPopup({
+                type: 'warning',
+                title: 'Select a slot',
+                message: 'Please choose a time slot before confirming your booking.',
+            });
             return;
         }
 
         // Double-check that the selected slot can accommodate the duration
         if (isSlotDisabled(selectedSlot)) {
-            alert(`This time slot cannot accommodate ${duration} minutes. Maximum available: ${getSuggestedDuration(selectedSlot)}`);
+            openPopup({
+                type: 'warning',
+                title: 'Slot too short',
+                message: `This time slot cannot accommodate ${duration} minutes. Maximum available: ${getSuggestedDuration(selectedSlot)}.`,
+            });
             return;
         }
 
@@ -116,6 +144,10 @@ function SimulatorBooking() {
             duration_minutes: duration,
             // total_price will be calculated on backend based on duration
         };
+        
+        if (useCredit) {
+            bookingData.use_simulator_credit = true;
+        }
 
         const result = await dispatch(createBooking(bookingData));
         if (createBooking.fulfilled.match(result)) {
@@ -123,6 +155,8 @@ function SimulatorBooking() {
             dispatch(clearAvailability());
             setSelectedSlot(null);
             setBookingSuccess(true);
+            setUseCredit(false);
+            dispatch(getSimulatorCredits());
         } else {
             const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
             if (typeof errorMessage === 'object') {
@@ -130,9 +164,17 @@ function SimulatorBooking() {
                 const errorText = Object.entries(errorMessage)
                     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
                     .join('\n');
-                alert('Error creating booking:\n' + errorText);
+                openPopup({
+                    type: 'error',
+                    title: 'Booking failed',
+                    message: `Error creating booking:\n${errorText}`,
+                });
             } else {
-                alert('Error creating booking: ' + errorMessage);
+                openPopup({
+                    type: 'error',
+                    title: 'Booking failed',
+                    message: `Error creating booking: ${errorMessage}`,
+                });
             }
         }
     };
@@ -162,8 +204,14 @@ function SimulatorBooking() {
             <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Book Simulator Session</h2>
                 <p className="text-sm text-gray-600 mb-4">
-                    We’ll automatically assign the optimal bay at confirmation so you can focus on picking the best time.
+                    We’ll automatically assign the optimal bay at confirmation. Simulator bookings can be cancelled up to 24 hours out without penalty—inside that window you’ll need an admin override.
                 </p>
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-900">
+                    <p className="font-semibold">Refund policy</p>
+                    <p>
+                        Cancelling at least 24 hours in advance converts your payment into a simulator credit so you can rebook later at no charge.
+                    </p>
+                </div>
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -268,6 +316,28 @@ function SimulatorBooking() {
                         })}
                     </div>
                     
+                    {availableCredits > 0 && (
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-purple-900 font-semibold">You have {availableCredits} simulator credit{availableCredits > 1 ? 's' : ''}</p>
+                                    <p className="text-sm text-purple-800">
+                                        Use a credit to waive payment for this booking.
+                                    </p>
+                                </div>
+                                <label className="flex items-center gap-2 text-purple-900 font-medium">
+                                    <input 
+                                        type="checkbox" 
+                                        className="h-5 w-5 text-purple-600"
+                                        checked={useCredit}
+                                        onChange={(e) => setUseCredit(e.target.checked)}
+                                        disabled={creditsLoading}
+                                    />
+                                    Apply credit
+                                </label>
+                            </div>
+                        </div>
+                    )}
                     {selectedSlot && (
                         <div className="bg-gray-50 rounded-lg p-6">
                             <h4 className="text-lg font-bold text-gray-900 mb-4">Booking Summary</h4>
@@ -285,6 +355,11 @@ function SimulatorBooking() {
                                     <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                                 </p>
                             </div>
+                            {useCredit && (
+                                <div className="text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg p-3 mb-4">
+                                    This booking will use one simulator credit. No additional payment is required.
+                                </div>
+                            )}
                             <button 
                                 onClick={handleBooking}
                                 disabled={bookingLoading}
@@ -306,6 +381,23 @@ function SimulatorBooking() {
                     )}
                 </div>
             )}
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? async () => {
+                    const action = popup.onConfirm;
+                    closePopup();
+                    if (action) {
+                        await action();
+                    }
+                } : closePopup}
+                onClose={closePopup}
+            />
         </div>
     );
 }

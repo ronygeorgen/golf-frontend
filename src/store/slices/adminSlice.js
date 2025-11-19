@@ -239,16 +239,19 @@ export const deletePackage = createAsyncThunk(
 // Booking management thunks
 export const getBookings = createAsyncThunk(
     'admin/getBookings',
-    async ({ filter = 'all', dateRange = {} }, { rejectWithValue }) => {
+    async ({ filter = 'all', dateRange = {}, page = 1, bookingType = 'all' } = {}, { rejectWithValue }) => {
         try {
             const params = new URLSearchParams();
             if (filter !== 'all') params.append('status', filter);
             if (dateRange.start_date) params.append('start_date', dateRange.start_date);
             if (dateRange.end_date) params.append('end_date', dateRange.end_date);
-            
-            const response = await apiClient.get(
-                `${endpoints.admin.bookings.list}?${params.toString()}`
-            );
+            if (bookingType && bookingType !== 'all') params.append('booking_type', bookingType);
+            if (page) params.append('page', page);
+            const queryString = params.toString();
+            const url = queryString 
+                ? `${endpoints.admin.bookings.list}?${queryString}`
+                : endpoints.admin.bookings.list;
+            const response = await apiClient.get(url);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -264,6 +267,43 @@ export const updateBookingStatus = createAsyncThunk(
                 endpoints.admin.bookings.updateStatus(bookingId),
                 { status }
             );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const adminCancelBooking = createAsyncThunk(
+    'admin/adminCancelBooking',
+    async ({ bookingId, forceOverride = false }, { rejectWithValue }) => {
+        try {
+            const payload = forceOverride ? { force_override: true } : {};
+            const response = await apiClient.post(endpoints.admin.bookings.cancel(bookingId), payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const grantCoachingSessions = createAsyncThunk(
+    'admin/grantCoachingSessions',
+    async (payload, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.admin.overrides.coachingSessions, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const grantSimulatorCredits = createAsyncThunk(
+    'admin/grantSimulatorCredits',
+    async (payload, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.admin.overrides.simulatorCredits, payload);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -302,6 +342,24 @@ const initialState = {
         list: [],
         loading: false,
         error: null,
+        pagination: {
+            count: 0,
+            page: 1,
+            totalPages: 1,
+            pageSize: 10,
+        },
+    },
+    overrides: {
+        coaching: {
+            loading: false,
+            error: null,
+            success: null,
+        },
+        simulator: {
+            loading: false,
+            error: null,
+            success: null,
+        },
     },
 };
 
@@ -322,6 +380,15 @@ const adminSlice = createSlice({
             state.simulators.error = null;
             state.packages.error = null;
             state.bookings.error = null;
+            state.overrides.coaching.error = null;
+            state.overrides.simulator.error = null;
+        },
+        resetOverrideStatus: (state, action) => {
+            const target = action.payload;
+            if (target && state.overrides[target]) {
+                state.overrides[target].error = null;
+                state.overrides[target].success = null;
+            }
         },
     },
     extraReducers: (builder) => {
@@ -496,7 +563,19 @@ const adminSlice = createSlice({
             })
             .addCase(getBookings.fulfilled, (state, action) => {
                 state.bookings.loading = false;
-                state.bookings.list = action.payload;
+                const results = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
+                state.bookings.list = results;
+                const count = action.payload?.count ?? results.length ?? 0;
+                const pageSize = state.bookings.pagination.pageSize || 10;
+                const currentPage = action.meta?.arg?.page || 1;
+                state.bookings.pagination = {
+                    count,
+                    pageSize,
+                    page: currentPage,
+                    totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
+                };
             })
             .addCase(getBookings.rejected, (state, action) => {
                 state.bookings.loading = false;
@@ -507,10 +586,47 @@ const adminSlice = createSlice({
                 if (index !== -1) {
                     state.bookings.list[index] = action.payload;
                 }
+            })
+            .addCase(adminCancelBooking.fulfilled, (state, action) => {
+                const booking = action.payload?.booking || action.payload;
+                if (booking?.id) {
+                    const index = state.bookings.list.findIndex(b => b.id === booking.id);
+                    if (index !== -1) {
+                        state.bookings.list[index] = booking;
+                    }
+                }
+            });
+        
+        builder
+            .addCase(grantCoachingSessions.pending, (state) => {
+                state.overrides.coaching.loading = true;
+                state.overrides.coaching.error = null;
+                state.overrides.coaching.success = null;
+            })
+            .addCase(grantCoachingSessions.fulfilled, (state, action) => {
+                state.overrides.coaching.loading = false;
+                state.overrides.coaching.success = action.payload?.message || 'Sessions granted successfully.';
+            })
+            .addCase(grantCoachingSessions.rejected, (state, action) => {
+                state.overrides.coaching.loading = false;
+                state.overrides.coaching.error = action.payload || 'Unable to grant sessions.';
+            })
+            .addCase(grantSimulatorCredits.pending, (state) => {
+                state.overrides.simulator.loading = true;
+                state.overrides.simulator.error = null;
+                state.overrides.simulator.success = null;
+            })
+            .addCase(grantSimulatorCredits.fulfilled, (state, action) => {
+                state.overrides.simulator.loading = false;
+                state.overrides.simulator.success = action.payload?.message || 'Simulator credits granted.';
+            })
+            .addCase(grantSimulatorCredits.rejected, (state, action) => {
+                state.overrides.simulator.loading = false;
+                state.overrides.simulator.error = action.payload || 'Unable to grant simulator credits.';
             });
     },
 });
 
-export const { setSelectedStaff, setSelectedSimulator, clearError } = adminSlice.actions;
+export const { setSelectedStaff, setSelectedSimulator, clearError, resetOverrideStatus } = adminSlice.actions;
 export default adminSlice.reducer;
 

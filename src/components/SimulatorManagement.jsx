@@ -4,26 +4,45 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getSimulators, createSimulator, updateSimulator, deleteSimulator } from '../store/slices/adminSlice';
 import { Clock } from 'lucide-react';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 function SimulatorManagement() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const { popup, openPopup, closePopup } = usePopup();
     const { list: simulators, loading } = useAppSelector((state) => state.admin.simulators);
     const modalRef = useRef(null);
     
     const [showForm, setShowForm] = useState(false);
     const [editingSimulator, setEditingSimulator] = useState(null);
-    const [formData, setFormData] = useState({
+    const defaultFormState = {
         name: '',
         bay_number: '',
         is_active: true,
         is_coaching_bay: false,
-        description: ''
-    });
+        description: '',
+        hourly_price: ''
+    };
+    const [formData, setFormData] = useState(defaultFormState);
+    const [submitLoading, setSubmitLoading] = useState(false);
+    const handlePopupConfirm = async () => {
+        const action = popup.onConfirm;
+        closePopup();
+        if (action) {
+            await action();
+        }
+    };
 
     useEffect(() => {
         dispatch(getSimulators());
     }, [dispatch]);
+
+    useEffect(() => {
+        if (formData.is_coaching_bay && formData.hourly_price) {
+            setFormData((prev) => ({ ...prev, hourly_price: '' }));
+        }
+    }, [formData.is_coaching_bay]);
 
     // Close modal when clicking outside
     useEffect(() => {
@@ -31,7 +50,7 @@ function SimulatorManagement() {
             if (modalRef.current && !modalRef.current.contains(event.target)) {
                 setShowForm(false);
                 setEditingSimulator(null);
-                setFormData({ name: '', bay_number: '', is_active: true, is_coaching_bay: false, description: '' });
+                setFormData(defaultFormState);
             }
         };
 
@@ -46,15 +65,20 @@ function SimulatorManagement() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingSimulator) {
-            await dispatch(updateSimulator({ id: editingSimulator.id, simulatorData: formData }));
-        } else {
-            await dispatch(createSimulator(formData));
+        setSubmitLoading(true);
+        try {
+            if (editingSimulator) {
+                await dispatch(updateSimulator({ id: editingSimulator.id, simulatorData: formData }));
+            } else {
+                await dispatch(createSimulator(formData));
+            }
+            setShowForm(false);
+            setEditingSimulator(null);
+            setFormData(defaultFormState);
+            // No need to refetch - Redux already updates the state optimistically
+        } finally {
+            setSubmitLoading(false);
         }
-        setShowForm(false);
-        setEditingSimulator(null);
-        setFormData({ name: '', bay_number: '', is_active: true, is_coaching_bay: false, description: '' });
-        // No need to refetch - Redux already updates the state optimistically
     };
 
     const handleEdit = (simulator) => {
@@ -64,7 +88,8 @@ function SimulatorManagement() {
             bay_number: simulator.bay_number,
             is_active: simulator.is_active,
             is_coaching_bay: simulator.is_coaching_bay,
-            description: simulator.description
+            description: simulator.description || '',
+            hourly_price: simulator.hourly_price || ''
         });
         setShowForm(true);
     };
@@ -75,10 +100,17 @@ function SimulatorManagement() {
     };
 
     const handleDelete = async (simulatorId) => {
-        if (window.confirm('Are you sure you want to delete this simulator?')) {
-            await dispatch(deleteSimulator(simulatorId));
-            // No need to refetch - Redux already updates the state optimistically
-        }
+        openPopup({
+            type: 'warning',
+            title: 'Delete simulator?',
+            message: 'This action will remove the simulator and its availability schedule.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: async () => {
+                await dispatch(deleteSimulator(simulatorId));
+            },
+        });
     };
 
     return (
@@ -99,7 +131,7 @@ function SimulatorManagement() {
                     <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(3px)' }} onClick={() => {
                         setShowForm(false);
                         setEditingSimulator(null);
-                        setFormData({ name: '', bay_number: '', is_active: true, is_coaching_bay: false, description: '' });
+                        setFormData(defaultFormState);
                     }}>
                         <div ref={modalRef} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
@@ -168,12 +200,34 @@ function SimulatorManagement() {
                                             </label>
                                         </div>
                                     </div>
+                                    {!formData.is_coaching_bay && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Hourly Price (USD)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={formData.hourly_price}
+                                                onChange={(e) => setFormData({...formData, hourly_price: e.target.value})}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                required
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Charge per hour for normal simulator bookings.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="flex gap-4 pt-4">
                                         <button 
                                             type="submit" 
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            disabled={submitLoading}
+                                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                                         >
-                                            {editingSimulator ? 'Update' : 'Create'} Simulator
+                                            {submitLoading
+                                                ? (editingSimulator ? 'Updating...' : 'Creating...')
+                                                : `${editingSimulator ? 'Update' : 'Create'} Simulator`}
                                         </button>
                                         <button 
                                             type="button" 
@@ -181,7 +235,7 @@ function SimulatorManagement() {
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingSimulator(null);
-                                                setFormData({ name: '', bay_number: '', is_active: true, is_coaching_bay: false, description: '' });
+                                                setFormData(defaultFormState);
                                             }}
                                         >
                                             Cancel
@@ -214,6 +268,9 @@ function SimulatorManagement() {
                                                 Name
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Hourly Price
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Type
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -232,6 +289,9 @@ function SimulatorManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                                                     {simulator.name}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {simulator.is_coaching_bay ? '—' : `$${Number(simulator.hourly_price || 0).toFixed(2)}`}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
                                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -294,6 +354,17 @@ function SimulatorManagement() {
                         )}
                     </div>
                 )}
+                <PopupMessage
+                    open={popup.open}
+                    type={popup.type}
+                    title={popup.title}
+                    message={popup.message}
+                    confirmText={popup.confirmText}
+                    cancelText={popup.cancelText}
+                    showCancel={popup.showCancel}
+                    onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
+                    onClose={closePopup}
+                />
             </div>
     );
 }

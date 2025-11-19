@@ -5,6 +5,8 @@ import { getStaff, getStaffAvailability, updateStaffAvailability, setSelectedSta
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { localTimeToUTC, utcTimeToLocal } from '../utils/timezone';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 const DAYS_OF_WEEK = [
     { value: 0, label: 'Monday' },
@@ -20,6 +22,7 @@ function StaffAvailability() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { id } = useParams();
+    const { popup, openPopup, closePopup } = usePopup();
     const { list: staff, loading, selectedStaff, availability } = useAppSelector((state) => state.admin.staff);
     const [showAddDay, setShowAddDay] = useState(false);
     const [newAvailability, setNewAvailability] = useState({ 
@@ -27,6 +30,7 @@ function StaffAvailability() {
         start_time: '09:00', 
         end_time: '17:00' 
     });
+    const [addingAvailability, setAddingAvailability] = useState(false);
 
     useEffect(() => {
         dispatch(getStaff());
@@ -58,7 +62,11 @@ function StaffAvailability() {
         if (!selectedStaff) return;
         
         if (newAvailability.day_of_week === '') {
-            alert('Please select a day of week');
+            openPopup({
+                type: 'warning',
+                title: 'Select a day',
+                message: 'Please select a day of the week before adding availability.',
+            });
             return;
         }
 
@@ -71,7 +79,11 @@ function StaffAvailability() {
         );
         
         if (exists) {
-            alert('This day and time slot already exists. Please select a different time.');
+            openPopup({
+                type: 'warning',
+                title: 'Slot already exists',
+                message: 'This day and time slot already exists. Please choose a different start time.',
+            });
             return;
         }
 
@@ -84,19 +96,24 @@ function StaffAvailability() {
                 end_time: localTimeToUTC(newAvailability.end_time)
             }
         ];
-        
-        await dispatch(updateStaffAvailability({ 
-            staffId: selectedStaff.id, 
-            availabilityData: updatedAvailability 
-        }));
 
-        // Reset form
-        setNewAvailability({ 
-            day_of_week: '', 
-            start_time: '09:00', 
-            end_time: '17:00' 
-        });
-        setShowAddDay(false);
+        setAddingAvailability(true);
+        try {
+            await dispatch(updateStaffAvailability({ 
+                staffId: selectedStaff.id, 
+                availabilityData: updatedAvailability 
+            }));
+
+            // Reset form
+            setNewAvailability({ 
+                day_of_week: '', 
+                start_time: '09:00', 
+                end_time: '17:00' 
+            });
+            setShowAddDay(false);
+        } finally {
+            setAddingAvailability(false);
+        }
     };
 
     const handleUpdateAvailability = async (availabilityId, field, value) => {
@@ -124,17 +141,23 @@ function StaffAvailability() {
     const handleDeleteAvailability = async (availabilityId) => {
         if (!selectedStaff) return;
         
-        if (!window.confirm('Are you sure you want to delete this availability?')) {
-            return;
-        }
-
-        const availabilityArray = Array.isArray(availability) ? availability : [];
-        const updatedAvailability = availabilityArray.filter(avail => avail.id !== availabilityId);
-        
-        await dispatch(updateStaffAvailability({ 
-            staffId: selectedStaff.id, 
-            availabilityData: updatedAvailability 
-        }));
+        openPopup({
+            type: 'warning',
+            title: 'Delete availability?',
+            message: 'This will remove the selected availability slot for this staff member.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: async () => {
+                const availabilityArray = Array.isArray(availability) ? availability : [];
+                const updatedAvailability = availabilityArray.filter(avail => avail.id !== availabilityId);
+                
+                await dispatch(updateStaffAvailability({ 
+                    staffId: selectedStaff.id, 
+                    availabilityData: updatedAvailability 
+                }));
+            },
+        });
     };
 
     const availabilityArray = Array.isArray(availability) ? availability : [];
@@ -247,9 +270,10 @@ function StaffAvailability() {
                                 <div className="flex items-end space-x-2">
                                     <button
                                         onClick={handleAddAvailability}
-                                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                        disabled={addingAvailability}
+                                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                                     >
-                                        Add
+                                        {addingAvailability ? 'Adding...' : 'Add'}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -350,6 +374,23 @@ function StaffAvailability() {
                     )}
                 </div>
             )}
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? async () => {
+                    const action = popup.onConfirm;
+                    closePopup();
+                    if (action) {
+                        await action();
+                    }
+                } : closePopup}
+                onClose={closePopup}
+            />
         </div>
     );
 }

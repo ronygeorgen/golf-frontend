@@ -5,6 +5,8 @@ import { getSimulators, getSimulatorAvailability, updateSimulatorAvailability, s
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import { localTimeToUTC, utcTimeToLocal } from '../utils/timezone';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 const DAYS_OF_WEEK = [
     { value: 0, label: 'Monday' },
@@ -20,6 +22,7 @@ function SimulatorAvailability() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { id } = useParams();
+    const { popup, openPopup, closePopup } = usePopup();
     const { list: simulators, loading } = useAppSelector((state) => state.admin.simulators);
     const { selectedSimulator, availability } = useAppSelector((state) => state.admin.simulators);
     const [showAddDay, setShowAddDay] = useState(false);
@@ -59,7 +62,11 @@ function SimulatorAvailability() {
         if (!selectedSimulator) return;
         
         if (newAvailability.day_of_week === '') {
-            alert('Please select a day of week');
+            openPopup({
+                type: 'warning',
+                title: 'Select a day',
+                message: 'Please choose a day of the week before adding availability.',
+            });
             return;
         }
 
@@ -74,7 +81,11 @@ function SimulatorAvailability() {
         );
         
         if (exists) {
-            alert('This day and time slot already exists. Please select a different time.');
+            openPopup({
+                type: 'warning',
+                title: 'Slot already exists',
+                message: 'This day and time slot already exists. Please choose a different time.',
+            });
             return;
         }
 
@@ -129,19 +140,25 @@ function SimulatorAvailability() {
     const handleDeleteAvailability = async (availabilityId) => {
         if (!selectedSimulator) return;
         
-        if (!window.confirm('Are you sure you want to delete this availability?')) {
-            return;
-        }
-
-        const availabilityArray = selectedSimulator.id in availability 
-            ? availability[selectedSimulator.id] 
-            : [];
-        const updatedAvailability = availabilityArray.filter(avail => avail.id !== availabilityId);
-        
-        await dispatch(updateSimulatorAvailability({ 
-            simulatorId: selectedSimulator.id, 
-            availabilityData: updatedAvailability 
-        }));
+        openPopup({
+            type: 'warning',
+            title: 'Delete availability?',
+            message: 'This will remove the selected availability slot for this simulator.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: async () => {
+                const availabilityArray = selectedSimulator.id in availability 
+                    ? availability[selectedSimulator.id] 
+                    : [];
+                const updatedAvailability = availabilityArray.filter(avail => avail.id !== availabilityId);
+                
+                await dispatch(updateSimulatorAvailability({ 
+                    simulatorId: selectedSimulator.id, 
+                    availabilityData: updatedAvailability 
+                }));
+            },
+        });
     };
 
     const availabilityArray = selectedSimulator && selectedSimulator.id in availability
@@ -356,6 +373,23 @@ function SimulatorAvailability() {
                     )}
                 </div>
             )}
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? async () => {
+                    const action = popup.onConfirm;
+                    closePopup();
+                    if (action) {
+                        await action();
+                    }
+                } : closePopup}
+                onClose={closePopup}
+            />
         </div>
     );
 }

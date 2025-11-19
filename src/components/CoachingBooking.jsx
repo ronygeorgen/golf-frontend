@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkCoachingAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
 import { getActiveCoachingPackages, getMyPackagePurchases, createPackagePurchase } from '../store/slices/coachingSlice';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 function CoachingBooking() {
     const dispatch = useAppDispatch();
+    const { popup, openPopup, closePopup } = usePopup();
     const { availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
     const { packages, purchases, purchaseSubmitting, purchasesLoading } = useAppSelector((state) => state.coaching);
     
@@ -55,32 +58,56 @@ function CoachingBooking() {
 
     const handlePurchasePackage = async () => {
         if (!selectedPackage) {
-            alert('Select a coaching package first.');
+            openPopup({
+                type: 'warning',
+                title: 'Select a package',
+                message: 'Please choose a coaching package first.',
+            });
             return;
         }
 
         const result = await dispatch(createPackagePurchase({ packageId: selectedPackage }));
         if (createPackagePurchase.fulfilled.match(result)) {
             dispatch(getMyPackagePurchases());
-            alert('Package sessions added. You can now book your coaching session.');
+            openPopup({
+                type: 'success',
+                title: 'Sessions added',
+                message: 'Package sessions added. You can now book your coaching session.',
+            });
         } else {
-            alert('Unable to add package sessions: ' + (result.payload?.error || 'Unknown error'));
+            openPopup({
+                type: 'error',
+                title: 'Purchase failed',
+                message: result.payload?.error || 'Unable to add package sessions.',
+            });
         }
     };
 
     const checkAvailability = async () => {
         if (!date) {
-            alert('Please select a date');
+            openPopup({
+                type: 'warning',
+                title: 'Select a date',
+                message: 'Please choose a date before checking availability.',
+            });
             return;
         }
 
         if (!selectedPackage) {
-            alert('Please select a coaching package');
+            openPopup({
+                type: 'warning',
+                title: 'Select a package',
+                message: 'Please choose a coaching package before checking availability.',
+            });
             return;
         }
         
         if (!hasSessions) {
-            alert('You are out of sessions for this package. Please purchase another package to continue.');
+            openPopup({
+                type: 'warning',
+                title: 'No sessions remaining',
+                message: 'You are out of sessions for this package. Please purchase another package to continue.',
+            });
             return;
         }
 
@@ -187,17 +214,29 @@ function CoachingBooking() {
 
     const handleBooking = async () => {
         if (!selectedSlot) {
-            alert('Please select a time slot');
+            openPopup({
+                type: 'warning',
+                title: 'Select a slot',
+                message: 'Please choose a time slot before confirming your coaching session.',
+            });
             return;
         }
 
         if (!selectedSlot.available_coaches || selectedSlot.available_coaches.length === 0) {
-            alert('No coach available for this slot');
+            openPopup({
+                type: 'warning',
+                title: 'No coach available',
+                message: 'No coach is available for this slot. Please select another time.',
+            });
             return;
         }
         
         if (!hasSessions) {
-            alert('You are out of sessions for this package.');
+            openPopup({
+                type: 'warning',
+                title: 'No sessions remaining',
+                message: 'You are out of sessions for this package. Please purchase additional sessions.',
+            });
             return;
         }
 
@@ -223,9 +262,17 @@ function CoachingBooking() {
                 const errorText = Object.entries(errorMessage)
                     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
                     .join('\n');
-                alert('Error creating booking:\n' + errorText);
+                openPopup({
+                    type: 'error',
+                    title: 'Booking failed',
+                    message: `Error creating booking:\n${errorText}`,
+                });
             } else {
-                alert('Error creating booking: ' + errorMessage);
+                openPopup({
+                    type: 'error',
+                    title: 'Booking failed',
+                    message: `Error creating booking: ${errorMessage}`,
+                });
             }
         }
     };
@@ -547,6 +594,23 @@ function CoachingBooking() {
                     )}
                 </div>
             )}
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? async () => {
+                    const action = popup.onConfirm;
+                    closePopup();
+                    if (action) {
+                        await action();
+                    }
+                } : closePopup}
+                onClose={closePopup}
+            />
         </div>
     );
 }

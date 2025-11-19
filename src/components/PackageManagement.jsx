@@ -3,9 +3,12 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getPackages, createPackage, updatePackage, deletePackage } from '../store/slices/adminSlice';
 import { getStaff } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
 
 function PackageManagement() {
     const dispatch = useAppDispatch();
+    const { popup, openPopup, closePopup } = usePopup();
     const { list: packages, loading: packagesLoading } = useAppSelector((state) => state.admin.packages);
     const { list: staff } = useAppSelector((state) => state.admin.staff);
     const modalRef = useRef(null);
@@ -22,6 +25,14 @@ function PackageManagement() {
         is_active: true
     };
     const [formData, setFormData] = useState(emptyForm);
+    const [submitLoading, setSubmitLoading] = useState(false);
+    const handlePopupConfirm = async () => {
+        const action = popup.onConfirm;
+        closePopup();
+        if (action) {
+            await action();
+        }
+    };
 
     useEffect(() => {
         dispatch(getPackages());
@@ -58,16 +69,21 @@ function PackageManagement() {
             ...formData,
             staff_members: cleanedStaffMembers
         };
-        
-        if (editingPackage) {
-            await dispatch(updatePackage({ id: editingPackage.id, packageData: cleanedFormData }));
-        } else {
-            await dispatch(createPackage(cleanedFormData));
+
+        setSubmitLoading(true);
+        try {
+            if (editingPackage) {
+                await dispatch(updatePackage({ id: editingPackage.id, packageData: cleanedFormData }));
+            } else {
+                await dispatch(createPackage(cleanedFormData));
+            }
+            setShowForm(false);
+            setEditingPackage(null);
+            setFormData(emptyForm);
+            // No need to refetch - Redux already updates the state optimistically
+        } finally {
+            setSubmitLoading(false);
         }
-        setShowForm(false);
-        setEditingPackage(null);
-        setFormData(emptyForm);
-        // No need to refetch - Redux already updates the state optimistically
     };
 
     const handleEdit = (pkg) => {
@@ -107,13 +123,21 @@ function PackageManagement() {
     };
 
     const handleDelete = async (packageId) => {
-        if (window.confirm('Are you sure you want to delete this package?')) {
-            await dispatch(deletePackage(packageId));
-            // No need to refetch - Redux already updates the state optimistically
-        }
+        openPopup({
+            type: 'warning',
+            title: 'Delete package?',
+            message: 'This will remove the package and its assigned staff.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: async () => {
+                await dispatch(deletePackage(packageId));
+            },
+        });
     };
 
     return (
+        <>
         <div className="max-w-7xl mx-auto">
                 <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -239,9 +263,12 @@ function PackageManagement() {
                                     <div className="flex gap-4 pt-4">
                                         <button 
                                             type="submit" 
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            disabled={submitLoading}
+                                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                                         >
-                                            {editingPackage ? 'Update' : 'Create'} Package
+                                            {submitLoading
+                                                ? (editingPackage ? 'Updating...' : 'Creating...')
+                                                : `${editingPackage ? 'Update' : 'Create'} Package`}
                                         </button>
                                         <button 
                                             type="button" 
@@ -372,6 +399,18 @@ function PackageManagement() {
                     </div>
                 )}
             </div>
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
+                onClose={closePopup}
+            />
+        </>
     );
 }
 
