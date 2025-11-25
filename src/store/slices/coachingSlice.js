@@ -43,15 +43,102 @@ export const getMyPackagePurchases = createAsyncThunk(
 
 export const createPackagePurchase = createAsyncThunk(
     'coaching/createPackagePurchase',
-    async ({ packageId, notes }, { rejectWithValue }) => {
+    async ({ packageId, notes, purchaseType = 'normal', recipientPhone, purchaseName }, { rejectWithValue }) => {
         try {
             const payload = {
                 package: packageId,
+                purchase_type: purchaseType,
+                purchase_name: purchaseName,
             };
             if (notes) {
                 payload.notes = notes;
             }
+            if (purchaseType === 'gift' && recipientPhone) {
+                payload.recipient_phone = recipientPhone;
+            }
             const response = await apiClient.post(endpoints.coaching.purchases, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getGiftsPending = createAsyncThunk(
+    'coaching/getGiftsPending',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.giftsPending);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const claimGift = createAsyncThunk(
+    'coaching/claimGift',
+    async ({ token, action }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.coaching.giftClaim(token), { action });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const checkPhoneExists = createAsyncThunk(
+    'coaching/checkPhoneExists',
+    async (phone, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.checkPhone, {
+                params: { phone }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const createSessionTransfer = createAsyncThunk(
+    'coaching/createSessionTransfer',
+    async ({ packagePurchaseId, toUserPhone, sessionCount, notes }, { rejectWithValue }) => {
+        try {
+            const payload = {
+                package_purchase: packagePurchaseId,
+                to_user_phone: toUserPhone,
+                session_count: sessionCount,
+            };
+            if (notes) {
+                payload.notes = notes;
+            }
+            const response = await apiClient.post(endpoints.coaching.transfers, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getTransfersPending = createAsyncThunk(
+    'coaching/getTransfersPending',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.transfersPending);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const claimTransfer = createAsyncThunk(
+    'coaching/claimTransfer',
+    async ({ transferId, action }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.coaching.transferClaim(transferId), { action });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -64,9 +151,15 @@ const initialState = {
     packages: [],
     activePackages: [],
     purchases: [],
+    giftsPending: [],
+    transfersPending: [],
+    phoneCheck: null,
     loading: false,
     purchasesLoading: false,
     purchaseSubmitting: false,
+    phoneChecking: false,
+    giftsLoading: false,
+    transfersLoading: false,
     error: null,
 };
 
@@ -77,6 +170,9 @@ const coachingSlice = createSlice({
     reducers: {
         clearError: (state) => {
             state.error = null;
+        },
+        clearPhoneCheck: (state) => {
+            state.phoneCheck = null;
         },
     },
     extraReducers: (builder) => {
@@ -129,10 +225,68 @@ const coachingSlice = createSlice({
             .addCase(createPackagePurchase.rejected, (state, action) => {
                 state.purchaseSubmitting = false;
                 state.error = action.payload;
+            })
+            .addCase(getGiftsPending.pending, (state) => {
+                state.giftsLoading = true;
+            })
+            .addCase(getGiftsPending.fulfilled, (state, action) => {
+                state.giftsLoading = false;
+                state.giftsPending = action.payload;
+            })
+            .addCase(getGiftsPending.rejected, (state, action) => {
+                state.giftsLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(claimGift.fulfilled, (state, action) => {
+                // Remove from pending and add to purchases if accepted
+                state.giftsPending = state.giftsPending.filter(
+                    gift => gift.id !== action.payload.purchase?.id
+                );
+                if (action.payload.purchase) {
+                    state.purchases = [action.payload.purchase, ...state.purchases];
+                }
+            })
+            .addCase(checkPhoneExists.pending, (state) => {
+                state.phoneChecking = true;
+            })
+            .addCase(checkPhoneExists.fulfilled, (state, action) => {
+                state.phoneChecking = false;
+                state.phoneCheck = action.payload;
+            })
+            .addCase(checkPhoneExists.rejected, (state, action) => {
+                state.phoneChecking = false;
+                state.phoneCheck = { exists: false };
+            })
+            .addCase(createSessionTransfer.fulfilled, (state, action) => {
+                // Update the purchase to reflect transferred sessions
+                const purchase = state.purchases.find(p => p.id === action.payload.package_purchase);
+                if (purchase) {
+                    purchase.sessions_remaining -= action.payload.session_count;
+                }
+            })
+            .addCase(getTransfersPending.pending, (state) => {
+                state.transfersLoading = true;
+            })
+            .addCase(getTransfersPending.fulfilled, (state, action) => {
+                state.transfersLoading = false;
+                state.transfersPending = action.payload;
+            })
+            .addCase(getTransfersPending.rejected, (state, action) => {
+                state.transfersLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(claimTransfer.fulfilled, (state, action) => {
+                // Remove from pending and add to purchases if accepted
+                state.transfersPending = state.transfersPending.filter(
+                    transfer => transfer.id !== action.payload.transfer?.id
+                );
+                if (action.payload.new_purchase) {
+                    state.purchases = [action.payload.new_purchase, ...state.purchases];
+                }
             });
     },
 });
 
-export const { clearError } = coachingSlice.actions;
+export const { clearError, clearPhoneCheck } = coachingSlice.actions;
 export default coachingSlice.reducer;
 

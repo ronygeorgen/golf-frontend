@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkCoachingAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
-import { getActiveCoachingPackages, getMyPackagePurchases, createPackagePurchase } from '../store/slices/coachingSlice';
+import { getActiveCoachingPackages, getMyPackagePurchases } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 
 function CoachingBooking() {
     const dispatch = useAppDispatch();
+    const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
     const { packages, purchases, purchaseSubmitting, purchasesLoading } = useAppSelector((state) => state.coaching);
@@ -57,30 +59,7 @@ function CoachingBooking() {
     }, [packageSessionDuration]);
 
     const handlePurchasePackage = async () => {
-        if (!selectedPackage) {
-            openPopup({
-                type: 'warning',
-                title: 'Select a package',
-                message: 'Please choose a coaching package first.',
-            });
-            return;
-        }
-
-        const result = await dispatch(createPackagePurchase({ packageId: selectedPackage }));
-        if (createPackagePurchase.fulfilled.match(result)) {
-            dispatch(getMyPackagePurchases());
-            openPopup({
-                type: 'success',
-                title: 'Sessions added',
-                message: 'Package sessions added. You can now book your coaching session.',
-            });
-        } else {
-            openPopup({
-                type: 'error',
-                title: 'Purchase failed',
-                message: result.payload?.error || 'Unable to add package sessions.',
-            });
-        }
+        navigate('/packages');
     };
 
     const checkAvailability = async () => {

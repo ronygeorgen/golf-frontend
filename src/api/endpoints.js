@@ -91,6 +91,12 @@ export const endpoints = {
         active: '/coaching/packages/active_packages/',
         purchases: '/coaching/purchases/',
         myPurchases: '/coaching/purchases/my/',
+        giftsPending: '/coaching/purchases/gifts_pending/',
+        giftClaim: (token) => `/coaching/gifts/claim/${token}/`,
+        transfers: '/coaching/transfers/',
+        transfersPending: '/coaching/transfers/pending/',
+        transferClaim: (id) => `/coaching/transfers/${id}/claim/`,
+        checkPhone: '/coaching/users/check-phone/',
     },
 };
 

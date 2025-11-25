@@ -17,6 +17,7 @@ import CalendarView from './components/CalendarView';
 import AdminLayout from './components/AdminLayout';
 import UserLayout from './components/UserLayout';
 import AdminOverrides from './components/AdminOverrides';
+import Packages from './pages/Packages';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -93,6 +94,7 @@ function App() {
                         <Route path="portal" element={<ClientPortal />} />
                         <Route path="booking" element={<Booking />} />
                         <Route path="calendar" element={<CalendarView isUserView={true} />} />
+                        <Route path="packages" element={<Packages />} />
                     </Route>
 
                     {/* Admin Routes with AdminLayout */}

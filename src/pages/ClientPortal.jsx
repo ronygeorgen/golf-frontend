@@ -4,6 +4,10 @@ import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBook
 import { useNavigate } from 'react-router-dom';
 import { BookingCardSkeleton } from '../components/skeletons/SkeletonLoader';
 import PopupMessage from '../components/PopupMessage';
+import GiftClaim from '../components/GiftClaim';
+import TransferClaim from '../components/TransferClaim';
+import SessionTransfer from '../components/SessionTransfer';
+import { getGiftsPending, getTransfersPending } from '../store/slices/coachingSlice';
 import usePopup from '../hooks/usePopup';
 
 function ClientPortal() {
@@ -11,6 +15,7 @@ function ClientPortal() {
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
     const { upcomingBookings, loading, simulatorCredits, upcomingPagination } = useAppSelector((state) => state.booking);
+    const { giftsPending, transfersPending } = useAppSelector((state) => state.coaching);
     const { popup, openPopup, closePopup } = usePopup();
     const [cancellingId, setCancellingId] = useState(null);
     const [rescheduleTarget, setRescheduleTarget] = useState(null);
@@ -20,6 +25,7 @@ function ClientPortal() {
     const [rescheduleError, setRescheduleError] = useState(null);
     const [bookingType, setBookingType] = useState('all');
     const [page, setPage] = useState(1);
+    const [activeTab, setActiveTab] = useState('bookings');
     const availableSimCredits = simulatorCredits?.length || 0;
     const totalPages = upcomingPagination?.totalPages || 1;
     const pageSize = upcomingPagination?.pageSize || 5; // 5 items per page for upcoming bookings
@@ -31,6 +37,11 @@ function ClientPortal() {
 
     useEffect(() => {
         dispatch(getSimulatorCredits());
+    }, [dispatch]);
+
+    useEffect(() => {
+        dispatch(getGiftsPending());
+        dispatch(getTransfersPending());
     }, [dispatch]);
 
     useEffect(() => {
@@ -194,6 +205,53 @@ function ClientPortal() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2">
+                        {/* Tabs */}
+                        <div className="bg-white rounded-lg shadow-md mb-6">
+                            <div className="border-b border-gray-200">
+                                <nav className="flex -mb-px">
+                                    {[
+                                        { id: 'bookings', label: 'Bookings' },
+                                        { id: 'gifts', label: 'Gifts', pending: giftsPending?.length || 0 },
+                                        { id: 'transfers', label: 'Transfers', pending: transfersPending?.length || 0 },
+                                        { id: 'send-transfer', label: 'Send Transfer' },
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
+                                                activeTab === tab.id
+                                                    ? 'border-blue-500 text-blue-600'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            }`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {tab.label}
+                                                {tab.pending > 0 && (
+                                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
+                                                        <svg
+                                                            className="w-3 h-3"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M12 8v4l2.5 2.5M12 22a10 10 0 100-20 10 10 0 000 20z"
+                                                            />
+                                                        </svg>
+                                                        {tab.pending}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </nav>
+                            </div>
+                        </div>
+
+                        {activeTab === 'bookings' && (
                         <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                                 <h2 className="text-xl font-bold text-gray-900">Upcoming Bookings</h2>
@@ -365,6 +423,25 @@ function ClientPortal() {
                                 </div>
                             )}
                         </div>
+                        )}
+
+                        {activeTab === 'gifts' && (
+                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+                                <GiftClaim />
+                            </div>
+                        )}
+
+                        {activeTab === 'transfers' && (
+                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+                                <TransferClaim />
+                            </div>
+                        )}
+
+                        {activeTab === 'send-transfer' && (
+                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+                                <SessionTransfer />
+                            </div>
+                        )}
                     </div>
 
                     <div>

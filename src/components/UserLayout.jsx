@@ -38,6 +38,7 @@ function UserLayout() {
         if (path === '/portal') return 'My Portal';
         if (path === '/calendar') return 'My Calendar';
         if (path === '/booking') return 'Book a Session';
+        if (path === '/packages') return 'Packages & Gifts';
         return 'Dashboard';
     };
 
@@ -95,6 +96,16 @@ function UserLayout() {
                                         <Calendar className="w-4 h-4" />
                                         <span>Calendar</span>
                                     </div>
+                                </button>
+                                <button
+                                    onClick={() => navigate('/packages')}
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        location.pathname === '/packages'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    Packages
                                 </button>
                             </nav>
 
