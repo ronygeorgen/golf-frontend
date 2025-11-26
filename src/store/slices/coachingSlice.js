@@ -56,6 +56,10 @@ export const createPackagePurchase = createAsyncThunk(
             if (purchaseType === 'gift' && recipientPhone) {
                 payload.recipient_phone = recipientPhone;
             }
+            const locationId = localStorage.getItem('ghlLocationId');
+            if (locationId) {
+                payload.location_id = locationId;
+            }
             const response = await apiClient.post(endpoints.coaching.purchases, payload);
             return response.data;
         } catch (error) {

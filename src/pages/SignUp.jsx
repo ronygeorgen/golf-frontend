@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, clearError } from '../store/slices/authSlice';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function SignUp() {
     const dispatch = useAppDispatch();
@@ -18,6 +20,20 @@ function SignUp() {
     });
     
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const locationId = searchParams.get('location');
+        if (locationId) {
+            localStorage.setItem('ghlLocationId', locationId);
+            const onboardFlag = `ghlOnboarded:${locationId}`;
+            if (!localStorage.getItem(onboardFlag)) {
+                apiClient.post(endpoints.ghl.onboard, { location_id: locationId })
+                    .then(() => localStorage.setItem(onboardFlag, 'true'))
+                    .catch(() => {});
+            }
+        }
+    }, [searchParams]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

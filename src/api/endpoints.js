@@ -98,5 +98,9 @@ export const endpoints = {
         transferClaim: (id) => `/coaching/transfers/${id}/claim/`,
         checkPhone: '/coaching/users/check-phone/',
     },
+
+    ghl: {
+        onboard: '/ghlpage/onboard/',
+    },
 };
 

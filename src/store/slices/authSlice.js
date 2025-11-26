@@ -39,7 +39,12 @@ export const requestOTP = createAsyncThunk(
     'auth/requestOTP',
     async (phone, { rejectWithValue }) => {
         try {
-            const response = await apiClient.post(endpoints.auth.requestOTP, { phone });
+            const payload = { phone };
+            const locationId = localStorage.getItem('ghlLocationId');
+            if (locationId) {
+                payload.location_id = locationId;
+            }
+            const response = await apiClient.post(endpoints.auth.requestOTP, payload);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -51,7 +56,16 @@ export const verifyOTP = createAsyncThunk(
     'auth/verifyOTP',
     async ({ phone, otp }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.post(endpoints.auth.verifyOTP, { phone, otp });
+            const payload = { phone, otp };
+            // Get location_id from localStorage (set from URL parameter ?location=)
+            const locationId = localStorage.getItem('ghlLocationId');
+            if (locationId && locationId.trim()) {
+                payload.location_id = locationId.trim();
+                console.log('Sending location_id to backend:', payload.location_id);
+            } else {
+                console.warn('No location_id found in localStorage for GHL sync');
+            }
+            const response = await apiClient.post(endpoints.auth.verifyOTP, payload);
             if (response.data.token) {
                 localStorage.setItem('token', response.data.token);
                 localStorage.setItem('user', JSON.stringify(response.data.user));

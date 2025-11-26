@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/authSlice';
+import { requestOTP, verifyOTP, clearError } from '../store/slices/authSlice';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function SignIn() {
     const dispatch = useAppDispatch();
@@ -12,6 +14,23 @@ function SignIn() {
     const [step, setStep] = useState('phone');
     
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const locationId = searchParams.get('location');
+        if (locationId && locationId.trim()) {
+            // Store location_id for use during OTP verification
+            const cleanLocationId = locationId.trim();
+            localStorage.setItem('ghlLocationId', cleanLocationId);
+            console.log('Stored GHL location_id from URL:', cleanLocationId);
+            // Note: Onboarding is now done via OAuth flow at /api/ghlpage/onboard/
+            // No need to POST here - just store the location_id for later use
+        } else {
+            // Clear if no location in URL
+            localStorage.removeItem('ghlLocationId');
+            console.log('No location parameter in URL, cleared ghlLocationId from localStorage');
+        }
+    }, [searchParams]);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
