@@ -118,22 +118,22 @@ function Packages() {
                                     <p>Session length: {pkg.session_duration_minutes} minutes</p>
                                     <p>You currently have <span className="font-semibold text-gray-800">{ownedSessions}</span> session(s) remaining for this package.</p>
                                 </div>
-                                <div className="flex flex-col gap-3">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
                                     <button
                                         onClick={() => handleOpenModal(pkg.id, 'normal')}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
+                                        className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
                                     >
                                         Buy for Myself
                                     </button>
                                     <button
                                         onClick={() => handleOpenModal(pkg.id, 'gift')}
-                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
+                                        className="w-full sm:flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
                                     >
                                         Gift Entire Package
                                     </button>
                                     <button
                                         onClick={() => handleOpenModal(pkg.id, 'organization')}
-                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
+                                        className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
                                     >
                                         Buy for Organization
                                     </button>
