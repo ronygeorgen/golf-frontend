@@ -10,6 +10,7 @@ import PackagePurchaseModal from '../components/PackagePurchaseModal';
 import SessionTransfer from '../components/SessionTransfer';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
+import { Skeleton } from '../components/skeletons/SkeletonLoader';
 
 function Packages() {
     const dispatch = useAppDispatch();
@@ -63,8 +64,29 @@ function Packages() {
                 </div>
 
                 {loading && (
-                    <div className="text-center py-6 text-gray-500">
-                        Loading packages...
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <div key={idx} className="border border-gray-200 rounded-xl p-5 shadow-sm bg-white space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1 pr-4">
+                                        <Skeleton height="24px" width="70%" className="mb-2" />
+                                        <Skeleton height="16px" width="90%" />
+                                    </div>
+                                    <div className="text-right space-y-2">
+                                        <Skeleton height="28px" width="80px" />
+                                        <Skeleton height="16px" width="60px" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Skeleton height="16px" width="60%" />
+                                    <Skeleton height="16px" width="80%" />
+                                </div>
+                                <div className="flex flex-col gap-3">
+                                    <Skeleton height="44px" />
+                                    <Skeleton height="44px" />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
 
@@ -109,6 +131,12 @@ function Packages() {
                                     >
                                         Gift Entire Package
                                     </button>
+                                    <button
+                                        onClick={() => handleOpenModal(pkg.id, 'organization')}
+                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
+                                    >
+                                        Buy for Organization
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -138,7 +166,19 @@ function Packages() {
                     </button>
                 </div>
                 {purchasesLoading ? (
-                    <div className="text-center text-gray-500 py-6">Loading purchases...</div>
+                    <div className="grid gap-4">
+                        {Array.from({ length: 3 }).map((_, idx) => (
+                            <div key={idx} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
+                                <Skeleton height="20px" width="50%" />
+                                <Skeleton height="16px" width="70%" />
+                                <Skeleton height="16px" width="60%" />
+                                <div className="flex items-center justify-between">
+                                    <Skeleton height="24px" width="100px" rounded="rounded-full" />
+                                    <Skeleton height="14px" width="120px" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : purchases.length === 0 ? (
                     <div className="text-center text-gray-500 py-6">You haven&apos;t purchased any packages yet.</div>
                 ) : (
@@ -152,7 +192,6 @@ function Packages() {
                                 <div key={purchase.id} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                         <div>
-                                            <p className="text-sm text-gray-500 uppercase tracking-wide">Purchase Name</p>
                                             <h3 className="text-lg font-semibold text-gray-900">{purchase.purchase_name}</h3>
                                             <p className="text-sm text-gray-600">
                                                 Package: {purchase.package_details?.title}

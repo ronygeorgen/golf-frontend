@@ -23,6 +23,9 @@ function PackagePurchaseModal({
     const [recipientPhone, setRecipientPhone] = useState('');
     const [phoneValidated, setPhoneValidated] = useState(false);
     const [notes, setNotes] = useState('');
+    const [memberPhones, setMemberPhones] = useState([]); // [{phone: string, validated: boolean, name: string}]
+    const [newMemberPhone, setNewMemberPhone] = useState('');
+    const [validatingMemberPhone, setValidatingMemberPhone] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -32,6 +35,8 @@ function PackagePurchaseModal({
             setRecipientPhone('');
             setPhoneValidated(false);
             setNotes('');
+            setMemberPhones([]);
+            setNewMemberPhone('');
             // Clear phone check state
             dispatch(clearPhoneCheck());
             // Close any open popups
@@ -43,6 +48,8 @@ function PackagePurchaseModal({
             setRecipientPhone('');
             setPhoneValidated(false);
             setNotes('');
+            setMemberPhones([]);
+            setNewMemberPhone('');
             // Clear phone check state
             dispatch(clearPhoneCheck());
             // Close any open popups
@@ -94,6 +101,58 @@ function PackagePurchaseModal({
         }
     };
 
+    const handleAddMember = async () => {
+        if (!newMemberPhone.trim()) {
+            openPopup({
+                type: 'warning',
+                title: 'Phone Required',
+                message: 'Please enter a phone number.',
+            });
+            return;
+        }
+
+        // Check if already added
+        if (memberPhones.some(m => m.phone === newMemberPhone.trim())) {
+            openPopup({
+                type: 'warning',
+                title: 'Already Added',
+                message: 'This phone number is already in the member list.',
+            });
+            return;
+        }
+
+        setValidatingMemberPhone(true);
+        const result = await dispatch(checkPhoneExists(newMemberPhone.trim()));
+        setValidatingMemberPhone(false);
+
+        if (checkPhoneExists.fulfilled.match(result)) {
+            if (result.payload.exists) {
+                setMemberPhones([...memberPhones, {
+                    phone: newMemberPhone.trim(),
+                    validated: true,
+                    name: result.payload.name || result.payload.username
+                }]);
+                setNewMemberPhone('');
+            } else {
+                openPopup({
+                    type: 'error',
+                    title: 'User Not Found',
+                    message: 'No user found with this phone number. Members must be registered in the system.',
+                });
+            }
+        } else {
+            openPopup({
+                type: 'error',
+                title: 'Validation Error',
+                message: result.payload?.error || 'Unable to validate phone number.',
+            });
+        }
+    };
+
+    const handleRemoveMember = (phone) => {
+        setMemberPhones(memberPhones.filter(m => m.phone !== phone));
+    };
+
     const handlePurchase = async () => {
         if (!purchaseName.trim()) {
             openPopup({
@@ -123,12 +182,24 @@ function PackagePurchaseModal({
             }
         }
 
+        if (purchaseType === 'organization') {
+            if (memberPhones.length === 0) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Members Required',
+                    message: 'Please add at least one member to the organization package.',
+                });
+                return;
+            }
+        }
+
         const result = await dispatch(createPackagePurchase({
             packageId,
             notes: notes.trim() || undefined,
             purchaseType,
             recipientPhone: purchaseType === 'gift' ? recipientPhone.trim() : undefined,
             purchaseName: purchaseName.trim(),
+            memberPhones: purchaseType === 'organization' ? memberPhones.map(m => m.phone) : undefined,
         }));
 
         if (createPackagePurchase.fulfilled.match(result)) {
@@ -247,6 +318,78 @@ function PackagePurchaseModal({
                                                 <div className="text-sm text-gray-500">Send this package to someone else</div>
                                             </div>
                                         </label>
+                                        <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                            <input
+                                                type="radio"
+                                                name="purchaseType"
+                                                value="organization"
+                                                checked={purchaseType === 'organization'}
+                                                onChange={(e) => setPurchaseType(e.target.value)}
+                                                className="mr-3"
+                                            />
+                                            <div>
+                                                <div className="font-medium text-gray-900">Buy for Organization</div>
+                                                <div className="text-sm text-gray-500">Share this package with multiple members</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {purchaseType === 'organization' && (
+                                <div className="space-y-3 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Add Organization Members
+                                        </label>
+                                        <div className="flex gap-2 mb-3">
+                                            <input
+                                                type="tel"
+                                                value={newMemberPhone}
+                                                onChange={(e) => setNewMemberPhone(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && handleAddMember()}
+                                                placeholder="Enter member phone number"
+                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleAddMember}
+                                                disabled={validatingMemberPhone || !newMemberPhone.trim()}
+                                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                            >
+                                                {validatingMemberPhone ? 'Checking...' : 'Add'}
+                                            </button>
+                                        </div>
+                                        {memberPhones.length > 0 && (
+                                            <div className="space-y-2">
+                                                <p className="text-sm font-medium text-gray-700">Members ({memberPhones.length}):</p>
+                                                {memberPhones.map((member, index) => (
+                                                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                                                        <div className="flex items-center">
+                                                            <svg className="h-4 w-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                            </svg>
+                                                            <span className="text-sm text-gray-900">{member.phone}</span>
+                                                            {member.name && (
+                                                                <span className="text-sm text-gray-500 ml-2">({member.name})</span>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveMember(member.phone)}
+                                                            className="text-red-600 hover:text-red-800"
+                                                        >
+                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-600 mt-2">
+                                            All members (including you) can use sessions from this package. First-come-first-served basis.
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -310,10 +453,10 @@ function PackagePurchaseModal({
                         <button
                             type="button"
                             onClick={handlePurchase}
-                            disabled={purchaseSubmitting || (purchaseType === 'gift' && !phoneValidated)}
+                            disabled={purchaseSubmitting || (purchaseType === 'gift' && !phoneValidated) || (purchaseType === 'organization' && memberPhones.length === 0)}
                             className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
-                            {purchaseSubmitting ? 'Processing...' : purchaseType === 'gift' ? 'Purchase Gift' : 'Purchase Package'}
+                            {purchaseSubmitting ? 'Processing...' : purchaseType === 'gift' ? 'Purchase Gift' : purchaseType === 'organization' ? 'Purchase for Organization' : 'Purchase Package'}
                         </button>
                         <button
                             type="button"

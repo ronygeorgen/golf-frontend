@@ -97,6 +97,7 @@ export const endpoints = {
         transfersPending: '/coaching/transfers/pending/',
         transferClaim: (id) => `/coaching/transfers/${id}/claim/`,
         checkPhone: '/coaching/users/check-phone/',
+        organizationPackages: '/coaching/purchases/organization_packages/',
     },
 
     ghl: {

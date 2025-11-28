@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkCoachingAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
-import { getActiveCoachingPackages, getMyPackagePurchases } from '../store/slices/coachingSlice';
+import { getActiveCoachingPackages, getMyPackagePurchases, getOrganizationPackages } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 
@@ -11,7 +11,7 @@ function CoachingBooking() {
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
-    const { packages, purchases, purchaseSubmitting, purchasesLoading } = useAppSelector((state) => state.coaching);
+    const { packages, purchases, organizationPackages, purchaseSubmitting, purchasesLoading, organizationPackagesLoading } = useAppSelector((state) => state.coaching);
     
     const DEFAULT_DURATION = 60;
     const [date, setDate] = useState('');
@@ -23,23 +23,42 @@ function CoachingBooking() {
     const [loading, setLoading] = useState(false);
     const [coaches, setCoaches] = useState([]);
     const [toast, setToast] = useState({ show: false, message: '' });
+    const [packageType, setPackageType] = useState('personal'); // 'personal' or 'organization'
     
     const selectedPackageData = selectedPackage
         ? packages.find((pkg) => pkg.id === selectedPackage)
         : null;
-    // Sum up all remaining sessions from all purchases for this package
-    const sessionsRemaining = selectedPackage
+    
+    // Calculate sessions remaining for personal/gifted packages (exclude organization)
+    const personalSessionsRemaining = selectedPackage
         ? purchases
-            .filter((purchase) => purchase.package === selectedPackage)
+            .filter((purchase) => 
+                purchase.package === selectedPackage && 
+                purchase.purchase_type !== 'organization'
+            )
             .reduce((total, purchase) => total + (purchase.sessions_remaining || 0), 0)
         : 0;
-    const hasSessions = selectedPackage ? sessionsRemaining > 0 : false;
+    
+    // Calculate total available sessions from all organization packages for selected package
+    // All members see the same total - it's first-come-first-served
+    const organizationSessionsRemaining = selectedPackage && packageType === 'organization'
+        ? organizationPackages
+            .filter((orgPkg) => 
+                orgPkg.package === selectedPackage && 
+                orgPkg.sessions_remaining > 0
+            )
+            .reduce((total, orgPkg) => total + (orgPkg.sessions_remaining || 0), 0)
+        : 0;
+    
+    const sessionsRemaining = packageType === 'organization' ? organizationSessionsRemaining : personalSessionsRemaining;
+    const hasSessions = selectedPackage ? (packageType === 'organization' ? organizationSessionsRemaining > 0 : personalSessionsRemaining > 0) : false;
     const packageSessionDuration = selectedPackageData?.session_duration_minutes || DEFAULT_DURATION;
 
     useEffect(() => {
         // Load active coaching packages and current purchases
         dispatch(getActiveCoachingPackages());
         dispatch(getMyPackagePurchases());
+        dispatch(getOrganizationPackages());
     }, [dispatch]);
 
     useEffect(() => {
@@ -57,6 +76,12 @@ function CoachingBooking() {
     useEffect(() => {
         setDuration(packageSessionDuration);
     }, [packageSessionDuration]);
+
+    useEffect(() => {
+        // Reset slot and availability when package type changes
+        setSelectedSlot(null);
+        dispatch(clearAvailability());
+    }, [packageType, dispatch]);
 
     const handlePurchasePackage = async () => {
         navigate('/packages');
@@ -228,11 +253,15 @@ function CoachingBooking() {
             duration_minutes: duration,
             coaching_package: selectedPackage,
             coach: selectedCoachData.id,
+            use_organization_package: packageType === 'organization',
         };
 
         const result = await dispatch(createBooking(bookingData));
         if (createBooking.fulfilled.match(result)) {
             await dispatch(getMyPackagePurchases());
+            if (packageType === 'organization') {
+                await dispatch(getOrganizationPackages());
+            }
             setBookingSuccess(true);
         } else {
             const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
@@ -370,28 +399,85 @@ function CoachingBooking() {
                     </div>
 
                     {selectedPackage && (
-                        <div className="border border-gray-200 rounded-lg bg-gray-50 p-4 space-y-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <div>
-                                    <p className="text-sm text-gray-600">Sessions remaining</p>
-                                    <p className={`text-2xl font-bold ${hasSessions ? 'text-green-700' : 'text-red-600'}`}>
-                                        {purchasesLoading ? 'Checking…' : sessionsRemaining}
-                                    </p>
+                        <div className="space-y-4">
+                            {/* Package Type Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Package Type
+                                </label>
+                                <div className="space-y-2">
+                                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                        <input
+                                            type="radio"
+                                            name="packageType"
+                                            value="personal"
+                                            checked={packageType === 'personal'}
+                                            onChange={(e) => setPackageType(e.target.value)}
+                                            className="mr-3"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="font-medium text-gray-900">Personal / Gifted / Transferred Packages</div>
+                                            <div className="text-sm text-gray-500">
+                                                Use your personal packages, received gifts, or transferred sessions
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                        <input
+                                            type="radio"
+                                            name="packageType"
+                                            value="organization"
+                                            checked={packageType === 'organization'}
+                                            onChange={(e) => setPackageType(e.target.value)}
+                                            className="mr-3"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="font-medium text-gray-900">Organization Packages</div>
+                                            <div className="text-sm text-gray-500">
+                                                Use packages purchased for your organization (first-come-first-served)
+                                            </div>
+                                        </div>
+                                    </label>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={handlePurchasePackage}
-                                    disabled={purchaseSubmitting}
-                                    className="px-4 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 transition duration-200"
-                                >
-                                    {purchaseSubmitting ? 'Adding…' : hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
-                                </button>
                             </div>
-                            {!hasSessions && (
-                                <p className="text-sm text-red-600">
-                                    You are out of sessions. Add another package bundle before booking.
-                                </p>
-                            )}
+
+                            {/* Sessions/Packages Remaining Display */}
+                            <div className="border border-gray-200 rounded-lg bg-gray-50 p-4 space-y-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm text-gray-600">
+                                            {packageType === 'organization' ? 'Available sessions (organization)' : 'Sessions remaining'}
+                                        </p>
+                                        <p className={`text-2xl font-bold ${hasSessions ? 'text-green-700' : 'text-red-600'}`}>
+                                            {packageType === 'organization' 
+                                                ? (organizationPackagesLoading ? 'Checking…' : organizationSessionsRemaining)
+                                                : (purchasesLoading ? 'Checking…' : personalSessionsRemaining)
+                                            }
+                                        </p>
+                                        {packageType === 'organization' && organizationSessionsRemaining > 0 && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                First-come-first-served. All members can use these sessions.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handlePurchasePackage}
+                                        disabled={purchaseSubmitting}
+                                        className="px-4 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 transition duration-200"
+                                    >
+                                        {purchaseSubmitting ? 'Adding…' : hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
+                                    </button>
+                                </div>
+                                {!hasSessions && (
+                                    <p className="text-sm text-red-600">
+                                        {packageType === 'organization' 
+                                            ? 'No organization packages available. Add another package bundle before booking.'
+                                            : 'You are out of sessions. Add another package bundle before booking.'
+                                        }
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -548,7 +634,9 @@ function CoachingBooking() {
                                 )}
                                 {selectedPackage && (
                                     <p className="text-gray-700">
-                                        <span className="font-medium">Sessions left after booking:</span> {Math.max(sessionsRemaining - 1, 0)}
+                                        <span className="font-medium">
+                                            {packageType === 'organization' ? 'Organization sessions left after booking:' : 'Sessions left after booking:'}
+                                        </span> {Math.max(sessionsRemaining - 1, 0)}
                                     </p>
                                 )}
                             </div>

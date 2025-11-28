@@ -327,6 +327,26 @@ function ClientPortal() {
                                                                 <span className="font-medium">Package:</span> {booking.package_details.title}
                                                             </p>
                                                         )}
+                                                        {booking.booking_type === 'coaching' && booking.package_purchase_details && (
+                                                            <div className="space-y-1">
+                                                                <p className="text-sm text-gray-500">
+                                                                    <span className="font-medium">Purchase Name:</span> {booking.package_purchase_details.purchase_name || booking.package_details?.title || 'N/A'}
+                                                                </p>
+                                                                {booking.purchase_type_label && (
+                                                                    <p className="text-sm">
+                                                                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                                                            booking.purchase_type_label === 'Personal' ? 'bg-blue-100 text-blue-800' :
+                                                                            booking.purchase_type_label === 'Gifted' ? 'bg-purple-100 text-purple-800' :
+                                                                            booking.purchase_type_label === 'Organization' ? 'bg-green-100 text-green-800' :
+                                                                            booking.purchase_type_label === 'Transferred' ? 'bg-orange-100 text-orange-800' :
+                                                                            'bg-gray-100 text-gray-800'
+                                                                        }`}>
+                                                                            {booking.purchase_type_label}
+                                                                        </span>
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 w-40">

@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
-import { LogOut, Calendar, Home, User, ChevronDown, Settings } from 'lucide-react';
+import { endpoints } from '../api/endpoints';
+import { LogOut, Calendar, Home, User, ChevronDown, Settings, Link2 } from 'lucide-react';
 
 function UserLayout() {
     const navigate = useNavigate();
@@ -31,6 +32,12 @@ function UserLayout() {
     const handleLogout = async () => {
         await dispatch(logout());
         navigate('/signin');
+    };
+
+    const handleGHLOnboard = () => {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
+        window.open(onboardURL, '_blank', 'noopener,noreferrer');
     };
 
     const getPageTitle = () => {
@@ -165,6 +172,18 @@ function UserLayout() {
                                                 >
                                                     <Settings className="w-4 h-4" />
                                                     <span>Switch to Admin</span>
+                                                </button>
+                                            )}
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={() => {
+                                                        handleGHLOnboard();
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                                >
+                                                    <Link2 className="w-4 h-4" />
+                                                    <span>Onboard GHL</span>
                                                 </button>
                                             )}
                                             <button

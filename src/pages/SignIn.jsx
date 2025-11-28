@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { requestOTP, verifyOTP, clearError } from '../store/slices/authSlice';
+import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/authSlice';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
+import { Link2 } from 'lucide-react';
 
 function SignIn() {
     const dispatch = useAppDispatch();
@@ -15,6 +16,7 @@ function SignIn() {
     
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const [hasLocationId, setHasLocationId] = useState(false);
 
     useEffect(() => {
         const locationId = searchParams.get('location');
@@ -22,15 +24,21 @@ function SignIn() {
             // Store location_id for use during OTP verification
             const cleanLocationId = locationId.trim();
             localStorage.setItem('ghlLocationId', cleanLocationId);
+            setHasLocationId(true);
             console.log('Stored GHL location_id from URL:', cleanLocationId);
             // Note: Onboarding is now done via OAuth flow at /api/ghlpage/onboard/
             // No need to POST here - just store the location_id for later use
         } else {
             // Clear if no location in URL
             localStorage.removeItem('ghlLocationId');
+            setHasLocationId(false);
             console.log('No location parameter in URL, cleared ghlLocationId from localStorage');
         }
-    }, [searchParams]);
+        // Clear OTP state when location changes
+        dispatch(clearError());
+        dispatch(clearOTP());
+        setStep('phone');
+    }, [searchParams, dispatch]);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
@@ -48,6 +56,12 @@ function SignIn() {
         if (verifyOTP.fulfilled.match(result)) {
             navigate('/booking');
         }
+    };
+
+    const handleGHLOnboard = () => {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
+        window.open(onboardURL, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -72,10 +86,17 @@ function SignIn() {
                                 required
                             />
                         </div>
+                        {!hasLocationId && (
+                            <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm text-yellow-800 text-center">
+                                    Location ID is required. Please access this page with a valid location parameter.
+                                </p>
+                            </div>
+                        )}
                         <button 
                             type="submit" 
-                            disabled={loading}
-                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+                            disabled={loading || !hasLocationId}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
                         >
                             {loading ? 'Sending OTP...' : 'Get OTP'}
                         </button>
@@ -130,6 +151,17 @@ function SignIn() {
                         </p>
                     </div>
                 )}
+                
+                {/* GHL Onboard Button */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                    <button
+                        onClick={handleGHLOnboard}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                        <Link2 className="w-4 h-4" />
+                        <span>Onboard GHL Location</span>
+                    </button>
+                </div>
                 
                 <p className="mt-6 text-sm text-center text-gray-600">
                     Don't have an account?{' '}

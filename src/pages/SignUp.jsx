@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, clearError } from '../store/slices/authSlice';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
+import { Link2 } from 'lucide-react';
 
 function SignUp() {
     const dispatch = useAppDispatch();
@@ -42,6 +43,12 @@ function SignUp() {
         if (signup.fulfilled.match(result)) {
             navigate('/booking');
         }
+    };
+
+    const handleGHLOnboard = () => {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
+        window.open(onboardURL, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -145,6 +152,17 @@ function SignUp() {
                         </p>
                     </div>
                 )}
+                
+                {/* GHL Onboard Button */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                    <button
+                        onClick={handleGHLOnboard}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                        <Link2 className="w-4 h-4" />
+                        <span>Onboard GHL Location</span>
+                    </button>
+                </div>
                 
                 <p className="mt-6 text-sm text-center text-gray-600">
                     Already have an account?{' '}

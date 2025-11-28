@@ -139,7 +139,8 @@ function SessionTransfer() {
     const availablePurchases = purchases.filter(
         p => p.sessions_remaining > 0 && 
         p.package_status === 'active' && 
-        p.gift_status !== 'pending'
+        p.gift_status !== 'pending' &&
+        p.purchase_type !== 'organization' // Exclude organization packages from transfers
     );
 
     if (purchasesLoading) {
@@ -163,7 +164,14 @@ function SessionTransfer() {
                         <div key={purchase.id} className="border border-gray-200 rounded-lg p-4">
                             <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                    <h3 className="font-semibold text-gray-900">{purchase.purchase_name || purchase.package_details?.title}</h3>
+                                    <h3 className="font-semibold text-gray-900">
+                                        {purchase.purchase_name || purchase.package_details?.title}
+                                    </h3>
+                                    {purchase.purchase_name && (
+                                        <p className="text-xs text-gray-500">
+                                            package: {purchase.package_details?.title || 'Unknown package'}
+                                        </p>
+                                    )}
                                     <p className="text-sm text-gray-600 mt-1">
                                         {purchase.sessions_remaining} of {purchase.sessions_total} sessions remaining
                                     </p>
@@ -208,7 +216,12 @@ function SessionTransfer() {
                                 </div>
 
                                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                    <h4 className="font-semibold text-gray-900">{selectedPurchase.package_details?.title}</h4>
+                                    <h4 className="font-semibold text-gray-900">
+                                        {selectedPurchase.purchase_name || selectedPurchase.package_details?.title}
+                                    </h4>
+                                    <p className="text-xs text-gray-500">
+                                        package: {selectedPurchase.package_details?.title || 'Unknown package'}
+                                    </p>
                                     <p className="text-sm text-gray-600 mt-1">
                                         Available: {selectedPurchase.sessions_remaining} sessions
                                     </p>

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
+import { endpoints } from '../api/endpoints';
 import { 
     LayoutDashboard, 
     Users, 
@@ -13,7 +14,10 @@ import {
     Menu, 
     X,
     User,
-    ShieldCheck
+    ShieldCheck,
+    Link2,
+    ChevronDown,
+    Home
 } from 'lucide-react';
 
 function AdminLayout() {
@@ -22,6 +26,8 @@ function AdminLayout() {
         const saved = localStorage.getItem('adminSidebarOpen');
         return saved !== null ? saved === 'true' : true;
     });
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
@@ -31,6 +37,20 @@ function AdminLayout() {
     useEffect(() => {
         localStorage.setItem('adminSidebarOpen', sidebarOpen.toString());
     }, [sidebarOpen]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const menuItems = [
         { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -54,6 +74,12 @@ function AdminLayout() {
         navigate('/signin');
     };
 
+    const handleGHLOnboard = () => {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
+        window.open(onboardURL, '_blank', 'noopener,noreferrer');
+    };
+
     const getPageTitle = () => {
         const path = location.pathname;
         const activeItem = menuItems.find(item => isActive(item.path));
@@ -63,9 +89,9 @@ function AdminLayout() {
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-white shadow-md border-b border-gray-200 z-20">
+            <header className="bg-white shadow-md border-b border-gray-200 fixed top-0 left-0 right-0 z-20">
                 <div className="px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         {/* Left side - Logo */}
@@ -80,35 +106,110 @@ function AdminLayout() {
 
                         {/* Right side - Actions */}
                         <div className="flex items-center space-x-4">
-                            {/* Switch to User Side Button (only for admins) */}
+                            {/* User Dropdown */}
                             {isAdmin && (
-                                <button
-                                    onClick={() => navigate('/portal')}
-                                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                                >
-                                    Switch to User Side
-                                </button>
+                                <div className="relative" ref={dropdownRef}>
+                                    <button
+                                        onClick={() => setDropdownOpen(!dropdownOpen)}
+                                        className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                                    >
+                                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                            <span className="text-white text-sm font-semibold">
+                                                {user?.first_name?.[0] || user?.email?.[0] || 'A'}
+                                            </span>
+                                        </div>
+                                        <div className="hidden md:flex flex-col items-start">
+                                            <span className="text-sm font-medium text-gray-700">
+                                                {user?.first_name || user?.username || 'Admin'}
+                                            </span>
+                                            {user?.email && user?.first_name && (
+                                                <span className="text-xs text-gray-500">{user.email}</span>
+                                            )}
+                                        </div>
+                                        <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {/* Dropdown Menu */}
+                                    {dropdownOpen && (
+                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                            {/* User Info Section */}
+                                            <div className="px-4 py-3 border-b border-gray-200">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                                        <span className="text-white text-sm font-semibold">
+                                                            {user?.first_name?.[0] || user?.email?.[0] || 'A'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                                            {user?.first_name || user?.username || 'Admin'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 truncate">
+                                                            {user?.email || ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Menu Items */}
+                                            <div className="py-1">
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/portal');
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                                >
+                                                    <Home className="w-4 h-4" />
+                                                    <span>Switch to User Side</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleGHLOnboard();
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                                >
+                                                    <Link2 className="w-4 h-4" />
+                                                    <span>Onboard GHL</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleLogout();
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                                >
+                                                    <LogOut className="w-4 h-4" />
+                                                    <span>Logout</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
-                            {/* User Info */}
-                            <div className="flex items-center space-x-3">
-                                <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
-                                    <User className="w-4 h-4" />
-                                    <span>{user?.first_name || user?.username || 'Admin'}</span>
+                            {/* User Info (fallback for non-admin) */}
+                            {!isAdmin && (
+                                <div className="flex items-center space-x-3">
+                                    <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
+                                        <User className="w-4 h-4" />
+                                        <span>{user?.first_name || user?.username || 'User'}</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </header>
 
-            <div className="flex flex-1">
+            <div className="flex pt-16">
             {/* Sidebar */}
             <aside
                 className={`bg-white text-blue-700 transition-all duration-300 ease-in-out ${
                     sidebarOpen ? 'w-64' : 'w-20'
                 } fixed z-30 shadow-xl border-r border-gray-200`}
-                style={{ top: '64px', height: 'calc(100vh - 64px)' }}
+                style={{ top: '64px', height: 'calc(100vh - 64px)', overflowY: 'auto' }}
             >
                 <div className="flex flex-col h-full">
                     {/* Header */}
@@ -173,14 +274,13 @@ function AdminLayout() {
             </aside>
 
             {/* Main Content */}
-            <div
-                className={`flex-1 transition-all duration-300 ease-in-out ${
+            <main
+                className={`flex-1 transition-all duration-300 ease-in-out min-h-[calc(100vh-64px)] ${
                     sidebarOpen ? 'ml-64' : 'ml-20'
                 }`}
-                style={{ marginTop: '64px' }}
             >
                 {/* Mobile Menu Button */}
-                <div className="lg:hidden fixed top-4 left-4 z-30">
+                <div className="lg:hidden fixed top-20 left-4 z-40">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         className="p-2 bg-white hover:bg-blue-50 text-blue-700 rounded-lg shadow-lg border border-gray-200 transition-colors"
@@ -191,19 +291,20 @@ function AdminLayout() {
                 </div>
 
                 {/* Content */}
-                <div className="px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8 pt-2 md:pt-1 w-full">
+                <div className="px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8 pt-4 md:pt-6 w-full">
                     {/* Page Title */}
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
                         {getPageTitle()}
                     </h1>
                     <Outlet />
                 </div>
-            </div>
+            </main>
 
             {/* Overlay for mobile */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+                    className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+                    style={{ top: '64px' }}
                     onClick={() => setSidebarOpen(false)}
                 />
             )}

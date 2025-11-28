@@ -43,7 +43,7 @@ export const getMyPackagePurchases = createAsyncThunk(
 
 export const createPackagePurchase = createAsyncThunk(
     'coaching/createPackagePurchase',
-    async ({ packageId, notes, purchaseType = 'normal', recipientPhone, purchaseName }, { rejectWithValue }) => {
+    async ({ packageId, notes, purchaseType = 'normal', recipientPhone, purchaseName, memberPhones }, { rejectWithValue }) => {
         try {
             const payload = {
                 package: packageId,
@@ -56,11 +56,26 @@ export const createPackagePurchase = createAsyncThunk(
             if (purchaseType === 'gift' && recipientPhone) {
                 payload.recipient_phone = recipientPhone;
             }
+            if (purchaseType === 'organization' && memberPhones && memberPhones.length > 0) {
+                payload.member_phones = memberPhones;
+            }
             const locationId = localStorage.getItem('ghlLocationId');
             if (locationId) {
                 payload.location_id = locationId;
             }
             const response = await apiClient.post(endpoints.coaching.purchases, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getOrganizationPackages = createAsyncThunk(
+    'coaching/getOrganizationPackages',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.organizationPackages);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -155,11 +170,13 @@ const initialState = {
     packages: [],
     activePackages: [],
     purchases: [],
+    organizationPackages: [],
     giftsPending: [],
     transfersPending: [],
     phoneCheck: null,
     loading: false,
     purchasesLoading: false,
+    organizationPackagesLoading: false,
     purchaseSubmitting: false,
     phoneChecking: false,
     giftsLoading: false,
@@ -277,6 +294,18 @@ const coachingSlice = createSlice({
             })
             .addCase(getTransfersPending.rejected, (state, action) => {
                 state.transfersLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getOrganizationPackages.pending, (state) => {
+                state.organizationPackagesLoading = true;
+                state.error = null;
+            })
+            .addCase(getOrganizationPackages.fulfilled, (state, action) => {
+                state.organizationPackagesLoading = false;
+                state.organizationPackages = action.payload;
+            })
+            .addCase(getOrganizationPackages.rejected, (state, action) => {
+                state.organizationPackagesLoading = false;
                 state.error = action.payload;
             })
             .addCase(claimTransfer.fulfilled, (state, action) => {

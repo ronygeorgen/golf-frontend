@@ -96,10 +96,12 @@ export const logout = createAsyncThunk(
             await apiClient.post(endpoints.auth.logout);
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            localStorage.removeItem('ghlLocationId');  // Clear GHL location ID on logout
             return null;
         } catch (error) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            localStorage.removeItem('ghlLocationId');  // Clear GHL location ID even on error
             return rejectWithValue(error.response?.data || error.message);
         }
     }
@@ -220,6 +222,8 @@ const authSlice = createSlice({
                 state.user = null;
                 state.token = null;
                 state.error = null;
+                state.otpSent = false;
+                state.otpMessage = null;
             });
     },
 });

@@ -222,6 +222,9 @@ function BookingManagement() {
                                         Resource
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Package Info
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Price
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -266,6 +269,28 @@ function BookingManagement() {
                                                     booking.coach_details ? 
                                                         `${booking.coach_details.first_name} ${booking.coach_details.last_name}` :
                                                         'Any Coach'
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {booking.booking_type === 'coaching' && booking.package_purchase_details ? (
+                                                    <div className="space-y-1">
+                                                        <div className="font-medium text-gray-900">
+                                                            {booking.package_purchase_details.purchase_name || booking.package_details?.title || 'N/A'}
+                                                        </div>
+                                                        <div>
+                                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                                                booking.purchase_type_label === 'Personal' ? 'bg-blue-100 text-blue-800' :
+                                                                booking.purchase_type_label === 'Gifted' ? 'bg-purple-100 text-purple-800' :
+                                                                booking.purchase_type_label === 'Organization' ? 'bg-green-100 text-green-800' :
+                                                                booking.purchase_type_label === 'Transferred' ? 'bg-orange-100 text-orange-800' :
+                                                                'bg-gray-100 text-gray-800'
+                                                            }`}>
+                                                                {booking.purchase_type_label || 'Personal'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400">—</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
