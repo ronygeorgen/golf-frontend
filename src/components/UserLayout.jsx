@@ -57,16 +57,16 @@ function UserLayout() {
                 <div className="w-full px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-14">
                         {/* Left side - Logo/Title */}
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2 md:space-x-4">
                             <div className="bg-white p-1 rounded-md">
                                 <img 
                                     src={logo} 
                                     alt="Hole 9 Golf Logo" 
-                                    className="h-10 w-auto object-contain"
+                                    className="h-6 w-auto md:h-10 object-contain"
                                 />
                             </div>
                             <div className="hidden md:block h-6 w-px bg-gray-300"></div>
-                            <h2 className="text-lg font-semibold text-gray-700">
+                            <h2 className="text-sm md:text-lg font-semibold text-gray-700">
                                 {getPageTitle()}
                             </h2>
                         </div>
@@ -169,6 +169,67 @@ function UserLayout() {
 
                                         {/* Menu Items */}
                                         <div className="py-1">
+                                            {/* Mobile Navigation Links - Only visible on mobile */}
+                                            <div className="md:hidden border-b border-gray-200 pb-2 mb-2">
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/portal');
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        location.pathname === '/portal'
+                                                            ? 'bg-blue-50 text-blue-700 font-medium'
+                                                            : 'text-gray-700 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <Home className="w-4 h-4" />
+                                                    <span>Portal</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/booking');
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        location.pathname === '/booking'
+                                                            ? 'bg-blue-50 text-blue-700 font-medium'
+                                                            : 'text-gray-700 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <Calendar className="w-4 h-4" />
+                                                    <span>Book Session</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/calendar');
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        location.pathname === '/calendar'
+                                                            ? 'bg-blue-50 text-blue-700 font-medium'
+                                                            : 'text-gray-700 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <Calendar className="w-4 h-4" />
+                                                    <span>Calendar</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/packages');
+                                                        setDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        location.pathname === '/packages'
+                                                            ? 'bg-blue-50 text-blue-700 font-medium'
+                                                            : 'text-gray-700 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <User className="w-4 h-4" />
+                                                    <span>Packages</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Admin Options */}
                                             {isAdmin && (
                                                 <button
                                                     onClick={() => {
