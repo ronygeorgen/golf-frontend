@@ -19,6 +19,7 @@ import {
     ChevronDown,
     Home
 } from 'lucide-react';
+import logo from '../assets/hole9golf-logo.png';
 
 function AdminLayout() {
     // Load sidebar state from localStorage, default to true (open)
@@ -91,16 +92,18 @@ function AdminLayout() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-white shadow-md border-b border-gray-200 fixed top-0 left-0 right-0 z-20">
+            <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50 w-full">
                 <div className="px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center justify-between h-14">
                         {/* Left side - Logo */}
                         <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-md">
-                                <span className="text-white text-xl font-bold">G</span>
-                            </div>
+                            <img 
+                                src={logo} 
+                                alt="Hole 9 Golf Logo" 
+                                className="h-10 w-auto object-contain"
+                            />
                             <h1 className="text-xl font-bold text-blue-700">
-                                Golf Booking
+                                Admin Panel
                             </h1>
                         </div>
 
@@ -131,7 +134,7 @@ function AdminLayout() {
 
                                     {/* Dropdown Menu */}
                                     {dropdownOpen && (
-                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60]">
                                             {/* User Info Section */}
                                             <div className="px-4 py-3 border-b border-gray-200">
                                                 <div className="flex items-center space-x-3">
@@ -203,13 +206,13 @@ function AdminLayout() {
                 </div>
             </header>
 
-            <div className="flex pt-16">
+            <div className="flex pt-14">
             {/* Sidebar */}
             <aside
                 className={`bg-white text-blue-700 transition-all duration-300 ease-in-out ${
                     sidebarOpen ? 'w-64' : 'w-20'
-                } fixed z-30 shadow-xl border-r border-gray-200`}
-                style={{ top: '64px', height: 'calc(100vh - 64px)', overflowY: 'auto' }}
+                } fixed z-40 shadow-xl border-r border-gray-200`}
+                style={{ top: '56px', height: 'calc(100vh - 56px)', overflowY: 'auto' }}
             >
                 <div className="flex flex-col h-full">
                     {/* Header */}
@@ -275,12 +278,12 @@ function AdminLayout() {
 
             {/* Main Content */}
             <main
-                className={`flex-1 transition-all duration-300 ease-in-out min-h-[calc(100vh-64px)] ${
+                className={`flex-1 transition-all duration-300 ease-in-out min-h-[calc(100vh-56px)] ${
                     sidebarOpen ? 'ml-64' : 'ml-20'
                 }`}
             >
                 {/* Mobile Menu Button */}
-                <div className="lg:hidden fixed top-20 left-4 z-40">
+                <div className="lg:hidden fixed top-[60px] left-4 z-40">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         className="p-2 bg-white hover:bg-blue-50 text-blue-700 rounded-lg shadow-lg border border-gray-200 transition-colors"
@@ -303,8 +306,8 @@ function AdminLayout() {
             {/* Overlay for mobile */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
-                    style={{ top: '64px' }}
+                    className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+                    style={{ top: '56px' }}
                     onClick={() => setSidebarOpen(false)}
                 />
             )}

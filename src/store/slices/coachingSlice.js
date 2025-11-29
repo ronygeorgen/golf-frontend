@@ -41,6 +41,24 @@ export const getMyPackagePurchases = createAsyncThunk(
     }
 );
 
+export const createTempPurchase = createAsyncThunk(
+    'coaching/createTempPurchase',
+    async ({ packageId, buyerPhone, purchaseType = 'normal', recipients = [] }, { rejectWithValue }) => {
+        try {
+            const payload = {
+                package_id: packageId,
+                buyer_phone: buyerPhone,
+                purchase_type: purchaseType,
+                recipients: recipients,
+            };
+            const response = await apiClient.post(endpoints.coaching.tempPurchase, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const createPackagePurchase = createAsyncThunk(
     'coaching/createPackagePurchase',
     async ({ packageId, notes, purchaseType = 'normal', recipientPhone, purchaseName, memberPhones }, { rejectWithValue }) => {
@@ -233,6 +251,18 @@ const coachingSlice = createSlice({
             })
             .addCase(getMyPackagePurchases.rejected, (state, action) => {
                 state.purchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(createTempPurchase.pending, (state) => {
+                state.purchaseSubmitting = true;
+                state.error = null;
+            })
+            .addCase(createTempPurchase.fulfilled, (state, action) => {
+                state.purchaseSubmitting = false;
+                // Temp purchase doesn't add to purchases - it's just for redirect
+            })
+            .addCase(createTempPurchase.rejected, (state, action) => {
+                state.purchaseSubmitting = false;
                 state.error = action.payload;
             })
             .addCase(createPackagePurchase.pending, (state) => {

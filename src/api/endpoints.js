@@ -98,6 +98,8 @@ export const endpoints = {
         transferClaim: (id) => `/coaching/transfers/${id}/claim/`,
         checkPhone: '/coaching/users/check-phone/',
         organizationPackages: '/coaching/purchases/organization_packages/',
+        purchaseWebhook: '/coaching/webhook/purchase/',
+        tempPurchase: '/coaching/temp-purchase/',
     },
 
     ghl: {

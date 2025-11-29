@@ -5,6 +5,7 @@ import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/aut
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { Link2 } from 'lucide-react';
+import logo from '../assets/hole9golf-logo.png';
 
 function SignIn() {
     const dispatch = useAppDispatch();
@@ -67,6 +68,13 @@ function SignIn() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 md:p-8">
+                <div className="flex justify-center mb-6">
+                    <img 
+                        src={logo} 
+                        alt="Hole 9 Golf Logo" 
+                        className="h-16 w-auto object-contain"
+                    />
+                </div>
                 <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 text-center">
                     Sign In
                 </h2>

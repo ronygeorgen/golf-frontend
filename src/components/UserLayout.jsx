@@ -4,6 +4,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
 import { endpoints } from '../api/endpoints';
 import { LogOut, Calendar, Home, User, ChevronDown, Settings, Link2 } from 'lucide-react';
+import logo from '../assets/hole9golf-logo.png';
 
 function UserLayout() {
     const navigate = useNavigate();
@@ -52,12 +53,18 @@ function UserLayout() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-white shadow-md border-b border-gray-200 w-full">
+            <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50 w-full">
                 <div className="w-full px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center justify-between h-14">
                         {/* Left side - Logo/Title */}
                         <div className="flex items-center space-x-4">
-                            <h1 className="text-xl font-bold text-blue-700">Golf Booking</h1>
+                            <div className="bg-white p-1 rounded-md">
+                                <img 
+                                    src={logo} 
+                                    alt="Hole 9 Golf Logo" 
+                                    className="h-10 w-auto object-contain"
+                                />
+                            </div>
                             <div className="hidden md:block h-6 w-px bg-gray-300"></div>
                             <h2 className="text-lg font-semibold text-gray-700">
                                 {getPageTitle()}
@@ -140,7 +147,7 @@ function UserLayout() {
 
                                 {/* Dropdown Menu */}
                                 {dropdownOpen && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60]">
                                         {/* User Info Section */}
                                         <div className="px-4 py-3 border-b border-gray-200">
                                             <div className="flex items-center space-x-3">
@@ -206,7 +213,7 @@ function UserLayout() {
             </header>
 
             {/* Main Content */}
-            <main>
+            <main className="pt-0">
                 <Outlet />
             </main>
         </div>

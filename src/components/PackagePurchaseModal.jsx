@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { createPackagePurchase, checkPhoneExists, clearPhoneCheck } from '../store/slices/coachingSlice';
+import { createPackagePurchase, createTempPurchase, clearPhoneCheck } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 
@@ -16,16 +16,15 @@ function PackagePurchaseModal({
 }) {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
-    const { purchaseSubmitting, phoneChecking, phoneCheck } = useAppSelector((state) => state.coaching);
+    const { purchaseSubmitting } = useAppSelector((state) => state.coaching);
+    const { user } = useAppSelector((state) => state.auth);
     
     const [purchaseType, setPurchaseType] = useState(defaultType);
     const [purchaseName, setPurchaseName] = useState('');
     const [recipientPhone, setRecipientPhone] = useState('');
-    const [phoneValidated, setPhoneValidated] = useState(false);
     const [notes, setNotes] = useState('');
     const [memberPhones, setMemberPhones] = useState([]); // [{phone: string, validated: boolean, name: string}]
     const [newMemberPhone, setNewMemberPhone] = useState('');
-    const [validatingMemberPhone, setValidatingMemberPhone] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -33,7 +32,6 @@ function PackagePurchaseModal({
             setPurchaseType(defaultType);
             setPurchaseName('');
             setRecipientPhone('');
-            setPhoneValidated(false);
             setNotes('');
             setMemberPhones([]);
             setNewMemberPhone('');
@@ -46,7 +44,6 @@ function PackagePurchaseModal({
             setPurchaseType(defaultType);
             setPurchaseName('');
             setRecipientPhone('');
-            setPhoneValidated(false);
             setNotes('');
             setMemberPhones([]);
             setNewMemberPhone('');
@@ -57,51 +54,7 @@ function PackagePurchaseModal({
         }
     }, [isOpen, defaultType, dispatch, closePopup]);
 
-    useEffect(() => {
-        // Reset phone validation when phone changes
-        if (recipientPhone) {
-            setPhoneValidated(false);
-        }
-    }, [recipientPhone]);
-
-    const handlePhoneCheck = async () => {
-        if (!recipientPhone.trim()) {
-            openPopup({
-                type: 'warning',
-                title: 'Phone Required',
-                message: 'Please enter a phone number.',
-            });
-            return;
-        }
-
-        const result = await dispatch(checkPhoneExists(recipientPhone.trim()));
-        if (checkPhoneExists.fulfilled.match(result)) {
-            if (result.payload.exists) {
-                setPhoneValidated(true);
-                openPopup({
-                    type: 'success',
-                    title: 'User Found',
-                    message: `User found: ${result.payload.name || result.payload.username}`,
-                });
-            } else {
-                setPhoneValidated(false);
-                openPopup({
-                    type: 'error',
-                    title: 'User Not Found',
-                    message: 'No user found with this phone number. The recipient must be registered in the system.',
-                });
-            }
-        } else {
-            setPhoneValidated(false);
-            openPopup({
-                type: 'error',
-                title: 'Validation Error',
-                message: result.payload?.error || 'Unable to validate phone number.',
-            });
-        }
-    };
-
-    const handleAddMember = async () => {
+    const handleAddMember = () => {
         if (!newMemberPhone.trim()) {
             openPopup({
                 type: 'warning',
@@ -121,32 +74,13 @@ function PackagePurchaseModal({
             return;
         }
 
-        setValidatingMemberPhone(true);
-        const result = await dispatch(checkPhoneExists(newMemberPhone.trim()));
-        setValidatingMemberPhone(false);
-
-        if (checkPhoneExists.fulfilled.match(result)) {
-            if (result.payload.exists) {
-                setMemberPhones([...memberPhones, {
-                    phone: newMemberPhone.trim(),
-                    validated: true,
-                    name: result.payload.name || result.payload.username
-                }]);
-                setNewMemberPhone('');
-            } else {
-                openPopup({
-                    type: 'error',
-                    title: 'User Not Found',
-                    message: 'No user found with this phone number. Members must be registered in the system.',
-                });
-            }
-        } else {
-            openPopup({
-                type: 'error',
-                title: 'Validation Error',
-                message: result.payload?.error || 'Unable to validate phone number.',
-            });
-        }
+        // Add member directly without validation
+        setMemberPhones([...memberPhones, {
+            phone: newMemberPhone.trim(),
+            validated: false,
+            name: null
+        }]);
+        setNewMemberPhone('');
     };
 
     const handleRemoveMember = (phone) => {
@@ -154,7 +88,12 @@ function PackagePurchaseModal({
     };
 
     const handlePurchase = async () => {
-        if (!purchaseName.trim()) {
+        // Check if package has redirect_url - if yes, purchaseName is optional and use temp purchase flow
+        const redirectUrl = packageData?.redirect_url;
+        const hasRedirectUrl = redirectUrl && redirectUrl.trim() !== '';
+        
+        // Only require purchaseName if no redirect URL (normal purchase flow)
+        if (!hasRedirectUrl && !purchaseName.trim()) {
             openPopup({
                 type: 'warning',
                 title: 'Purchase Name Required',
@@ -172,14 +111,6 @@ function PackagePurchaseModal({
                 });
                 return;
             }
-            if (!phoneValidated) {
-                openPopup({
-                    type: 'warning',
-                    title: 'Validate Phone',
-                    message: 'Please validate the recipient phone number first.',
-                });
-                return;
-            }
         }
 
         if (purchaseType === 'organization') {
@@ -192,46 +123,115 @@ function PackagePurchaseModal({
                 return;
             }
         }
-
-        const result = await dispatch(createPackagePurchase({
-            packageId,
-            notes: notes.trim() || undefined,
-            purchaseType,
-            recipientPhone: purchaseType === 'gift' ? recipientPhone.trim() : undefined,
-            purchaseName: purchaseName.trim(),
-            memberPhones: purchaseType === 'organization' ? memberPhones.map(m => m.phone) : undefined,
-        }));
-
-        if (createPackagePurchase.fulfilled.match(result)) {
-            // Reset form state immediately
-            setRecipientPhone('');
-            setPhoneValidated(false);
-            setNotes('');
-            
-            openPopup({
-                type: 'success',
-                title: purchaseType === 'gift' ? 'Gift Purchased!' : 'Package Purchased!',
-                message: purchaseType === 'gift'
-                    ? 'The gift has been sent. The recipient will receive a notification to accept it.'
-                    : 'Package sessions added. You can now book your coaching session.',
-            });
-            if (onSuccess) {
-                onSuccess(result.payload);
+        
+        if (hasRedirectUrl) {
+            // Use temp purchase flow
+            // Get current logged-in user's phone number
+            const buyerPhone = user?.phone;
+            if (!buyerPhone) {
+                openPopup({
+                    type: 'error',
+                    title: 'Phone Required',
+                    message: 'Phone number not found. Please ensure you are logged in.',
+                });
+                return;
             }
-            setTimeout(() => {
-                closePopup();
-                onClose();
-            }, 1500);
+            
+            // Prepare recipients array
+            let recipients = [];
+            if (purchaseType === 'gift' && recipientPhone.trim()) {
+                recipients = [recipientPhone.trim()];
+            } else if (purchaseType === 'organization' && memberPhones.length > 0) {
+                recipients = memberPhones.map(m => m.phone);
+            }
+            
+            // Create temp purchase
+            const tempResult = await dispatch(createTempPurchase({
+                packageId,
+                buyerPhone,
+                purchaseType,
+                recipients,
+            }));
+            
+            if (createTempPurchase.fulfilled.match(tempResult)) {
+                const tempId = tempResult.payload.temp_id;
+                const redirectUrlFromResponse = tempResult.payload.redirect_url;
+                
+                // Build redirect URL with query params
+                // phone parameter contains the current logged-in user's phone number
+                const url = new URL(redirectUrlFromResponse);
+                url.searchParams.set('phone', buyerPhone); // Current user's phone
+                url.searchParams.set('package_id', packageId.toString());
+                url.searchParams.set('purchase_type', purchaseType);
+                url.searchParams.set('recipient_phone', tempId); // recipient_phone contains temp_id
+                
+                // Reset form state
+                setRecipientPhone('');
+                // setPhoneValidated(false);
+                setNotes('');
+                setMemberPhones([]);
+                
+                openPopup({
+                    type: 'success',
+                    title: 'Redirecting to Payment...',
+                    message: 'You will be redirected to complete your purchase.',
+                });
+                
+                // Redirect after short delay
+                setTimeout(() => {
+                    window.location.href = url.toString();
+                }, 1000);
+            } else {
+                const errorMsg = tempResult.payload?.error || 
+                               tempResult.payload?.detail ||
+                               'Unable to create temporary purchase.';
+                openPopup({
+                    type: 'error',
+                    title: 'Error',
+                    message: errorMsg,
+                });
+            }
         } else {
-            const errorMsg = result.payload?.recipient_phone?.[0] || 
-                           result.payload?.error || 
-                           result.payload?.detail ||
-                           'Unable to complete purchase.';
-            openPopup({
-                type: 'error',
-                title: 'Purchase Failed',
-                message: errorMsg,
-            });
+            // No redirect URL - use normal purchase flow
+            const result = await dispatch(createPackagePurchase({
+                packageId,
+                notes: notes.trim() || undefined,
+                purchaseType,
+                recipientPhone: purchaseType === 'gift' ? recipientPhone.trim() : undefined,
+                purchaseName: purchaseName.trim(),
+                memberPhones: purchaseType === 'organization' ? memberPhones.map(m => m.phone) : undefined,
+            }));
+
+            if (createPackagePurchase.fulfilled.match(result)) {
+                // Reset form state immediately
+                setRecipientPhone('');
+                // setPhoneValidated(false);
+                setNotes('');
+                
+                openPopup({
+                    type: 'success',
+                    title: purchaseType === 'gift' ? 'Gift Purchased!' : 'Package Purchased!',
+                    message: purchaseType === 'gift'
+                        ? 'The gift has been sent. The recipient will receive a notification to accept it.'
+                        : 'Package sessions added. You can now book your coaching session.',
+                });
+                if (onSuccess) {
+                    onSuccess(result.payload);
+                }
+                setTimeout(() => {
+                    closePopup();
+                    onClose();
+                }, 1500);
+            } else {
+                const errorMsg = result.payload?.error || 
+                               result.payload?.detail ||
+                               'Unable to complete purchase.';
+                openPopup({
+                    type: 'error',
+                    title: 'Error',
+                    message: errorMsg,
+                });
+            }
         }
     };
 
@@ -354,10 +354,10 @@ function PackagePurchaseModal({
                                             <button
                                                 type="button"
                                                 onClick={handleAddMember}
-                                                disabled={validatingMemberPhone || !newMemberPhone.trim()}
+                                                disabled={!newMemberPhone.trim()}
                                                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                                             >
-                                                {validatingMemberPhone ? 'Checking...' : 'Add'}
+                                                Add
                                             </button>
                                         </div>
                                         {memberPhones.length > 0 && (
@@ -388,7 +388,7 @@ function PackagePurchaseModal({
                                             </div>
                                         )}
                                         <p className="text-xs text-gray-600 mt-2">
-                                            All members (including you) can use sessions from this package. First-come-first-served basis.
+                                            All members (including you) can use sessions from this package. First-come-first-served basis. Members don't need to be registered yet - they will receive access when they sign up.
                                         </p>
                                     </div>
                                 </div>
@@ -400,36 +400,16 @@ function PackagePurchaseModal({
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Recipient Phone Number
                                         </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="tel"
-                                                value={recipientPhone}
-                                                onChange={(e) => setRecipientPhone(e.target.value)}
-                                                placeholder="Enter phone number"
-                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={handlePhoneCheck}
-                                                disabled={phoneChecking || !recipientPhone.trim()}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                            >
-                                                {phoneChecking ? 'Checking...' : 'Validate'}
-                                            </button>
-                                        </div>
-                                        {phoneCheck && phoneCheck.exists && (
-                                            <div className="mt-2 text-sm text-green-600 flex items-center">
-                                                <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                </svg>
-                                                User found: {phoneCheck.name || phoneCheck.username}
-                                            </div>
-                                        )}
-                                        {phoneCheck && !phoneCheck.exists && recipientPhone.trim() && (
-                                            <div className="mt-2 text-sm text-red-600">
-                                                User not found. Recipient must be registered in the system.
-                                            </div>
-                                        )}
+                                        <input
+                                            type="tel"
+                                            value={recipientPhone}
+                                            onChange={(e) => setRecipientPhone(e.target.value)}
+                                            placeholder="Enter recipient phone number"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                        <p className="mt-2 text-xs text-gray-600">
+                                            Recipient doesn't need to be registered yet. They will receive the package when they sign up.
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -453,7 +433,7 @@ function PackagePurchaseModal({
                         <button
                             type="button"
                             onClick={handlePurchase}
-                            disabled={purchaseSubmitting || (purchaseType === 'gift' && !phoneValidated) || (purchaseType === 'organization' && memberPhones.length === 0)}
+                            disabled={purchaseSubmitting || (purchaseType === 'organization' && memberPhones.length === 0)}
                             className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
                             {purchaseSubmitting ? 'Processing...' : purchaseType === 'gift' ? 'Purchase Gift' : purchaseType === 'organization' ? 'Purchase for Organization' : 'Purchase Package'}

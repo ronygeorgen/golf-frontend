@@ -22,6 +22,7 @@ function PackageManagement() {
         staff_members: [],
         session_count: 5,
         session_duration_minutes: 60,
+        redirect_url: '',
         is_active: true
     };
     const [formData, setFormData] = useState(emptyForm);
@@ -104,6 +105,7 @@ function PackageManagement() {
             staff_members: staffMemberIds,
             session_count: pkg.session_count || 1,
             session_duration_minutes: pkg.session_duration_minutes || 60,
+            redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active
         });
         setShowForm(true);
@@ -135,6 +137,22 @@ function PackageManagement() {
             },
         });
     };
+
+    const truncateUrl = (url, maxLength = 15) => {
+        try {
+          // Remove protocol (http:// or https://)
+          const noProtocol = url.replace(/^https?:\/\//, '');
+      
+          // If noProtocol is shorter than maxLength, just return it
+          if (noProtocol.length <= maxLength) return noProtocol;
+      
+          // Truncate with ellipsis, preserving start and some of the path
+          return noProtocol.slice(0, maxLength - 3) + '...';
+        } catch {
+          return url;
+        }
+      }
+      
 
     return (
         <>
@@ -231,6 +249,21 @@ function PackageManagement() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Redirect URL (Optional)
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={formData.redirect_url}
+                                            onChange={(e) => setFormData({...formData, redirect_url: e.target.value})}
+                                            placeholder="https://example.com/redirect"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            URL to redirect users to after purchasing this package
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Assigned Staff
                                         </label>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-4">
@@ -318,6 +351,9 @@ function PackageManagement() {
                                                 Session Length
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Redirect URL
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Staff Members
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -345,6 +381,20 @@ function PackageManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                                                     {pkg.session_duration_minutes} min
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-gray-700 max-w-xs truncate">
+                                                    {pkg.redirect_url ? (
+                                                        <a 
+                                                            href={pkg.redirect_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 hover:text-blue-800 underline"
+                                                        >
+                                                            {truncateUrl(pkg.redirect_url, 20)}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-gray-400">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <div className="flex flex-wrap gap-1">
