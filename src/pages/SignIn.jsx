@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/authSlice';
-import apiClient from '../api/axios';
-import { endpoints } from '../api/endpoints';
-import { Link2 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 
@@ -17,30 +14,13 @@ function SignIn() {
     const [step, setStep] = useState('phone');
     
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-    const [hasLocationId, setHasLocationId] = useState(false);
 
     useEffect(() => {
-        const locationId = searchParams.get('location');
-        if (locationId && locationId.trim()) {
-            // Store location_id for use during OTP verification
-            const cleanLocationId = locationId.trim();
-            localStorage.setItem('ghlLocationId', cleanLocationId);
-            setHasLocationId(true);
-            console.log('Stored GHL location_id from URL:', cleanLocationId);
-            // Note: Onboarding is now done via OAuth flow at /api/ghlpage/onboard/
-            // No need to POST here - just store the location_id for later use
-        } else {
-            // Clear if no location in URL
-            localStorage.removeItem('ghlLocationId');
-            setHasLocationId(false);
-            console.log('No location parameter in URL, cleared ghlLocationId from localStorage');
-        }
-        // Clear OTP state when location changes
+        // Clear OTP state on mount
         dispatch(clearError());
         dispatch(clearOTP());
         setStep('phone');
-    }, [searchParams, dispatch]);
+    }, [dispatch]);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
@@ -58,12 +38,6 @@ function SignIn() {
         if (verifyOTP.fulfilled.match(result)) {
             navigate('/booking');
         }
-    };
-
-    const handleGHLOnboard = () => {
-        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
-        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
-        window.open(onboardURL, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -94,16 +68,9 @@ function SignIn() {
                                 required
                             />
                         </div>
-                        {!hasLocationId && (
-                            <div className="mb-2 p-3 bg-status-pending-bg border border-status-pending-text/20 rounded-card">
-                                <p className="text-sm text-status-pending-text text-center">
-                                    Location ID is required. Please access this page with a valid location parameter.
-                                </p>
-                            </div>
-                        )}
                         <Button 
                             type="submit" 
-                            disabled={loading || !hasLocationId}
+                            disabled={loading}
                             variant="primary"
                             className="w-full py-3"
                         >
@@ -161,18 +128,6 @@ function SignIn() {
                         </p>
                     </div>
                 )}
-                
-                {/* GHL Onboard Button */}
-                <div className="mt-4 pt-4 border-t border-border">
-                    <Button
-                        onClick={handleGHLOnboard}
-                        variant="accent"
-                        className="w-full flex items-center justify-center space-x-2"
-                    >
-                        <Link2 className="w-4 h-4" />
-                        <span>Onboard GHL Location</span>
-                    </Button>
-                </div>
                 
                 <p className="mt-6 text-sm text-center text-text-secondary">
                     Don't have an account?{' '}

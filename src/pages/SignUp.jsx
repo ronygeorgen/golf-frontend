@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, clearError } from '../store/slices/authSlice';
-import apiClient from '../api/axios';
-import { endpoints } from '../api/endpoints';
-import { Link2 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 
@@ -23,20 +20,6 @@ function SignUp() {
     });
     
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-
-    useEffect(() => {
-        const locationId = searchParams.get('location');
-        if (locationId) {
-            localStorage.setItem('ghlLocationId', locationId);
-            const onboardFlag = `ghlOnboarded:${locationId}`;
-            if (!localStorage.getItem(onboardFlag)) {
-                apiClient.post(endpoints.ghl.onboard, { location_id: locationId })
-                    .then(() => localStorage.setItem(onboardFlag, 'true'))
-                    .catch(() => {});
-            }
-        }
-    }, [searchParams]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -45,12 +28,6 @@ function SignUp() {
         if (signup.fulfilled.match(result)) {
             navigate('/booking');
         }
-    };
-
-    const handleGHLOnboard = () => {
-        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
-        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
-        window.open(onboardURL, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -156,18 +133,6 @@ function SignUp() {
                         </p>
                     </div>
                 )}
-                
-                {/* GHL Onboard Button */}
-                <div className="mt-4 pt-4 border-t border-border">
-                    <Button
-                        onClick={handleGHLOnboard}
-                        variant="accent"
-                        className="w-full flex items-center justify-center space-x-2"
-                    >
-                        <Link2 className="w-4 h-4" />
-                        <span>Onboard GHL Location</span>
-                    </Button>
-                </div>
                 
                 <p className="mt-6 text-sm text-center text-text-secondary">
                     Already have an account?{' '}
