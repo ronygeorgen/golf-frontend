@@ -89,6 +89,24 @@ export const getProfile = createAsyncThunk(
     }
 );
 
+export const autoLogin = createAsyncThunk(
+    'auth/autoLogin',
+    async (email, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.auth.autoLogin, {
+                params: { email }
+            });
+            if (response.data.token) {
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const logout = createAsyncThunk(
     'auth/logout',
     async (_, { rejectWithValue }) => {
@@ -212,6 +230,22 @@ const authSlice = createSlice({
                 state.user = action.payload;
             })
             .addCase(getProfile.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Auto Login
+        builder
+            .addCase(autoLogin.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(autoLogin.fulfilled, (state, action) => {
+                state.loading = false;
+                state.user = action.payload.user;
+                state.token = action.payload.token;
+            })
+            .addCase(autoLogin.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

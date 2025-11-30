@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from './store/hooks';
-import { getProfile } from './store/slices/authSlice';
+import { getProfile, autoLogin } from './store/slices/authSlice';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
 import Booking from './pages/Booking';
@@ -18,6 +18,9 @@ import AdminLayout from './components/AdminLayout';
 import UserLayout from './components/UserLayout';
 import AdminOverrides from './components/AdminOverrides';
 import Packages from './pages/Packages';
+import PersonalPurchases from './pages/PersonalPurchases';
+import OrganizationPurchases from './pages/OrganizationPurchases';
+import TransferSessions from './pages/TransferSessions';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -63,9 +66,47 @@ function ProtectedRoute({ children, allowedRoles }) {
     return children;
 }
 
-function App() {
+function AppContent() {
     const dispatch = useAppDispatch();
+    const location = useLocation();
+    const navigate = useNavigate();
     const { user, token } = useAppSelector((state) => state.auth);
+    
+    // Check for email query parameter and auto-login if admin
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        const email = searchParams.get('email');
+        
+        if (email) {
+            if (!token) {
+                // Only attempt auto-login if not already logged in
+                dispatch(autoLogin(email)).then((result) => {
+                    if (autoLogin.fulfilled.match(result)) {
+                        // Auto-login successful, redirect to home page
+                        navigate('/', { replace: true });
+                    } else {
+                        // Auto-login failed (user not admin or not found)
+                        console.warn('Auto-login failed:', result.payload?.error || 'Unknown error');
+                        // Remove email param even on failure
+                        searchParams.delete('email');
+                        const newSearch = searchParams.toString();
+                        const newUrl = newSearch 
+                            ? `${location.pathname}?${newSearch}` 
+                            : location.pathname;
+                        navigate(newUrl, { replace: true });
+                    }
+                });
+            } else {
+                // Already logged in, just remove email param from URL
+                searchParams.delete('email');
+                const newSearch = searchParams.toString();
+                const newUrl = newSearch 
+                    ? `${location.pathname}?${newSearch}` 
+                    : location.pathname;
+                navigate(newUrl, { replace: true });
+            }
+        }
+    }, [location.search, dispatch, navigate, token]);
     
     // Fetch fresh user profile on app load if user exists but data might be stale
     useEffect(() => {
@@ -75,50 +116,59 @@ function App() {
     }, []); // Only run on mount
     
     return (
+        <Routes>
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/signup" element={<SignUp />} />
+            
+            {/* User Routes with UserLayout */}
+            <Route 
+                path="/" 
+                element={
+                    <ProtectedRoute>
+                        <UserLayout />
+                    </ProtectedRoute>
+                }
+            >
+                <Route index element={<Navigate to="/portal" replace />} />
+                <Route path="portal" element={<ClientPortal />} />
+                <Route path="booking" element={<Booking />} />
+                <Route path="calendar" element={<CalendarView isUserView={true} />} />
+                <Route path="packages" element={<Packages />} />
+                <Route path="purchases/personal" element={<PersonalPurchases />} />
+                <Route path="purchases/organizations" element={<OrganizationPurchases />} />
+                <Route path="transfers/sessions" element={<TransferSessions />} />
+            </Route>
+
+            {/* Admin Routes with AdminLayout */}
+            <Route 
+                path="/admin" 
+                element={
+                    <ProtectedRoute allowedRoles={['admin', 'staff']}>
+                        <AdminLayout />
+                    </ProtectedRoute>
+                }
+            >
+                <Route index element={<AdminDashboard />} />
+                <Route path="staff" element={<StaffManagement />} />
+                <Route path="staff/:id/availability" element={<StaffAvailability />} />
+                <Route path="simulators" element={<SimulatorManagement />} />
+                <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
+                <Route path="packages" element={<PackageManagement />} />
+                <Route path="bookings" element={<BookingManagement />} />
+                <Route path="calendar" element={<CalendarView />} />
+                <Route path="overrides" element={<AdminOverrides />} />
+            </Route>
+
+            <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center"><div className="text-red-500 text-xl">Unauthorized Access</div></div>} />
+        </Routes>
+    );
+}
+
+function App() {
+    return (
         <Router>
             <div className="App">
-                <Routes>
-                    <Route path="/signin" element={<SignIn />} />
-                    <Route path="/signup" element={<SignUp />} />
-                    
-                    {/* User Routes with UserLayout */}
-                    <Route 
-                        path="/" 
-                        element={
-                            <ProtectedRoute>
-                                <UserLayout />
-                            </ProtectedRoute>
-                        }
-                    >
-                        <Route index element={<Navigate to="/portal" replace />} />
-                        <Route path="portal" element={<ClientPortal />} />
-                        <Route path="booking" element={<Booking />} />
-                        <Route path="calendar" element={<CalendarView isUserView={true} />} />
-                        <Route path="packages" element={<Packages />} />
-                    </Route>
-
-                    {/* Admin Routes with AdminLayout */}
-                    <Route 
-                        path="/admin" 
-                        element={
-                            <ProtectedRoute allowedRoles={['admin', 'staff']}>
-                                <AdminLayout />
-                            </ProtectedRoute>
-                        }
-                    >
-                        <Route index element={<AdminDashboard />} />
-                        <Route path="staff" element={<StaffManagement />} />
-                        <Route path="staff/:id/availability" element={<StaffAvailability />} />
-                        <Route path="simulators" element={<SimulatorManagement />} />
-                        <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
-                        <Route path="packages" element={<PackageManagement />} />
-                        <Route path="bookings" element={<BookingManagement />} />
-                        <Route path="calendar" element={<CalendarView />} />
-                        <Route path="overrides" element={<AdminOverrides />} />
-                    </Route>
-
-                    <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center"><div className="text-red-500 text-xl">Unauthorized Access</div></div>} />
-                </Routes>
+                <AppContent />
             </div>
         </Router>
     );

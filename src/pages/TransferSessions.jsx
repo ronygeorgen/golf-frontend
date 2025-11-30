@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getTransferablePurchases, createSessionTransfer, checkPhoneExists, getMyPackagePurchases } from '../store/slices/coachingSlice';
-import PopupMessage from './PopupMessage';
+import PopupMessage from '../components/PopupMessage';
 import usePopup from '../hooks/usePopup';
-import { FormSkeleton } from './skeletons/SkeletonLoader';
-import Button from './ui/Button';
+import { Skeleton } from '../components/skeletons/SkeletonLoader';
+import Button from '../components/ui/Button';
 
-function SessionTransfer({ showAll = false }) {
+function TransferSessions() {
     const dispatch = useAppDispatch();
-    const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { transferablePurchases, transferablePurchasesPagination, transferablePurchasesLoading, phoneChecking, phoneCheck } = useAppSelector((state) => state.coaching);
     
@@ -20,11 +18,11 @@ function SessionTransfer({ showAll = false }) {
     const [phoneValidated, setPhoneValidated] = useState(false);
     const [notes, setNotes] = useState('');
     const [transferLoading, setTransferLoading] = useState(false);
-    const previewLimit = 5;
+    const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
-        dispatch(getTransferablePurchases({ page: 1 }));
-    }, [dispatch]);
+        dispatch(getTransferablePurchases({ page: currentPage }));
+    }, [dispatch, currentPage]);
 
     useEffect(() => {
         if (!showTransferModal) {
@@ -125,7 +123,7 @@ function SessionTransfer({ showAll = false }) {
                 title: 'Transfer Initiated!',
                 message: 'The transfer request has been sent. The recipient will receive a notification.',
             });
-            dispatch(getTransferablePurchases({ page: 1 }));
+            dispatch(getTransferablePurchases({ page: currentPage }));
             setShowTransferModal(false);
         } else {
             const errorMsg = result.payload?.to_user_phone?.[0] || 
@@ -140,71 +138,110 @@ function SessionTransfer({ showAll = false }) {
         }
     };
 
-    if (transferablePurchasesLoading) {
-        return (
-            <div className="bg-surface rounded-card shadow-card p-6 h-full flex flex-col">
-                <h2 className="text-xl font-bold text-text-primary mb-4">Transfer Sessions</h2>
-                <FormSkeleton fields={3} />
-            </div>
-        );
-    }
-
-    const displayedPurchases = showAll ? transferablePurchases : transferablePurchases.slice(0, previewLimit);
+    const totalPages = transferablePurchasesPagination.totalPages || 1;
+    const totalCount = transferablePurchasesPagination.count || 0;
+    const pageSize = transferablePurchasesPagination.pageSize || 10;
 
     return (
-        <div className="bg-surface rounded-card shadow-card p-6 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-text-primary">Transfer Sessions</h2>
-                {!showAll && transferablePurchases.length > previewLimit && (
+        <div className="p-4 md:p-6 lg:p-8">
+            <div className="bg-surface rounded-card shadow-card p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold text-text-primary">Transfer Sessions</h1>
+                        <p className="text-sm text-text-secondary mt-1">
+                            Transfer sessions from your packages to other users
+                        </p>
+                    </div>
                     <button
-                        onClick={() => navigate('/transfers/sessions')}
-                        className="group text-sm text-primary hover:text-primary-light transition-colors font-medium cursor-pointer"
+                        onClick={() => dispatch(getTransferablePurchases({ page: currentPage }))}
+                        className="text-sm text-primary hover:text-primary-light font-semibold transition-colors"
                     >
-                        <span className="border-b border-current group-hover:border-primary-light transition-colors">
-                            View All ({transferablePurchasesPagination.count || transferablePurchases.length})
-                        </span>
+                        Refresh
                     </button>
+                </div>
+
+                {transferablePurchasesLoading ? (
+                    <div className="grid gap-4">
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                            <div key={idx} className="rounded-card p-4 bg-surface shadow-card space-y-3">
+                                <Skeleton height="20px" width="50%" />
+                                <Skeleton height="16px" width="70%" />
+                                <Skeleton height="40px" width="150px" />
+                            </div>
+                        ))}
+                    </div>
+                ) : transferablePurchases.length === 0 ? (
+                    <div className="text-center text-text-secondary py-12">
+                        <p className="text-lg mb-2">You have no packages with transferable sessions.</p>
+                        <p className="text-sm">Purchase a package to start transferring sessions.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="space-y-4 mb-6">
+                            {transferablePurchases.map((purchase) => (
+                                <div key={purchase.id} className="border border-border rounded-card p-4 bg-background">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-text-primary">
+                                                {purchase.purchase_name || purchase.package_details?.title}
+                                            </h3>
+                                            {purchase.purchase_name && (
+                                                <p className="text-xs text-text-secondary">
+                                                    Package: {purchase.package_details?.title || 'Unknown package'}
+                                                </p>
+                                            )}
+                                            <p className="text-sm text-text-secondary mt-1">
+                                                {purchase.sessions_remaining} of {purchase.sessions_total} sessions remaining
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={() => {
+                                                setSelectedPurchase(purchase);
+                                                setSessionCount(Math.min(1, purchase.sessions_remaining));
+                                                setShowTransferModal(true);
+                                            }}
+                                            variant="primary"
+                                            className="ml-4"
+                                        >
+                                            Transfer Sessions
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-border">
+                                <p className="text-sm text-text-secondary">
+                                    Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalCount)} of {totalCount} packages
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1 || transferablePurchasesLoading}
+                                        variant="secondary"
+                                        className="px-3 py-1"
+                                    >
+                                        Previous
+                                    </Button>
+                                    <span className="text-sm font-medium text-text-primary">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    <Button
+                                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage >= totalPages || transferablePurchasesLoading}
+                                        variant="primary"
+                                        className="px-3 py-1"
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
-            
-            {transferablePurchases.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center py-8">
-                    <p className="text-text-secondary">You have no packages with transferable sessions.</p>
-                </div>
-            ) : (
-                <div className="flex-1 space-y-4">
-                    {displayedPurchases.map((purchase) => (
-                        <div key={purchase.id} className="border border-border rounded-card p-4 bg-surface">
-                            <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-text-primary">
-                                        {purchase.purchase_name || purchase.package_details?.title}
-                                    </h3>
-                                    {purchase.purchase_name && (
-                                        <p className="text-xs text-text-secondary">
-                                            package: {purchase.package_details?.title || 'Unknown package'}
-                                        </p>
-                                    )}
-                                    <p className="text-sm text-text-secondary mt-1">
-                                        {purchase.sessions_remaining} of {purchase.sessions_total} sessions remaining
-                                    </p>
-                                </div>
-                                <Button
-                                    onClick={() => {
-                                        setSelectedPurchase(purchase);
-                                        setSessionCount(Math.min(1, purchase.sessions_remaining));
-                                        setShowTransferModal(true);
-                                    }}
-                                    variant="primary"
-                                    className="ml-4"
-                                >
-                                    Transfer Sessions
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
 
             {/* Transfer Modal */}
             {showTransferModal && selectedPurchase && (
@@ -234,7 +271,7 @@ function SessionTransfer({ showAll = false }) {
                                         {selectedPurchase.purchase_name || selectedPurchase.package_details?.title}
                                     </h4>
                                     <p className="text-xs text-text-secondary">
-                                        package: {selectedPurchase.package_details?.title || 'Unknown package'}
+                                        Package: {selectedPurchase.package_details?.title || 'Unknown package'}
                                     </p>
                                     <p className="text-sm text-text-secondary mt-1">
                                         Available: {selectedPurchase.sessions_remaining} sessions
@@ -348,5 +385,5 @@ function SessionTransfer({ showAll = false }) {
     );
 }
 
-export default SessionTransfer;
+export default TransferSessions;
 

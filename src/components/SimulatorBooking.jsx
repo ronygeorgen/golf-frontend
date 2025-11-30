@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits } from '../store/slices/bookingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import Button from './ui/Button';
 
 function SimulatorBooking() {
     const dispatch = useAppDispatch();
@@ -181,32 +182,32 @@ function SimulatorBooking() {
 
     if (bookingSuccess) {
         return (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+            <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-8 text-center">
                 <div className="mb-4">
-                    <svg className="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="mx-auto h-12 w-12 text-status-confirmed-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-green-800 mb-2">Booking Confirmed!</h3>
-                <p className="text-gray-600 mb-6">Your simulator session has been booked successfully.</p>
-                <button 
+                <h3 className="text-2xl font-bold text-status-confirmed-text mb-2">Booking Confirmed!</h3>
+                <p className="text-text-secondary mb-6">Your simulator session has been booked successfully.</p>
+                <Button 
                     onClick={() => setBookingSuccess(false)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200"
+                    variant="primary"
                 >
                     Book Another Session
-                </button>
+                </Button>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Book Simulator Session</h2>
-                <p className="text-sm text-gray-600 mb-4">
-                    We’ll automatically assign the optimal bay at confirmation. Simulator bookings can be cancelled up to 24 hours out without penalty—inside that window you’ll need an admin override.
+            <div className="bg-surface rounded-card shadow-card p-6">
+                <h2 className="text-xl font-bold text-text-primary mb-2">Book Simulator Session</h2>
+                <p className="text-sm text-text-secondary mb-4">
+                    We'll automatically assign the optimal bay at confirmation. Simulator bookings can be cancelled up to 24 hours out without penalty—inside that window you'll need an admin override.
                 </p>
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-900">
+                <div className="mb-4 p-4 bg-primary-light/10 border border-primary/20 rounded-card text-sm text-primary">
                     <p className="font-semibold">Refund policy</p>
                     <p>
                         Cancelling at least 24 hours in advance converts your payment into a simulator credit so you can rebook later at no charge.
@@ -214,7 +215,7 @@ function SimulatorBooking() {
                 </div>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
                             Date
                         </label>
                         <input
@@ -222,12 +223,11 @@ function SimulatorBooking() {
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
                             min={new Date().toISOString().split('T')[0]}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
                             Duration
                         </label>
                         <select 
@@ -236,36 +236,36 @@ function SimulatorBooking() {
                                 setDuration(parseInt(e.target.value));
                                 setSelectedSlot(null); // Reset selected slot when duration changes
                             }}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                         >
-                            <option value={30} className="text-gray-900">30 minutes</option>
-                            <option value={60} className="text-gray-900">1 hour</option>
-                            <option value={120} className="text-gray-900">2 hours</option>
-                            <option value={180} className="text-gray-900">3 hours</option>
+                            <option value={30}>30 minutes</option>
+                            <option value={60}>1 hour</option>
+                            <option value={120}>2 hours</option>
+                            <option value={180}>3 hours</option>
                         </select>
                     </div>
                     
-                    <button 
+                    <Button 
                         onClick={checkAvailability} 
                         disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+                        variant="primary"
+                        className="w-full py-3"
                     >
                         {loading ? 'Checking Availability...' : 'Check Availability'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {availability.simulator && availability.simulator.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-surface rounded-card shadow-card p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                        <h3 className="text-xl font-bold text-gray-900">Available Time Slots</h3>
-                        <div className="text-sm text-gray-600 flex flex-wrap items-center gap-2">
+                        <h3 className="text-xl font-bold text-text-primary">Available Time Slots</h3>
+                        <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
                             <span className="font-medium">Book simulator sessions for</span>
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-semibold">
+                            <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
                                 {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
                             </span>
-                            <span className="text-gray-400">|</span>
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded font-semibold">
+                            <span className="text-text-secondary/50">|</span>
+                            <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
                                 {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                             </span>
                         </div>
@@ -279,34 +279,34 @@ function SimulatorBooking() {
                             return (
                                 <div
                                     key={index}
-                                    className={`p-4 border-2 rounded-lg transition duration-200 relative ${
+                                    className={`p-4 border-2 rounded-card transition duration-200 relative ${
                                         isDisabled
-                                            ? 'border-red-200 bg-red-50 cursor-not-allowed opacity-60'
+                                            ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
                                             : isSelected
-                                                ? 'border-blue-500 bg-blue-100 shadow-md cursor-pointer'
-                                                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50 cursor-pointer'
+                                                ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
+                                                : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                     }`}
                                     onClick={() => handleSlotSelect(slot)}
                                     title={isDisabled ? `This slot cannot accommodate ${duration} minutes. Maximum available: ${getSuggestedDuration(slot)}` : ''}
                                 >
-                                    <div className={`text-lg font-semibold ${isDisabled ? 'text-gray-500' : 'text-gray-900'}`}>
+                                    <div className={`text-lg font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                         {new Date(slot.start_time).toLocaleTimeString('en-US', { 
                                             hour: '2-digit', 
                                             minute: '2-digit'
                                         })}
                                     </div>
-                                    <div className={`text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    <div className={`text-sm ${isDisabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
                                         {slot.duration_minutes || duration} minutes
                                     </div>
                                     <div className="text-xs text-gray-400 mt-1">
                                         Bay assigned automatically at confirmation
                                     </div>
                                     {isDisabled && (
-                                        <div className="mt-2 pt-2 border-t border-red-200">
-                                            <div className="text-xs text-red-600 font-medium">
+                                        <div className="mt-2 pt-2 border-t border-danger/30">
+                                            <div className="text-xs text-danger font-medium">
                                                 Exceeds availability
                                             </div>
-                                            <div className="text-xs text-red-500 mt-1">
+                                            <div className="text-xs text-danger/80 mt-1">
                                                 Max: {getSuggestedDuration(slot)}
                                             </div>
                                         </div>
@@ -317,18 +317,18 @@ function SimulatorBooking() {
                     </div>
                     
                     {availableCredits > 0 && (
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                        <div className="bg-status-personal-bg border border-status-personal-text/20 rounded-card p-4 mb-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-purple-900 font-semibold">You have {availableCredits} simulator credit{availableCredits > 1 ? 's' : ''}</p>
-                                    <p className="text-sm text-purple-800">
+                                    <p className="text-status-personal-text font-semibold">You have {availableCredits} simulator credit{availableCredits > 1 ? 's' : ''}</p>
+                                    <p className="text-sm text-status-personal-text/80">
                                         Use a credit to waive payment for this booking.
                                     </p>
                                 </div>
-                                <label className="flex items-center gap-2 text-purple-900 font-medium">
+                                <label className="flex items-center gap-2 text-status-personal-text font-medium">
                                     <input 
                                         type="checkbox" 
-                                        className="h-5 w-5 text-purple-600"
+                                        className="h-5 w-5 text-status-personal-text"
                                         checked={useCredit}
                                         onChange={(e) => setUseCredit(e.target.checked)}
                                         disabled={creditsLoading}
@@ -339,31 +339,32 @@ function SimulatorBooking() {
                         </div>
                     )}
                     {selectedSlot && (
-                        <div className="bg-gray-50 rounded-lg p-6">
-                            <h4 className="text-lg font-bold text-gray-900 mb-4">Booking Summary</h4>
+                        <div className="bg-background rounded-card p-6">
+                            <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
                             <div className="space-y-2 mb-4">
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
                                 </p>
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">Start Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                 </p>
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">End Time:</span> {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                 </p>
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                                 </p>
                             </div>
                             {useCredit && (
-                                <div className="text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg p-3 mb-4">
+                                <div className="text-sm text-status-confirmed-text bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-3 mb-4">
                                     This booking will use one simulator credit. No additional payment is required.
                                 </div>
                             )}
-                            <button 
+                            <Button 
                                 onClick={handleBooking}
                                 disabled={bookingLoading}
-                                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2"
+                                variant="primary"
+                                className="w-full py-3 flex items-center justify-center gap-2"
                             >
                                 {bookingLoading ? (
                                     <>
@@ -376,7 +377,7 @@ function SimulatorBooking() {
                                 ) : (
                                     'Confirm Booking'
                                 )}
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>

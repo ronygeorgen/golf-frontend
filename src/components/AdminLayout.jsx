@@ -90,9 +90,9 @@ function AdminLayout() {
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-background">
             {/* Header */}
-            <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50 w-full">
+            <header className="bg-surface shadow-sm border-b border-border sticky top-0 z-50 w-full">
                 <div className="px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-14">
                         {/* Left side - Logo */}
@@ -102,7 +102,7 @@ function AdminLayout() {
                                 alt="Hole 9 Golf Logo" 
                                 className="h-10 w-auto object-contain"
                             />
-                            <h1 className="text-xl font-bold text-blue-700">
+                            <h1 className="text-xl font-bold text-primary">
                                 Admin Panel
                             </h1>
                         </div>
@@ -114,40 +114,40 @@ function AdminLayout() {
                                 <div className="relative" ref={dropdownRef}>
                                     <button
                                         onClick={() => setDropdownOpen(!dropdownOpen)}
-                                        className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                                        className="flex items-center space-x-2 px-3 py-2 rounded-button hover:bg-background transition-colors"
                                     >
-                                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                                             <span className="text-white text-sm font-semibold">
                                                 {user?.first_name?.[0] || user?.email?.[0] || 'A'}
                                             </span>
                                         </div>
                                         <div className="hidden md:flex flex-col items-start">
-                                            <span className="text-sm font-medium text-gray-700">
+                                            <span className="text-sm font-medium text-text-primary">
                                                 {user?.first_name || user?.username || 'Admin'}
                                             </span>
                                             {user?.email && user?.first_name && (
-                                                <span className="text-xs text-gray-500">{user.email}</span>
+                                                <span className="text-xs text-text-secondary">{user.email}</span>
                                             )}
                                         </div>
-                                        <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                                        <ChevronDown className={`w-4 h-4 text-text-secondary transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {/* Dropdown Menu */}
                                     {dropdownOpen && (
-                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60]">
+                                        <div className="absolute right-0 mt-2 w-56 bg-surface rounded-card shadow-card border border-border py-2 z-[60]">
                                             {/* User Info Section */}
-                                            <div className="px-4 py-3 border-b border-gray-200">
+                                            <div className="px-4 py-3 border-b border-border">
                                                 <div className="flex items-center space-x-3">
-                                                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                                    <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
                                                         <span className="text-white text-sm font-semibold">
                                                             {user?.first_name?.[0] || user?.email?.[0] || 'A'}
                                                         </span>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                                        <p className="text-sm font-medium text-text-primary truncate">
                                                             {user?.first_name || user?.username || 'Admin'}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 truncate">
+                                                        <p className="text-xs text-text-secondary truncate">
                                                             {user?.email || ''}
                                                         </p>
                                                     </div>
@@ -161,7 +161,7 @@ function AdminLayout() {
                                                         navigate('/portal');
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
                                                 >
                                                     <Home className="w-4 h-4" />
                                                     <span>Switch to User Side</span>
@@ -171,7 +171,7 @@ function AdminLayout() {
                                                         handleGHLOnboard();
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
                                                 >
                                                     <Link2 className="w-4 h-4" />
                                                     <span>Onboard GHL</span>
@@ -181,7 +181,7 @@ function AdminLayout() {
                                                         handleLogout();
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
                                                 >
                                                     <LogOut className="w-4 h-4" />
                                                     <span>Logout</span>
@@ -195,7 +195,7 @@ function AdminLayout() {
                             {/* User Info (fallback for non-admin) */}
                             {!isAdmin && (
                                 <div className="flex items-center space-x-3">
-                                    <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
+                                    <div className="hidden md:flex items-center space-x-2 text-sm text-text-secondary">
                                         <User className="w-4 h-4" />
                                         <span>{user?.first_name || user?.username || 'User'}</span>
                                     </div>
@@ -209,20 +209,20 @@ function AdminLayout() {
             <div className="flex pt-14">
             {/* Sidebar */}
             <aside
-                className={`bg-white text-blue-700 transition-all duration-300 ease-in-out ${
+                className={`bg-surface text-primary transition-all duration-300 ease-in-out ${
                     sidebarOpen ? 'w-64' : 'w-20'
-                } fixed z-40 shadow-xl border-r border-gray-200`}
+                } fixed z-40 shadow-xl border-r border-border`}
                 style={{ top: '56px', height: 'calc(100vh - 56px)', overflowY: 'auto' }}
             >
                 <div className="flex flex-col h-full">
                     {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between p-4 border-b border-border">
                         {sidebarOpen && (
-                            <h2 className="text-xl font-bold text-blue-700">Admin Panel</h2>
+                            <h2 className="text-xl font-bold text-primary">Admin Panel</h2>
                         )}
                         <button
                             onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="p-2 rounded-lg hover:bg-blue-50 text-blue-700 transition-colors"
+                            className="p-2 rounded-button hover:bg-background text-primary transition-colors"
                             aria-label="Toggle sidebar"
                         >
                             {sidebarOpen ? (
@@ -244,8 +244,8 @@ function AdminLayout() {
                                             onClick={() => navigate(item.path)}
                                             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                                                 active
-                                                    ? 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 shadow-md font-semibold border-l-4 border-blue-600'
-                                                    : 'text-blue-700 hover:bg-blue-50'
+                                                    ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold border-l-4 border-primary'
+                                                    : 'text-primary hover:bg-background'
                                             }`}
                                             title={!sidebarOpen ? item.label : ''}
                                         >
@@ -261,10 +261,10 @@ function AdminLayout() {
                     </nav>
 
                     {/* Logout Button */}
-                    <div className="p-4 border-t border-gray-200">
+                    <div className="p-4 border-t border-border">
                         <button
                             onClick={handleLogout}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-blue-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 ${
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-primary hover:bg-danger/10 hover:text-danger transition-all duration-200 ${
                                 !sidebarOpen ? 'justify-center' : ''
                             }`}
                             title={!sidebarOpen ? 'Logout' : ''}
@@ -286,7 +286,7 @@ function AdminLayout() {
                 <div className="lg:hidden fixed top-[60px] left-4 z-40">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="p-2 bg-white hover:bg-blue-50 text-blue-700 rounded-lg shadow-lg border border-gray-200 transition-colors"
+                        className="p-2 bg-surface hover:bg-background text-primary rounded-button shadow-card border border-border transition-colors"
                         aria-label="Toggle sidebar"
                     >
                         <Menu className="w-6 h-6" />
@@ -296,7 +296,7 @@ function AdminLayout() {
                 {/* Content */}
                 <div className="px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8 pt-4 md:pt-6 w-full">
                     {/* Page Title */}
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
+                    <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-6">
                         {getPageTitle()}
                     </h1>
                     <Outlet />

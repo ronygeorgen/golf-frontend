@@ -31,9 +31,11 @@ export const getActiveCoachingPackages = getActivePackages; // Alias for consist
 
 export const getMyPackagePurchases = createAsyncThunk(
     'coaching/getMyPackagePurchases',
-    async (_, { rejectWithValue }) => {
+    async ({ page = 1 } = {}, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get(endpoints.coaching.myPurchases);
+            const response = await apiClient.get(endpoints.coaching.myPurchases, {
+                params: { page }
+            });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -94,6 +96,62 @@ export const getOrganizationPackages = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             const response = await apiClient.get(endpoints.coaching.organizationPackages);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getMyOrganizationPurchases = createAsyncThunk(
+    'coaching/getMyOrganizationPurchases',
+    async ({ page = 1 } = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.myOrganizationPurchases, {
+                params: { page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getTransferablePurchases = createAsyncThunk(
+    'coaching/getTransferablePurchases',
+    async ({ page = 1 } = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.transferablePurchases, {
+                params: { page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const addOrganizationMember = createAsyncThunk(
+    'coaching/addOrganizationMember',
+    async ({ purchaseId, phone }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.coaching.addMember(purchaseId), {
+                phone: phone.trim()
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const removeOrganizationMember = createAsyncThunk(
+    'coaching/removeOrganizationMember',
+    async ({ purchaseId, phone }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.coaching.removeMember(purchaseId), {
+                phone: phone.trim()
+            });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -188,13 +246,36 @@ const initialState = {
     packages: [],
     activePackages: [],
     purchases: [],
+    purchasesPagination: {
+        count: 0,
+        totalPages: 0,
+        currentPage: 1,
+        pageSize: 10,
+    },
     organizationPackages: [],
+    organizationPurchases: [],
+    organizationPurchasesPagination: {
+        count: 0,
+        totalPages: 0,
+        currentPage: 1,
+        pageSize: 10,
+    },
+    transferablePurchases: [],
+    transferablePurchasesPagination: {
+        count: 0,
+        totalPages: 0,
+        currentPage: 1,
+        pageSize: 10,
+    },
     giftsPending: [],
     transfersPending: [],
     phoneCheck: null,
     loading: false,
     purchasesLoading: false,
     organizationPackagesLoading: false,
+    organizationPurchasesLoading: false,
+    transferablePurchasesLoading: false,
+    memberManagementLoading: false,
     purchaseSubmitting: false,
     phoneChecking: false,
     giftsLoading: false,
@@ -247,7 +328,19 @@ const coachingSlice = createSlice({
             })
             .addCase(getMyPackagePurchases.fulfilled, (state, action) => {
                 state.purchasesLoading = false;
-                state.purchases = action.payload;
+                // Handle paginated response
+                if (action.payload.results !== undefined) {
+                    state.purchases = action.payload.results;
+                    state.purchasesPagination = {
+                        count: action.payload.count || 0,
+                        totalPages: action.payload.total_pages || 0,
+                        currentPage: action.payload.current_page || 1,
+                        pageSize: action.payload.page_size || 10,
+                    };
+                } else {
+                    // Fallback for non-paginated response
+                    state.purchases = action.payload;
+                }
             })
             .addCase(getMyPackagePurchases.rejected, (state, action) => {
                 state.purchasesLoading = false;
@@ -296,6 +389,88 @@ const coachingSlice = createSlice({
                 if (action.payload.purchase) {
                     state.purchases = [action.payload.purchase, ...state.purchases];
                 }
+            })
+            .addCase(getMyOrganizationPurchases.pending, (state) => {
+                state.organizationPurchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getMyOrganizationPurchases.fulfilled, (state, action) => {
+                state.organizationPurchasesLoading = false;
+                // Handle paginated response
+                if (action.payload.results !== undefined) {
+                    state.organizationPurchases = action.payload.results;
+                    state.organizationPurchasesPagination = {
+                        count: action.payload.count || 0,
+                        totalPages: action.payload.total_pages || 0,
+                        currentPage: action.payload.current_page || 1,
+                        pageSize: action.payload.page_size || 10,
+                    };
+                } else {
+                    // Fallback for non-paginated response
+                    state.organizationPurchases = action.payload;
+                }
+            })
+            .addCase(getMyOrganizationPurchases.rejected, (state, action) => {
+                state.organizationPurchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getTransferablePurchases.pending, (state) => {
+                state.transferablePurchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getTransferablePurchases.fulfilled, (state, action) => {
+                state.transferablePurchasesLoading = false;
+                // Handle paginated response
+                if (action.payload.results !== undefined) {
+                    state.transferablePurchases = action.payload.results;
+                    state.transferablePurchasesPagination = {
+                        count: action.payload.count || 0,
+                        totalPages: action.payload.total_pages || 0,
+                        currentPage: action.payload.current_page || 1,
+                        pageSize: action.payload.page_size || 10,
+                    };
+                } else {
+                    // Fallback for non-paginated response
+                    state.transferablePurchases = action.payload;
+                }
+            })
+            .addCase(getTransferablePurchases.rejected, (state, action) => {
+                state.transferablePurchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(addOrganizationMember.pending, (state) => {
+                state.memberManagementLoading = true;
+                state.error = null;
+            })
+            .addCase(addOrganizationMember.fulfilled, (state, action) => {
+                state.memberManagementLoading = false;
+                // Update the purchase in organizationPurchases
+                const updatedPurchase = action.payload.purchase;
+                const index = state.organizationPurchases.findIndex(p => p.id === updatedPurchase.id);
+                if (index !== -1) {
+                    state.organizationPurchases[index] = updatedPurchase;
+                }
+            })
+            .addCase(addOrganizationMember.rejected, (state, action) => {
+                state.memberManagementLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(removeOrganizationMember.pending, (state) => {
+                state.memberManagementLoading = true;
+                state.error = null;
+            })
+            .addCase(removeOrganizationMember.fulfilled, (state, action) => {
+                state.memberManagementLoading = false;
+                // Update the purchase in organizationPurchases
+                const updatedPurchase = action.payload.purchase;
+                const index = state.organizationPurchases.findIndex(p => p.id === updatedPurchase.id);
+                if (index !== -1) {
+                    state.organizationPurchases[index] = updatedPurchase;
+                }
+            })
+            .addCase(removeOrganizationMember.rejected, (state, action) => {
+                state.memberManagementLoading = false;
+                state.error = action.payload;
             })
             .addCase(checkPhoneExists.pending, (state) => {
                 state.phoneChecking = true;

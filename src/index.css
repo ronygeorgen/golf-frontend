@@ -1,4 +1,101 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Font Family */
+  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+
+  /* Font Weight */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Responsive Type Scale */
+  --fs-h1: clamp(1.5rem, 2vw + 0.8rem, 2rem);      /* 24–32px */
+  --fs-h2: clamp(1.25rem, 1.5vw + 0.5rem, 1.5rem); /* 20–24px */
+  --fs-h3: clamp(1.125rem, 1vw + 0.5rem, 1.25rem); /* 18–20px */
+  --fs-body: clamp(0.875rem, 0.5vw + 0.7rem, 1rem); /* 14–16px */
+  --fs-small: clamp(0.75rem, 0.5vw + 0.5rem, 0.875rem); /* 12–14px */
+
+  /* Line Heights */
+  --lh-tight: 1.1;
+  --lh-normal: 1.4;
+  --lh-loose: 1.6;
+
+  /* Letter Spacing */
+  --ls-tight: -0.01em;
+  --ls-normal: 0;
+}
+
+@layer base {
+    body {
+        font-family: var(--font-main);
+        line-height: var(--lh-normal);
+        @apply bg-background text-text-primary;
+    }
+
+    h1 {
+        font-size: var(--fs-h1);
+        font-weight: var(--fw-bold);
+        line-height: var(--lh-tight);
+        letter-spacing: var(--ls-tight);
+    }
+
+    h2 {
+        font-size: var(--fs-h2);
+        font-weight: var(--fw-semibold);
+        line-height: var(--lh-tight);
+        letter-spacing: var(--ls-tight);
+    }
+
+    h3 {
+        font-size: var(--fs-h3);
+        font-weight: var(--fw-semibold);
+        line-height: var(--lh-normal);
+    }
+
+    p, span, div {
+        font-size: var(--fs-body);
+        font-weight: var(--fw-regular);
+        line-height: var(--lh-normal);
+    }
+
+    .small-text {
+        font-size: var(--fs-small);
+        line-height: var(--lh-loose);
+        @apply text-text-secondary;
+    }
+    
+    /* Unified input styling */
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    input[type="password"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    select,
+    textarea {
+        @apply w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface transition-colors;
+    }
+    
+    input[type="text"]:disabled,
+    input[type="email"]:disabled,
+    input[type="tel"]:disabled,
+    input[type="number"]:disabled,
+    input[type="password"]:disabled,
+    input[type="date"]:disabled,
+    input[type="time"]:disabled,
+    select:disabled,
+    textarea:disabled {
+        @apply bg-background text-text-secondary cursor-not-allowed;
+    }
+}
 
 @keyframes slide-in-right {
     from {

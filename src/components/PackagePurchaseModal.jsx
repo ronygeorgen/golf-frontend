@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { createPackagePurchase, createTempPurchase, clearPhoneCheck } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import Button from './ui/Button';
 
 function PackagePurchaseModal({
     isOpen,
@@ -118,7 +119,7 @@ function PackagePurchaseModal({
                 openPopup({
                     type: 'warning',
                     title: 'Members Required',
-                    message: 'Please add at least one member to the organization package.',
+                    message: 'Please add at least one member to the group package.',
                 });
                 return;
             }
@@ -242,13 +243,13 @@ function PackagePurchaseModal({
             <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                 <div className="fixed inset-0 transition-opacity bg-black/50 backdrop-blur-sm" onClick={onClose}></div>
 
-                <div className="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="relative z-10 inline-block align-bottom bg-surface rounded-card text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div className="bg-surface px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">{titleText}</h3>
+                            <h3 className="text-lg font-medium text-text-primary">{titleText}</h3>
                             <button
                                 onClick={onClose}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-text-secondary hover:text-text-primary transition-colors"
                             >
                                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -257,23 +258,23 @@ function PackagePurchaseModal({
                         </div>
 
                         {packageData && (
-                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                <h4 className="font-semibold text-gray-900">{packageData.title}</h4>
-                                <p className="text-sm text-gray-600 mt-1">{packageData.description}</p>
+                            <div className="mb-4 p-3 bg-background rounded-lg">
+                                <h4 className="font-semibold text-text-primary">{packageData.title}</h4>
+                                <p className="text-sm text-text-secondary mt-1">{packageData.description}</p>
                                 <div className="mt-2 flex justify-between text-sm">
-                                    <span className="text-gray-600">Sessions:</span>
-                                    <span className="font-medium">{packageData.session_count}</span>
+                                    <span className="text-text-secondary">Sessions:</span>
+                                    <span className="font-medium text-text-primary">{packageData.session_count}</span>
                                 </div>
                                 <div className="mt-1 flex justify-between text-sm">
-                                    <span className="text-gray-600">Price:</span>
-                                    <span className="font-medium">${packageData.price}</span>
+                                    <span className="text-text-secondary">Price:</span>
+                                    <span className="font-medium text-accent">${packageData.price}</span>
                                 </div>
                             </div>
                         )}
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-text-primary mb-2">
                                     Purchase Name
                                 </label>
                                 <input
@@ -281,16 +282,15 @@ function PackagePurchaseModal({
                                     value={purchaseName}
                                     onChange={(e) => setPurchaseName(e.target.value)}
                                     placeholder="e.g., Fall Coaching Plan"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
                             </div>
                             {!lockType && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-text-primary mb-2">
                                         Purchase Type
                                     </label>
                                     <div className="space-y-2">
-                                        <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                        <label className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
                                             <input
                                                 type="radio"
                                                 name="purchaseType"
@@ -300,11 +300,11 @@ function PackagePurchaseModal({
                                                 className="mr-3"
                                             />
                                             <div>
-                                                <div className="font-medium text-gray-900">Buy for Myself</div>
-                                                <div className="text-sm text-gray-500">Package will be immediately available for booking</div>
+                                                <div className="font-medium text-text-primary">Buy for Myself</div>
+                                                <div className="text-sm text-text-secondary">Package will be immediately available for booking</div>
                                             </div>
                                         </label>
-                                        <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                        <label className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
                                             <input
                                                 type="radio"
                                                 name="purchaseType"
@@ -314,11 +314,11 @@ function PackagePurchaseModal({
                                                 className="mr-3"
                                             />
                                             <div>
-                                                <div className="font-medium text-gray-900">Buy as Gift</div>
-                                                <div className="text-sm text-gray-500">Send this package to someone else</div>
+                                                <div className="font-medium text-text-primary">Buy as Gift</div>
+                                                <div className="text-sm text-text-secondary">Send this package to someone else</div>
                                             </div>
                                         </label>
-                                        <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                        <label className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
                                             <input
                                                 type="radio"
                                                 name="purchaseType"
@@ -328,8 +328,8 @@ function PackagePurchaseModal({
                                                 className="mr-3"
                                             />
                                             <div>
-                                                <div className="font-medium text-gray-900">Buy for Organization</div>
-                                                <div className="text-sm text-gray-500">Share this package with multiple members</div>
+                                                <div className="font-medium text-text-primary">Buy for Group</div>
+                                                <div className="text-sm text-text-secondary">Share this package with multiple members</div>
                                             </div>
                                         </label>
                                     </div>
@@ -337,9 +337,9 @@ function PackagePurchaseModal({
                             )}
 
                             {purchaseType === 'organization' && (
-                                <div className="space-y-3 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                                <div className="space-y-3 p-4 bg-status-personal-bg rounded-lg border border-status-personal-text/20">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Add Organization Members
                                         </label>
                                         <div className="flex gap-2 mb-3">
@@ -349,35 +349,35 @@ function PackagePurchaseModal({
                                                 onChange={(e) => setNewMemberPhone(e.target.value)}
                                                 onKeyPress={(e) => e.key === 'Enter' && handleAddMember()}
                                                 placeholder="Enter member phone number"
-                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                                className="flex-1"
                                             />
-                                            <button
+                                            <Button
                                                 type="button"
                                                 onClick={handleAddMember}
                                                 disabled={!newMemberPhone.trim()}
-                                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                                variant="accent"
                                             >
                                                 Add
-                                            </button>
+                                            </Button>
                                         </div>
                                         {memberPhones.length > 0 && (
                                             <div className="space-y-2">
-                                                <p className="text-sm font-medium text-gray-700">Members ({memberPhones.length}):</p>
+                                                <p className="text-sm font-medium text-text-primary">Members ({memberPhones.length}):</p>
                                                 {memberPhones.map((member, index) => (
-                                                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                                                    <div key={index} className="flex items-center justify-between p-2 bg-surface rounded border border-border">
                                                         <div className="flex items-center">
-                                                            <svg className="h-4 w-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                            <svg className="h-4 w-4 mr-2 text-status-confirmed-text" fill="currentColor" viewBox="0 0 20 20">
                                                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                                             </svg>
-                                                            <span className="text-sm text-gray-900">{member.phone}</span>
+                                                            <span className="text-sm text-text-primary">{member.phone}</span>
                                                             {member.name && (
-                                                                <span className="text-sm text-gray-500 ml-2">({member.name})</span>
+                                                                <span className="text-sm text-text-secondary ml-2">({member.name})</span>
                                                             )}
                                                         </div>
                                                         <button
                                                             type="button"
                                                             onClick={() => handleRemoveMember(member.phone)}
-                                                            className="text-red-600 hover:text-red-800"
+                                                            className="text-danger hover:text-danger-light transition-colors"
                                                         >
                                                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -387,7 +387,7 @@ function PackagePurchaseModal({
                                                 ))}
                                             </div>
                                         )}
-                                        <p className="text-xs text-gray-600 mt-2">
+                                        <p className="text-xs text-text-secondary mt-2">
                                             All members (including you) can use sessions from this package. First-come-first-served basis. Members don't need to be registered yet - they will receive access when they sign up.
                                         </p>
                                     </div>
@@ -395,9 +395,9 @@ function PackagePurchaseModal({
                             )}
 
                             {purchaseType === 'gift' && (
-                                <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <div className="space-y-3 p-4 bg-status-pending-bg rounded-lg border border-status-pending-text/20">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Recipient Phone Number
                                         </label>
                                         <input
@@ -405,9 +405,8 @@ function PackagePurchaseModal({
                                             value={recipientPhone}
                                             onChange={(e) => setRecipientPhone(e.target.value)}
                                             placeholder="Enter recipient phone number"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         />
-                                        <p className="mt-2 text-xs text-gray-600">
+                                        <p className="mt-2 text-xs text-text-secondary">
                                             Recipient doesn't need to be registered yet. They will receive the package when they sign up.
                                         </p>
                                     </div>
@@ -415,7 +414,7 @@ function PackagePurchaseModal({
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-text-primary mb-2">
                                     Notes (Optional)
                                 </label>
                                 <textarea
@@ -423,28 +422,29 @@ function PackagePurchaseModal({
                                     onChange={(e) => setNotes(e.target.value)}
                                     placeholder="Add any notes..."
                                     rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button
+                    <div className="bg-background px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+                        <Button
                             type="button"
                             onClick={handlePurchase}
                             disabled={purchaseSubmitting || (purchaseType === 'organization' && memberPhones.length === 0)}
-                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            variant="primary"
+                            className="w-full sm:w-auto"
                         >
-                            {purchaseSubmitting ? 'Processing...' : purchaseType === 'gift' ? 'Purchase Gift' : purchaseType === 'organization' ? 'Purchase for Organization' : 'Purchase Package'}
-                        </button>
-                        <button
+                            {purchaseSubmitting ? 'Processing...' : purchaseType === 'gift' ? 'Purchase Gift' : purchaseType === 'organization' ? 'Purchase for Group' : 'Purchase Package'}
+                        </Button>
+                        <Button
                             type="button"
                             onClick={onClose}
-                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            variant="secondary"
+                            className="w-full sm:w-auto"
                         >
                             Cancel
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
