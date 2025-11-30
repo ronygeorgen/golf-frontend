@@ -55,7 +55,7 @@ function UserLayout() {
                                 <img 
                                     src={logo} 
                                     alt="Hole 9 Golf Logo" 
-                                    className="h-6 w-auto md:h-10 object-contain"
+                                    className="h-10 w-auto md:h-10 object-contain"
                                 />
                             </div>
                             <div className="hidden md:block h-6 w-px bg-border"></div>

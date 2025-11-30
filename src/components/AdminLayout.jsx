@@ -11,39 +11,45 @@ import {
     Calendar, 
     CalendarDays, 
     LogOut, 
-    Menu, 
-    X,
     User,
     ShieldCheck,
     Link2,
     ChevronDown,
-    Home
+    Home,
+    Settings,
+    UserCog
 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
 function AdminLayout() {
-    // Load sidebar state from localStorage, default to true (open)
-    const [sidebarOpen, setSidebarOpen] = useState(() => {
-        const saved = localStorage.getItem('adminSidebarOpen');
-        return saved !== null ? saved === 'true' : true;
-    });
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [manageMenuOpen, setManageMenuOpen] = useState(false);
+    const [bookingsMenuOpen, setBookingsMenuOpen] = useState(false);
+    const [isInIframe, setIsInIframe] = useState(false);
     const dropdownRef = useRef(null);
+    const manageMenuRef = useRef(null);
+    const bookingsMenuRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.auth);
 
-    // Save sidebar state to localStorage when it changes
+    // Detect if page is loaded in an iframe
     useEffect(() => {
-        localStorage.setItem('adminSidebarOpen', sidebarOpen.toString());
-    }, [sidebarOpen]);
+        setIsInIframe(window.self !== window.top);
+    }, []);
 
-    // Close dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdownOpen(false);
+            }
+            if (manageMenuRef.current && !manageMenuRef.current.contains(event.target)) {
+                setManageMenuOpen(false);
+            }
+            if (bookingsMenuRef.current && !bookingsMenuRef.current.contains(event.target)) {
+                setBookingsMenuOpen(false);
             }
         };
 
@@ -53,21 +59,40 @@ function AdminLayout() {
         };
     }, []);
 
-    const menuItems = [
-        { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/admin/staff', label: 'Manage Staff', icon: Users },
-        { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
-        { path: '/admin/packages', label: 'Manage Packages', icon: Package },
-        { path: '/admin/bookings', label: 'View Bookings', icon: Calendar },
-        { path: '/admin/calendar', label: 'Calendar View', icon: CalendarDays },
-        { path: '/admin/overrides', label: 'Admin Overrides', icon: ShieldCheck },
-    ];
+    // Navigation structure with grouped items
+    const navigationItems = {
+        dashboard: { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+        manage: {
+            label: 'Manage',
+            icon: Settings,
+            items: [
+                { path: '/admin/users', label: 'Manage Users', icon: UserCog },
+                { path: '/admin/staff', label: 'Manage Staff', icon: Users },
+                { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
+                { path: '/admin/packages', label: 'Manage Packages', icon: Package },
+            ]
+        },
+        bookings: {
+            label: 'Bookings',
+            icon: Calendar,
+            items: [
+                { path: '/admin/bookings', label: 'View Bookings', icon: Calendar },
+                { path: '/admin/calendar', label: 'Calendar View', icon: CalendarDays },
+            ]
+        },
+        overrides: { path: '/admin/overrides', label: 'Admin Overrides', icon: ShieldCheck },
+    };
 
     const isActive = (path) => {
         if (path === '/admin') {
             return location.pathname === '/admin';
         }
         return location.pathname.startsWith(path);
+    };
+
+    // Check if any item in a group is active
+    const isGroupActive = (items) => {
+        return items.some(item => isActive(item.path));
     };
 
     const handleLogout = async () => {
@@ -83,33 +108,186 @@ function AdminLayout() {
 
     const getPageTitle = () => {
         const path = location.pathname;
-        const activeItem = menuItems.find(item => isActive(item.path));
-        return activeItem ? activeItem.label : 'Admin Dashboard';
+        
+        // Check manage items
+        const manageItem = navigationItems.manage.items.find(item => isActive(item.path));
+        if (manageItem) return manageItem.label;
+        
+        // Check bookings items
+        const bookingItem = navigationItems.bookings.items.find(item => isActive(item.path));
+        if (bookingItem) return bookingItem.label;
+        
+        // Check standalone items
+        if (isActive(navigationItems.dashboard.path)) return 'Dashboard';
+        if (isActive(navigationItems.overrides.path)) return 'Admin Overrides';
+        
+        return 'Admin Dashboard';
     };
 
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
 
+    const handleNavClick = (path) => {
+        navigate(path);
+        setManageMenuOpen(false);
+        setBookingsMenuOpen(false);
+        setDropdownOpen(false);
+    };
+
     return (
         <div className="min-h-screen bg-background">
-            {/* Header */}
+            {/* Top Navigation Bar */}
             <header className="bg-surface shadow-sm border-b border-border sticky top-0 z-50 w-full">
                 <div className="px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-14">
-                        {/* Left side - Logo */}
-                        <div className="flex items-center space-x-3">
-                            <img 
-                                src={logo} 
-                                alt="Hole 9 Golf Logo" 
-                                className="h-10 w-auto object-contain"
-                            />
-                            <h1 className="text-xl font-bold text-primary">
-                                Admin Panel
-                            </h1>
-                        </div>
+                    <div className="flex items-center justify-between h-16">
+                        {/* Left side - Logo (clickable) - Hidden in iframe */}
+                        {!isInIframe && (
+                            <button
+                                onClick={() => navigate('/admin')}
+                                className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity"
+                            >
+                                <img 
+                                    src={logo} 
+                                    alt="Hole 9 Golf Logo" 
+                                    className="h-10 sm:h-8 md:h-10 w-auto object-contain"
+                                />
+                                <h1 className="text-lg sm:text-xl font-bold text-primary hidden sm:block">
+                                    Admin Panel
+                                </h1>
+                            </button>
+                        )}
 
-                        {/* Right side - Actions */}
+                        {/* Center - Main Navigation Links (Desktop) */}
+                        <nav className="hidden md:flex items-center space-x-1 flex-1 justify-center max-w-4xl mx-4">
+                            {/* Dashboard */}
+                            <button
+                                onClick={() => handleNavClick(navigationItems.dashboard.path)}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                                    isActive(navigationItems.dashboard.path)
+                                        ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
+                                        : 'text-text-primary hover:bg-background'
+                                }`}
+                            >
+                                <navigationItems.dashboard.icon className="w-4 h-4" />
+                                <span className="text-sm font-medium">{navigationItems.dashboard.label}</span>
+                            </button>
+
+                            {/* Manage Dropdown */}
+                            <div className="relative" ref={manageMenuRef}>
+                                <button
+                                    onClick={() => {
+                                        setManageMenuOpen(!manageMenuOpen);
+                                        setBookingsMenuOpen(false);
+                                    }}
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                                        isGroupActive(navigationItems.manage.items)
+                                            ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
+                                            : 'text-text-primary hover:bg-background'
+                                    }`}
+                                >
+                                    <navigationItems.manage.icon className="w-4 h-4" />
+                                    <span className="text-sm font-medium">{navigationItems.manage.label}</span>
+                                    <ChevronDown className={`w-3 h-3 transition-transform ${manageMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {/* Manage Dropdown Menu */}
+                                {manageMenuOpen && (
+                                    <div className="absolute top-full left-0 mt-1 w-56 bg-surface rounded-card shadow-card border border-border py-2 z-[60]">
+                                        {navigationItems.manage.items.map((item) => {
+                                            const active = isActive(item.path);
+                                            return (
+                                                <button
+                                                    key={item.path}
+                                                    onClick={() => handleNavClick(item.path)}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        active
+                                                            ? 'bg-primary-light/10 text-primary font-semibold'
+                                                            : 'text-text-primary hover:bg-background'
+                                                    }`}
+                                                >
+                                                    <item.icon className="w-4 h-4" />
+                                                    <span>{item.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Bookings Dropdown */}
+                            <div className="relative" ref={bookingsMenuRef}>
+                                <button
+                                    onClick={() => {
+                                        setBookingsMenuOpen(!bookingsMenuOpen);
+                                        setManageMenuOpen(false);
+                                    }}
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                                        isGroupActive(navigationItems.bookings.items)
+                                            ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
+                                            : 'text-text-primary hover:bg-background'
+                                    }`}
+                                >
+                                    <navigationItems.bookings.icon className="w-4 h-4" />
+                                    <span className="text-sm font-medium">{navigationItems.bookings.label}</span>
+                                    <ChevronDown className={`w-3 h-3 transition-transform ${bookingsMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {/* Bookings Dropdown Menu */}
+                                {bookingsMenuOpen && (
+                                    <div className="absolute top-full left-0 mt-1 w-56 bg-surface rounded-card shadow-card border border-border py-2 z-[60]">
+                                        {navigationItems.bookings.items.map((item) => {
+                                            const active = isActive(item.path);
+                                            return (
+                                                <button
+                                                    key={item.path}
+                                                    onClick={() => handleNavClick(item.path)}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        active
+                                                            ? 'bg-primary-light/10 text-primary font-semibold'
+                                                            : 'text-text-primary hover:bg-background'
+                                                    }`}
+                                                >
+                                                    <item.icon className="w-4 h-4" />
+                                                    <span>{item.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Admin Overrides */}
+                            <button
+                                onClick={() => handleNavClick(navigationItems.overrides.path)}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                                    isActive(navigationItems.overrides.path)
+                                        ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
+                                        : 'text-text-primary hover:bg-background'
+                                }`}
+                            >
+                                <navigationItems.overrides.icon className="w-4 h-4" />
+                                <span className="text-sm font-medium">{navigationItems.overrides.label}</span>
+                            </button>
+                        </nav>
+
+                        {/* Mobile Navigation - Show Dashboard only when in iframe */}
+                        {isInIframe && (
+                            <nav className="md:hidden flex items-center flex-1 justify-center">
+                                <button
+                                    onClick={() => handleNavClick(navigationItems.dashboard.path)}
+                                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+                                        isActive(navigationItems.dashboard.path)
+                                            ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
+                                            : 'text-text-primary hover:bg-background'
+                                    }`}
+                                >
+                                    <navigationItems.dashboard.icon className="w-5 h-5" />
+                                    <span className="text-sm font-medium">{navigationItems.dashboard.label}</span>
+                                </button>
+                            </nav>
+                        )}
+
+                        {/* Right side - User Profile Dropdown */}
                         <div className="flex items-center space-x-4">
-                            {/* User Dropdown */}
                             {isAdmin && (
                                 <div className="relative" ref={dropdownRef}>
                                     <button
@@ -134,7 +312,7 @@ function AdminLayout() {
 
                                     {/* Dropdown Menu */}
                                     {dropdownOpen && (
-                                        <div className="absolute right-0 mt-2 w-56 bg-surface rounded-card shadow-card border border-border py-2 z-[60]">
+                                        <div className="absolute right-0 mt-2 w-64 bg-surface rounded-card shadow-card border border-border py-2 z-[60] max-h-[calc(100vh-80px)] overflow-y-auto">
                                             {/* User Info Section */}
                                             <div className="px-4 py-3 border-b border-border">
                                                 <div className="flex items-center space-x-3">
@@ -154,7 +332,67 @@ function AdminLayout() {
                                                 </div>
                                             </div>
 
-                                            {/* Menu Items */}
+                                            {/* Navigation Items - Mobile Only */}
+                                            <div className="md:hidden py-1 border-b border-border">
+                                                {/* Manage Section */}
+                                                <div className="px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                                                    {navigationItems.manage.label}
+                                                </div>
+                                                {navigationItems.manage.items.map((item) => {
+                                                    const active = isActive(item.path);
+                                                    return (
+                                                        <button
+                                                            key={item.path}
+                                                            onClick={() => handleNavClick(item.path)}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 pl-8 text-sm transition-colors ${
+                                                                active
+                                                                    ? 'bg-primary-light/10 text-primary font-semibold'
+                                                                    : 'text-text-primary hover:bg-background'
+                                                            }`}
+                                                        >
+                                                            <item.icon className="w-4 h-4" />
+                                                            <span>{item.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
+
+                                                {/* Bookings Section */}
+                                                <div className="px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wider mt-2">
+                                                    {navigationItems.bookings.label}
+                                                </div>
+                                                {navigationItems.bookings.items.map((item) => {
+                                                    const active = isActive(item.path);
+                                                    return (
+                                                        <button
+                                                            key={item.path}
+                                                            onClick={() => handleNavClick(item.path)}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 pl-8 text-sm transition-colors ${
+                                                                active
+                                                                    ? 'bg-primary-light/10 text-primary font-semibold'
+                                                                    : 'text-text-primary hover:bg-background'
+                                                            }`}
+                                                        >
+                                                            <item.icon className="w-4 h-4" />
+                                                            <span>{item.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
+
+                                                {/* Admin Overrides */}
+                                                <button
+                                                    onClick={() => handleNavClick(navigationItems.overrides.path)}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors mt-2 ${
+                                                        isActive(navigationItems.overrides.path)
+                                                            ? 'bg-primary-light/10 text-primary font-semibold'
+                                                            : 'text-text-primary hover:bg-background'
+                                                    }`}
+                                                >
+                                                    <navigationItems.overrides.icon className="w-4 h-4" />
+                                                    <span>{navigationItems.overrides.label}</span>
+                                                </button>
+                                            </div>
+
+                                            {/* User Menu Items */}
                                             <div className="py-1">
                                                 <button
                                                     onClick={() => {
@@ -206,115 +444,20 @@ function AdminLayout() {
                 </div>
             </header>
 
-            <div className="flex pt-14">
-            {/* Sidebar */}
-            <aside
-                className={`bg-surface text-primary transition-all duration-300 ease-in-out ${
-                    sidebarOpen ? 'w-64' : 'w-20'
-                } fixed z-40 shadow-xl border-r border-border`}
-                style={{ top: '56px', height: 'calc(100vh - 56px)', overflowY: 'auto' }}
-            >
-                <div className="flex flex-col h-full">
-                    {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-border">
-                        {sidebarOpen && (
-                            <h2 className="text-xl font-bold text-primary">Admin Panel</h2>
-                        )}
-                        <button
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="p-2 rounded-button hover:bg-background text-primary transition-colors"
-                            aria-label="Toggle sidebar"
-                        >
-                            {sidebarOpen ? (
-                                <X className="w-6 h-6" />
-                            ) : (
-                                <Menu className="w-6 h-6" />
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Navigation Menu */}
-                    <nav className="flex-1 overflow-y-auto p-4">
-                        <ul className="space-y-2">
-                            {menuItems.map((item) => {
-                                const active = isActive(item.path);
-                                return (
-                                    <li key={item.path}>
-                                        <button
-                                            onClick={() => navigate(item.path)}
-                                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                                                active
-                                                    ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold border-l-4 border-primary'
-                                                    : 'text-primary hover:bg-background'
-                                            }`}
-                                            title={!sidebarOpen ? item.label : ''}
-                                        >
-                                            <item.icon className="w-5 h-5 flex-shrink-0" />
-                                            {sidebarOpen && (
-                                                <span className="font-medium">{item.label}</span>
-                                            )}
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </nav>
-
-                    {/* Logout Button */}
-                    <div className="p-4 border-t border-border">
-                        <button
-                            onClick={handleLogout}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-primary hover:bg-danger/10 hover:text-danger transition-all duration-200 ${
-                                !sidebarOpen ? 'justify-center' : ''
-                            }`}
-                            title={!sidebarOpen ? 'Logout' : ''}
-                        >
-                            <LogOut className="w-5 h-5 flex-shrink-0" />
-                            {sidebarOpen && <span className="font-medium">Logout</span>}
-                        </button>
-                    </div>
-                </div>
-            </aside>
-
             {/* Main Content */}
-            <main
-                className={`flex-1 transition-all duration-300 ease-in-out min-h-[calc(100vh-56px)] ${
-                    sidebarOpen ? 'ml-64' : 'ml-20'
-                }`}
-            >
-                {/* Mobile Menu Button */}
-                <div className="lg:hidden fixed top-[60px] left-4 z-40">
-                    <button
-                        onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="p-2 bg-surface hover:bg-background text-primary rounded-button shadow-card border border-border transition-colors"
-                        aria-label="Toggle sidebar"
-                    >
-                        <Menu className="w-6 h-6" />
-                    </button>
-                </div>
-
-                {/* Content */}
+            <main className="min-h-[calc(100vh-64px)]">
                 <div className="px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8 pt-4 md:pt-6 w-full">
-                    {/* Page Title */}
-                    <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-6">
-                        {getPageTitle()}
-                    </h1>
-                    <Outlet />
+                    <div className="max-w-7xl mx-auto">
+                        {/* Page Title */}
+                        <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-6">
+                            {getPageTitle()}
+                        </h1>
+                        <Outlet />
+                    </div>
                 </div>
             </main>
-
-            {/* Overlay for mobile */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-                    style={{ top: '56px' }}
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
-            </div>
         </div>
     );
 }
 
 export default AdminLayout;
-

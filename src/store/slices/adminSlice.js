@@ -311,6 +311,42 @@ export const grantSimulatorCredits = createAsyncThunk(
     }
 );
 
+// User management thunks
+export const getUsers = createAsyncThunk(
+    'admin/getUsers',
+    async ({ page = 1, pageSize = 20, role = null, isPaused = null, search = null } = {}, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams();
+            if (page) params.append('page', page);
+            if (pageSize) params.append('page_size', pageSize);
+            if (role) params.append('role', role);
+            if (isPaused !== null) params.append('is_paused', isPaused);
+            if (search) params.append('search', search);
+            
+            const queryString = params.toString();
+            const url = queryString 
+                ? `${endpoints.admin.users.list}?${queryString}`
+                : endpoints.admin.users.list;
+            const response = await apiClient.get(url);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const toggleUserPause = createAsyncThunk(
+    'admin/toggleUserPause',
+    async (userId, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.admin.users.togglePause(userId));
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Initial state
 const initialState = {
     dashboard: {
@@ -349,6 +385,17 @@ const initialState = {
             pageSize: 10,
         },
     },
+    users: {
+        list: [],
+        loading: false,
+        error: null,
+        pagination: {
+            count: 0,
+            totalPages: 0,
+            currentPage: 1,
+            pageSize: 20,
+        },
+    },
     overrides: {
         coaching: {
             loading: false,
@@ -380,6 +427,7 @@ const adminSlice = createSlice({
             state.simulators.error = null;
             state.packages.error = null;
             state.bookings.error = null;
+            state.users.error = null;
             state.overrides.coaching.error = null;
             state.overrides.simulator.error = null;
         },
@@ -623,6 +671,45 @@ const adminSlice = createSlice({
             .addCase(grantSimulatorCredits.rejected, (state, action) => {
                 state.overrides.simulator.loading = false;
                 state.overrides.simulator.error = action.payload || 'Unable to grant simulator credits.';
+            });
+        
+        // User management
+        builder
+            .addCase(getUsers.pending, (state) => {
+                state.users.loading = true;
+                state.users.error = null;
+            })
+            .addCase(getUsers.fulfilled, (state, action) => {
+                state.users.loading = false;
+                state.users.list = action.payload.results || [];
+                const count = action.payload.count || 0;
+                const pageSize = action.meta?.arg?.pageSize || 20;
+                const currentPage = action.meta?.arg?.page || 1;
+                state.users.pagination = {
+                    count,
+                    pageSize,
+                    currentPage,
+                    totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
+                };
+            })
+            .addCase(getUsers.rejected, (state, action) => {
+                state.users.loading = false;
+                state.users.error = action.payload;
+            })
+            .addCase(toggleUserPause.pending, (state) => {
+                state.users.loading = true;
+            })
+            .addCase(toggleUserPause.fulfilled, (state, action) => {
+                state.users.loading = false;
+                const userId = action.meta?.arg;
+                const index = state.users.list.findIndex(u => u.id === userId);
+                if (index !== -1) {
+                    state.users.list[index].is_paused = action.payload.is_paused;
+                }
+            })
+            .addCase(toggleUserPause.rejected, (state, action) => {
+                state.users.loading = false;
+                state.users.error = action.payload;
             });
     },
 });

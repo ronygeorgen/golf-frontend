@@ -24,7 +24,7 @@ function AdminDashboard() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto">
+        <div>
             {loading ? (
                 <>
                     <StatsSkeleton count={4} />
