@@ -194,7 +194,7 @@ function Packages() {
                                                 variant="secondary"
                                                 className="w-full py-2 text-sm"
                                             >
-                                                For Organization
+                                                Group Purchase
                                             </Button>
                                         </div>
                                     </div>
