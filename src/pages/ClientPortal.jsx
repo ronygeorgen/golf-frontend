@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking } from '../store/slices/bookingSlice';
 import { useNavigate } from 'react-router-dom';
-import { BookingCardSkeleton } from '../components/skeletons/SkeletonLoader';
+import { BookingCardSkeleton, PackagesSkeleton } from '../components/skeletons/SkeletonLoader';
 import PopupMessage from '../components/PopupMessage';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
@@ -17,7 +17,7 @@ function ClientPortal() {
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
     const { upcomingBookings, loading, simulatorCredits, upcomingPagination } = useAppSelector((state) => state.booking);
-    const { giftsPending, transfersPending, purchases, organizationPurchases, packages } = useAppSelector((state) => state.coaching);
+    const { giftsPending, transfersPending, purchases, organizationPurchases, packages, purchasesLoading, organizationPurchasesLoading } = useAppSelector((state) => state.coaching);
     const { popup, openPopup, closePopup } = usePopup();
     const [cancellingId, setCancellingId] = useState(null);
     const [rescheduleTarget, setRescheduleTarget] = useState(null);
@@ -143,17 +143,6 @@ function ClientPortal() {
                 message: result.payload?.error || result.payload?.detail || 'Unable to cancel booking.',
             });
         }
-    };
-
-    const formatCurrency = (value) => {
-        if (value === undefined || value === null) {
-            return null;
-        }
-        const numberValue = Number(value);
-        if (Number.isNaN(numberValue)) {
-            return null;
-        }
-        return `$${numberValue.toFixed(2)}`;
     };
 
     const formatDateForInput = (dateObj) => {
@@ -350,13 +339,6 @@ function ClientPortal() {
                                                                 <span className="font-medium">Bay:</span> {booking.simulator_details.bay_number} - {booking.simulator_details.name}
                                                             </p>
                                                         )}
-                                                        <p className="text-sm text-text-secondary">
-                                                            <span className="font-medium">Price:</span>{' '}
-                                                            {booking.booking_type === 'simulator' && booking.uses_simulator_credit
-                                                                ? 'Covered by simulator credit'
-                                                                : formatCurrency(booking.total_price ?? booking.coaching_session_price) || '—'
-                                                            }
-                                                        </p>
                                                         {booking.booking_type === 'simulator' && booking.uses_simulator_credit && (
                                                             <p className="text-xs text-status-personal-text font-semibold">
                                                                 Simulator credit applied
@@ -372,24 +354,17 @@ function ClientPortal() {
                                                                 <span className="font-medium">Package:</span> {booking.package_details.title}
                                                             </p>
                                                         )}
-                                                        {booking.booking_type === 'coaching' && booking.package_purchase_details && (
-                                                            <div className="space-y-1">
-                                                                <p className="text-sm text-text-secondary">
-                                                                    <span className="font-medium">Purchase Name:</span> {booking.package_purchase_details.purchase_name || booking.package_details?.title || 'N/A'}
-                                                                </p>
-                                                                {booking.purchase_type_label && (
-                                                                    <p className="text-sm">
-                                                                        <Badge status={
-                                                                            booking.purchase_type_label === 'Personal' ? 'personal' :
-                                                                            booking.purchase_type_label === 'Gifted' ? 'pending' :
-                                                                            booking.purchase_type_label === 'Organization' ? 'confirmed' :
-                                                                            'pending'
-                                                                        }>
-                                                                            {booking.purchase_type_label}
-                                                                        </Badge>
-                                                                    </p>
-                                                                )}
-                                                            </div>
+                                                        {booking.booking_type === 'coaching' && booking.package_purchase_details && booking.purchase_type_label && (
+                                                            <p className="text-sm">
+                                                                <Badge status={
+                                                                    booking.purchase_type_label === 'Personal' ? 'personal' :
+                                                                    booking.purchase_type_label === 'Gifted' ? 'pending' :
+                                                                    booking.purchase_type_label === 'Organization' ? 'confirmed' :
+                                                                    'pending'
+                                                                }>
+                                                                    {booking.purchase_type_label}
+                                                                </Badge>
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -531,7 +506,9 @@ function ClientPortal() {
                                     Credits are issued when you cancel simulator bookings at least 24 hours ahead.
                                 </p>
                             </div>
-                            {(personalPackagesList.length > 0 || groupPackagesList.length > 0) && (
+                            {(purchasesLoading || organizationPurchasesLoading) ? (
+                                <PackagesSkeleton />
+                            ) : (personalPackagesList.length > 0 || groupPackagesList.length > 0) ? (
                                 <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary space-y-4">
                                     {personalPackagesList.length > 0 && (
                                         <div>
@@ -560,7 +537,7 @@ function ClientPortal() {
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 </div>

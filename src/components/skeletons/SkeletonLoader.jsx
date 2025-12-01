@@ -166,3 +166,33 @@ export const BookingCardSkeleton = ({ count = 3 }) => {
     );
 };
 
+// Packages skeleton for portal page
+export const PackagesSkeleton = () => {
+    return (
+        <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary space-y-4">
+            <div>
+                <Skeleton height="18px" width="60%" className="mb-2" />
+                <div className="space-y-2">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
+                            <Skeleton height="16px" width="50%" />
+                            <Skeleton height="16px" width="30%" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div>
+                <Skeleton height="18px" width="50%" className="mb-2" />
+                <div className="space-y-2">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
+                            <Skeleton height="16px" width="50%" />
+                            <Skeleton height="16px" width="30%" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
