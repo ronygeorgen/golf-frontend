@@ -8,6 +8,7 @@ export const endpoints = {
         login: '/auth/login/',
         logout: '/auth/logout/',
         profile: '/auth/profile/',
+        autoLogin: '/auth/auto-login/',
         requestOTP: '/auth/request-otp/',
         verifyOTP: '/auth/verify-otp/',
     },
@@ -57,6 +58,11 @@ export const endpoints = {
             coachingSessions: '/admin/overrides/coaching-sessions/',
             simulatorCredits: '/admin/overrides/simulator-credits/',
         },
+        users: {
+            list: '/admin/users/',
+            detail: (id) => `/admin/users/${id}/`,
+            togglePause: (id) => `/admin/users/${id}/toggle-pause/`,
+        },
     },
     
     // Booking endpoints
@@ -90,7 +96,9 @@ export const endpoints = {
         packages: '/coaching/packages/',
         active: '/coaching/packages/active_packages/',
         purchases: '/coaching/purchases/',
+        purchaseDetail: (id) => `/coaching/purchases/${id}/`,
         myPurchases: '/coaching/purchases/my/',
+        transferablePurchases: '/coaching/purchases/transferable_purchases/',
         giftsPending: '/coaching/purchases/gifts_pending/',
         giftClaim: (token) => `/coaching/gifts/claim/${token}/`,
         transfers: '/coaching/transfers/',
@@ -98,6 +106,11 @@ export const endpoints = {
         transferClaim: (id) => `/coaching/transfers/${id}/claim/`,
         checkPhone: '/coaching/users/check-phone/',
         organizationPackages: '/coaching/purchases/organization_packages/',
+        myOrganizationPurchases: '/coaching/purchases/my_organization_purchases/',
+        purchaseWebhook: '/coaching/webhook/purchase/',
+        tempPurchase: '/coaching/temp-purchase/',
+        addMember: (id) => `/coaching/purchases/${id}/add_member/`,
+        removeMember: (id) => `/coaching/purchases/${id}/remove_member/`,
     },
 
     ghl: {

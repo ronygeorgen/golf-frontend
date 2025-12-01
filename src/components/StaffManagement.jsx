@@ -5,6 +5,8 @@ import { getStaff, createStaff, updateStaff, deleteStaff } from '../store/slices
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
 
 function StaffManagement() {
     const dispatch = useAppDispatch();
@@ -101,14 +103,14 @@ function StaffManagement() {
     return (
         <>
         <div className="max-w-7xl mx-auto">
-                <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                        <button 
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                        <Button 
                             onClick={() => setShowForm(true)}
+                            variant="primary"
                         >
                             Add Staff Member
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -119,88 +121,85 @@ function StaffManagement() {
                         setEditingStaff(null);
                         setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
                     }}>
-                        <div ref={modalRef} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                                <h2 className="text-2xl font-bold text-text-primary mb-6">
                                     {editingStaff ? 'Edit Staff' : 'Add Staff'}
                                 </h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
                                                 First Name
                                             </label>
                                             <input
                                                 type="text"
                                                 value={formData.first_name}
                                                 onChange={(e) => setFormData({...formData, first_name: e.target.value})}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
                                                 Last Name
                                             </label>
                                             <input
                                                 type="text"
                                                 value={formData.last_name}
                                                 onChange={(e) => setFormData({...formData, last_name: e.target.value})}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 required
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Email
                                         </label>
                                         <input
                                             type="email"
                                             value={formData.email}
                                             onChange={(e) => setFormData({...formData, email: e.target.value})}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Phone
                                         </label>
                                         <input
                                             type="tel"
                                             value={formData.phone}
                                             onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Role
                                         </label>
                                         <select
                                             value={formData.role}
                                             onChange={(e) => setFormData({...formData, role: e.target.value})}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                                         >
-                                            <option value="staff" className="text-gray-900">Staff</option>
-                                            <option value="admin" className="text-gray-900">Admin</option>
+                                            <option value="staff">Staff</option>
+                                            <option value="admin">Admin</option>
                                         </select>
                                     </div>
                                     <div className="flex gap-4 pt-4">
-                                        <button 
+                                        <Button 
                                             type="submit" 
                                             disabled={submitLoading}
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            variant="primary"
+                                            className="flex-1"
                                         >
                                             {submitLoading
                                                 ? (editingStaff ? 'Updating...' : 'Creating...')
                                                 : `${editingStaff ? 'Update' : 'Create'} Staff`}
-                                        </button>
-                                        <button 
+                                        </Button>
+                                        <Button 
                                             type="button" 
-                                            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            variant="secondary"
+                                            className="flex-1"
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingStaff(null);
@@ -208,7 +207,7 @@ function StaffManagement() {
                                             }}
                                         >
                                             Cancel
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             </div>
@@ -220,70 +219,66 @@ function StaffManagement() {
                 {loading ? (
                     <TableSkeleton rows={5} cols={5} />
                 ) : (
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div className="bg-surface rounded-card shadow-card overflow-hidden">
                         {staff.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-gray-500 text-lg">No staff members found. Add your first staff member.</p>
+                                <p className="text-text-secondary text-lg">No staff members found. Add your first staff member.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
+                                <table className="min-w-full divide-y divide-border">
+                                    <thead className="bg-background">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Name
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Email
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Phone
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Role
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-surface divide-y divide-border">
                                         {staff.map(staffMember => (
-                                            <tr key={staffMember.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <tr key={staffMember.id} className="hover:bg-background transition-colors">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
                                                     {staffMember.first_name} {staffMember.last_name}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
                                                     {staffMember.email}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
                                                     {staffMember.phone}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                                        staffMember.role === 'admin' 
-                                                            ? 'bg-purple-100 text-purple-800' 
-                                                            : 'bg-blue-100 text-blue-800'
-                                                    }`}>
+                                                    <Badge status={staffMember.role === 'admin' ? 'personal' : 'pending'}>
                                                         {staffMember.role}
-                                                    </span>
+                                                    </Badge>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
                                                         <button 
-                                                            className="text-blue-600 hover:text-blue-900"
+                                                            className="text-primary hover:text-primary-light transition-colors"
                                                             onClick={() => handleEdit(staffMember)}
                                                         >
                                                             Edit
                                                         </button>
                                                         <button 
-                                                            className="text-red-600 hover:text-red-900"
+                                                            className="text-danger hover:text-danger-light transition-colors"
                                                             onClick={() => handleDelete(staffMember.id)}
                                                         >
                                                             Delete
                                                         </button>
                                                         <button 
-                                                            className="text-indigo-600 hover:text-indigo-900"
+                                                            className="text-status-personal-text hover:text-status-personal-text/80 transition-colors"
                                                             onClick={() => navigate(`/admin/staff/${staffMember.id}/availability`)}
                                                         >
                                                             Availability

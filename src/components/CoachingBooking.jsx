@@ -5,6 +5,7 @@ import { checkCoachingAvailability, createBooking, clearAvailability } from '../
 import { getActiveCoachingPackages, getMyPackagePurchases, getOrganizationPackages } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import Button from './ui/Button';
 
 function CoachingBooking() {
     const dispatch = useAppDispatch();
@@ -287,15 +288,15 @@ function CoachingBooking() {
 
     if (bookingSuccess) {
         return (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+            <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-8 text-center">
                 <div className="mb-4">
-                    <svg className="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="mx-auto h-12 w-12 text-status-confirmed-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-green-800 mb-2">Booking Confirmed!</h3>
-                <p className="text-gray-600 mb-6">Your coaching session has been booked successfully.</p>
-                <button 
+                <h3 className="text-2xl font-bold text-status-confirmed-text mb-2">Booking Confirmed!</h3>
+                <p className="text-text-secondary mb-6">Your coaching session has been booked successfully.</p>
+                <Button 
                     onClick={() => {
                         setBookingSuccess(false);
                         setSelectedSlot(null);
@@ -303,10 +304,10 @@ function CoachingBooking() {
                         setSelectedPackage(null);
                         setSelectedCoach(null);
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200"
+                    variant="primary"
                 >
                     Book Another Session
-                </button>
+                </Button>
             </div>
         );
     }
@@ -340,11 +341,11 @@ function CoachingBooking() {
                     </div>
                 </div>
             )}
-            <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Book Coaching Session</h2>
+            <div className="bg-surface rounded-card shadow-card p-6">
+                <h2 className="text-xl font-bold text-text-primary mb-4">Book Coaching Session</h2>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
                             Date
                         </label>
                         <input
@@ -352,12 +353,11 @@ function CoachingBooking() {
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
                             min={new Date().toISOString().split('T')[0]}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
                             Session Duration
                         </label>
                         <input
@@ -368,15 +368,15 @@ function CoachingBooking() {
                                     : 'Select a package to see session length'
                             }
                             disabled
-                            className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-text-secondary mt-1">
                             Duration is locked to your package and consumes one session.
                         </p>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
                             Select Package
                         </label>
                         <select 
@@ -385,13 +385,12 @@ function CoachingBooking() {
                                 setSelectedPackage(e.target.value ? parseInt(e.target.value) : null);
                                 setSelectedCoach(null);
                             }}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                         >
-                            <option value="" className="text-gray-900" disabled>
+                            <option value="" disabled>
                                 Select a package
                             </option>
                             {packages.map((pkg) => (
-                                <option key={pkg.id} value={pkg.id} className="text-gray-900">
+                                <option key={pkg.id} value={pkg.id}>
                                     {pkg.title}
                                 </option>
                             ))}
@@ -432,9 +431,9 @@ function CoachingBooking() {
                                             className="mr-3"
                                         />
                                         <div className="flex-1">
-                                            <div className="font-medium text-gray-900">Organization Packages</div>
+                                            <div className="font-medium text-gray-900">Group Packages</div>
                                             <div className="text-sm text-gray-500">
-                                                Use packages purchased for your organization (first-come-first-served)
+                                                Use packages purchased for your group (first-come-first-served)
                                             </div>
                                         </div>
                                     </label>
@@ -442,37 +441,37 @@ function CoachingBooking() {
                             </div>
 
                             {/* Sessions/Packages Remaining Display */}
-                            <div className="border border-gray-200 rounded-lg bg-gray-50 p-4 space-y-2">
+                            <div className="border border-border rounded-card bg-background p-4 space-y-2">
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <div>
-                                        <p className="text-sm text-gray-600">
-                                            {packageType === 'organization' ? 'Available sessions (organization)' : 'Sessions remaining'}
+                                        <p className="text-sm text-text-secondary">
+                                            {packageType === 'organization' ? 'Available sessions (group)' : 'Sessions remaining'}
                                         </p>
-                                        <p className={`text-2xl font-bold ${hasSessions ? 'text-green-700' : 'text-red-600'}`}>
+                                        <p className={`text-2xl font-bold ${hasSessions ? 'text-status-confirmed-text' : 'text-danger'}`}>
                                             {packageType === 'organization' 
                                                 ? (organizationPackagesLoading ? 'Checking…' : organizationSessionsRemaining)
                                                 : (purchasesLoading ? 'Checking…' : personalSessionsRemaining)
                                             }
                                         </p>
                                         {packageType === 'organization' && organizationSessionsRemaining > 0 && (
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-xs text-text-secondary mt-1">
                                                 First-come-first-served. All members can use these sessions.
                                             </p>
                                         )}
                                     </div>
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={handlePurchasePackage}
                                         disabled={purchaseSubmitting}
-                                        className="px-4 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 transition duration-200"
+                                        variant="accent"
                                     >
                                         {purchaseSubmitting ? 'Adding…' : hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
-                                    </button>
+                                    </Button>
                                 </div>
                                 {!hasSessions && (
-                                    <p className="text-sm text-red-600">
+                                    <p className="text-sm text-danger">
                                         {packageType === 'organization' 
-                                            ? 'No organization packages available. Add another package bundle before booking.'
+                                            ? 'No group packages available. Add another package bundle before booking.'
                                             : 'You are out of sessions. Add another package bundle before booking.'
                                         }
                                     </p>
@@ -483,63 +482,63 @@ function CoachingBooking() {
 
                     {selectedPackage && (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-text-primary mb-2">
                                 Select Coach
                             </label>
                             {coaches.length > 0 ? (
                                 <select 
                                     value={selectedCoach || ''} 
                                     onChange={(e) => setSelectedCoach(e.target.value ? parseInt(e.target.value, 10) : null)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                                 >
-                                    <option value="" className="text-gray-900">All Coaches in Package</option>
+                                    <option value="">All Coaches in Package</option>
                                     {coaches.map((coach) => (
-                                        <option key={coach.id} value={coach.id} className="text-gray-900">
+                                        <option key={coach.id} value={coach.id}>
                                             {coach.first_name} {coach.last_name} ({coach.email})
                                         </option>
                                     ))}
                                 </select>
                             ) : (
-                                <p className="text-sm text-red-600">No coaches are assigned to this package yet.</p>
+                                <p className="text-sm text-danger">No coaches are assigned to this package yet.</p>
                             )}
                         </div>
                     )}
                     
-                    <button 
+                    <Button 
                         onClick={checkAvailability} 
                         disabled={loading || bookingLoading || (selectedPackage && !hasSessions)}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+                        variant="primary"
+                        className="w-full py-3"
                     >
                         {loading || bookingLoading ? 'Checking Availability...' : 'Check Availability'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {availability.coaching && availability.coaching.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-surface rounded-card shadow-card p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                        <h3 className="text-xl font-bold text-gray-900">Available Time Slots</h3>
-                        <div className="text-sm text-gray-600 flex flex-wrap items-center gap-2">
+                        <h3 className="text-xl font-bold text-text-primary">Available Time Slots</h3>
+                        <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
                             <span className="font-medium">Book coaching sessions for</span>
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-semibold">
+                            <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
                                 {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
                             </span>
-                            <span className="text-gray-400">|</span>
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded font-semibold">
+                            <span className="text-text-secondary/50">|</span>
+                            <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
                                 {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                             </span>
                             {selectedCoach && (
                                 <>
-                                    <span className="text-gray-400">|</span>
-                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded font-semibold">
+                                    <span className="text-text-secondary/50">|</span>
+                                    <span className="px-2 py-1 bg-status-personal-bg text-status-personal-text rounded-badge font-semibold">
                                         {coaches.find(c => c.id === selectedCoach)?.first_name} {coaches.find(c => c.id === selectedCoach)?.last_name}
                                     </span>
                                 </>
                             )}
                             {selectedPackage && (
                                 <>
-                                    <span className="text-gray-400">|</span>
-                                    <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded font-semibold">
+                                    <span className="text-text-secondary/50">|</span>
+                                    <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
                                         {packages.find(p => p.id === selectedPackage)?.title}
                                     </span>
                                 </>
@@ -556,12 +555,12 @@ function CoachingBooking() {
                             return (
                                 <div
                                     key={index}
-                                    className={`p-4 border-2 rounded-lg transition duration-200 relative group ${
+                                    className={`p-4 border-2 rounded-card transition duration-200 relative group ${
                                         disabled
-                                            ? 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-60'
+                                            ? 'border-border bg-background cursor-not-allowed opacity-60'
                                             : isSelected
-                                                ? 'border-blue-500 bg-blue-100 shadow-md cursor-pointer'
-                                                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50 cursor-pointer'
+                                                ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
+                                                : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                     }`}
                                     onClick={() => !disabled && handleSlotSelect(slot)}
                                     title={disabled ? `This slot would exceed availability with ${duration} minutes. Try ${suggestedDuration} or less.` : ''}
@@ -573,17 +572,17 @@ function CoachingBooking() {
                                             </svg>
                                         </div>
                                     )}
-                                    <div className={`text-lg font-semibold ${disabled ? 'text-gray-500' : 'text-gray-900'}`}>
+                                    <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                         {new Date(slot.start_time).toLocaleTimeString('en-US', { 
                                             hour: '2-digit', 
                                             minute: '2-digit'
                                         })}
                                     </div>
-                                    <div className="text-sm text-gray-500">
+                                    <div className="text-sm text-text-secondary">
                                         {slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available
                                     </div>
                                     {disabled && (
-                                        <div className="mt-2 text-xs text-red-600 font-medium">
+                                        <div className="mt-2 text-xs text-danger font-medium">
                                             Max: {suggestedDuration}
                                         </div>
                                     )}
@@ -608,24 +607,24 @@ function CoachingBooking() {
                     </div>
                     
                     {selectedSlot && (
-                        <div className="bg-gray-50 rounded-lg p-6">
-                            <h4 className="text-lg font-bold text-gray-900 mb-4">Booking Summary</h4>
+                        <div className="bg-background rounded-card p-6">
+                            <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
                             <div className="space-y-2 mb-4">
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
                                 </p>
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
-                                <p className="text-gray-700">
+                                <p className="text-text-primary">
                                     <span className="font-medium">Duration:</span> {duration} minutes
                                 </p>
                                 {selectedSlot.available_coaches && selectedSlot.available_coaches.length > 0 && (
                                     <div className="mt-4">
-                                        <p className="font-medium text-gray-700 mb-2">Available Coaches:</p>
+                                        <p className="font-medium text-text-primary mb-2">Available Coaches:</p>
                                         <ul className="list-disc list-inside space-y-1">
                                             {selectedSlot.available_coaches.map((coach, idx) => (
-                                                <li key={idx} className="text-gray-600">
+                                                <li key={idx} className="text-text-secondary">
                                                     {coach.name} (Bay {coach.assigned_bay})
                                                 </li>
                                             ))}
@@ -633,17 +632,18 @@ function CoachingBooking() {
                                     </div>
                                 )}
                                 {selectedPackage && (
-                                    <p className="text-gray-700">
+                                    <p className="text-text-primary">
                                         <span className="font-medium">
-                                            {packageType === 'organization' ? 'Organization sessions left after booking:' : 'Sessions left after booking:'}
+                                            {packageType === 'organization' ? 'Group sessions left after booking:' : 'Sessions left after booking:'}
                                         </span> {Math.max(sessionsRemaining - 1, 0)}
                                     </p>
                                 )}
                             </div>
-                            <button 
+                            <Button 
                                 onClick={handleBooking}
                                 disabled={bookingLoading}
-                                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2"
+                                variant="primary"
+                                className="w-full py-3 flex items-center justify-center gap-2"
                             >
                                 {bookingLoading ? (
                                     <>
@@ -656,7 +656,7 @@ function CoachingBooking() {
                                 ) : (
                                     'Confirm Booking'
                                 )}
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>

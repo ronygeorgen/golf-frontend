@@ -4,6 +4,8 @@ import { getTransfersPending, claimTransfer, getMyPackagePurchases } from '../st
 import usePopup from '../hooks/usePopup';
 import PopupMessage from './PopupMessage';
 import { ListSkeleton } from './skeletons/SkeletonLoader';
+import Button from './ui/Button';
+import { ArrowRightLeft } from 'lucide-react';
 
 function TransferClaim() {
     const dispatch = useAppDispatch();
@@ -50,8 +52,8 @@ function TransferClaim() {
 
     if (transfersLoading) {
         return (
-            <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Pending Transfers</h2>
+            <div className="bg-surface rounded-card shadow-card p-6 h-full flex flex-col">
+                <h2 className="text-xl font-bold text-text-primary mb-4">Pending Transfers</h2>
                 <ListSkeleton items={3} />
             </div>
         );
@@ -59,54 +61,66 @@ function TransferClaim() {
 
     if (!transfersPending || transfersPending.length === 0) {
         return (
-            <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Pending Transfers</h2>
-                <p className="text-gray-600">You have no pending session transfers at this time.</p>
+            <div className="bg-surface rounded-card shadow-card p-6 h-full flex flex-col">
+                <div className="flex items-center gap-3 mb-4">
+                    <h2 className="text-xl font-bold text-text-primary">Pending Transfers</h2>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center py-12">
+                    <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                        <ArrowRightLeft className="w-10 h-10 text-primary" />
+                    </div>
+                    <p className="text-text-secondary text-center">You have no pending session transfers at this time.</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Pending Transfers</h2>
+        <div className="bg-surface rounded-card shadow-card p-6 h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-xl font-bold text-text-primary">Pending Transfers</h2>
+            </div>
+            <div className="flex-1">
             <div className="space-y-4">
                 {transfersPending.map((transfer) => (
-                    <div key={transfer.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div key={transfer.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow bg-surface">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900">
+                                <h3 className="font-semibold text-text-primary">
                                     {transfer.package_purchase_details?.purchase_name || transfer.package_purchase_details?.package_details?.title}
                                 </h3>
-                                <p className="text-sm text-gray-600 mt-1">
+                                <p className="text-sm text-text-secondary mt-1">
                                     {transfer.session_count} session{transfer.session_count !== 1 ? 's' : ''} from {transfer.from_user_details?.first_name} {transfer.from_user_details?.last_name}
                                 </p>
                                 {transfer.notes && (
-                                    <p className="text-sm text-gray-500 mt-2 italic">"{transfer.notes}"</p>
+                                    <p className="text-sm text-text-secondary mt-2 italic">"{transfer.notes}"</p>
                                 )}
                             </div>
                             <div className="ml-4 text-right">
-                                <div className="text-2xl font-bold text-blue-600">{transfer.session_count}</div>
-                                <div className="text-xs text-gray-500">sessions</div>
+                                <div className="text-2xl font-bold text-primary">{transfer.session_count}</div>
+                                <div className="text-xs text-text-secondary">sessions</div>
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button
+                            <Button
                                 onClick={() => handleClaimTransfer(transfer, 'accept')}
                                 disabled={processingId === transfer.id}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 disabled:bg-green-300 disabled:cursor-not-allowed"
+                                variant="primary"
+                                className="flex-1"
                             >
                                 {processingId === transfer.id && processingAction === 'accept' ? 'Accepting...' : 'Accept Transfer'}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={() => handleClaimTransfer(transfer, 'reject')}
                                 disabled={processingId === transfer.id}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 disabled:bg-red-300 disabled:cursor-not-allowed"
+                                variant="danger"
+                                className="flex-1"
                             >
                                 {processingId === transfer.id && processingAction === 'reject' ? 'Rejecting...' : 'Reject'}
-                            </button>
+                            </Button>
                         </div>
                         {transfer.expires_at && (
-                            <p className="text-xs text-gray-500 mt-2">
+                            <p className="text-xs text-text-secondary mt-2">
                                 Expires: {new Date(transfer.expires_at).toLocaleDateString()}
                             </p>
                         )}
@@ -130,6 +144,7 @@ function TransferClaim() {
                 } : closePopup}
                 onClose={closePopup}
             />
+            </div>
         </div>
     );
 }

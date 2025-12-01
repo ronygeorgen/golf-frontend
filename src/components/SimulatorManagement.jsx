@@ -6,6 +6,8 @@ import { Clock } from 'lucide-react';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
 
 function SimulatorManagement() {
     const dispatch = useAppDispatch();
@@ -115,14 +117,14 @@ function SimulatorManagement() {
 
     return (
         <div className="max-w-7xl mx-auto">
-                <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                        <button 
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                        <Button 
                             onClick={() => setShowForm(true)}
+                            variant="primary"
                         >
                             Add Simulator
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -133,26 +135,25 @@ function SimulatorManagement() {
                         setEditingSimulator(null);
                         setFormData(defaultFormState);
                     }}>
-                        <div ref={modalRef} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                                <h2 className="text-2xl font-bold text-text-primary mb-6">
                                     {editingSimulator ? 'Edit Simulator' : 'Add Simulator'}
                                 </h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Simulator Name
                                         </label>
                                         <input
                                             type="text"
                                             value={formData.name}
                                             onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Bay Number
                                         </label>
                                         <input
@@ -161,19 +162,17 @@ function SimulatorManagement() {
                                             onChange={(e) => setFormData({...formData, bay_number: parseInt(e.target.value)})}
                                             min="1"
                                             max="6"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Description
                                         </label>
                                         <textarea
                                             value={formData.description}
                                             onChange={(e) => setFormData({...formData, description: e.target.value})}
                                             rows="3"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         />
                                     </div>
                                     <div className="flex gap-6">
@@ -182,9 +181,9 @@ function SimulatorManagement() {
                                                 type="checkbox"
                                                 checked={formData.is_active}
                                                 onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                                             />
-                                            <label className="ml-2 text-sm font-medium text-gray-700">
+                                            <label className="ml-2 text-sm font-medium text-text-primary">
                                                 Active
                                             </label>
                                         </div>
@@ -193,16 +192,16 @@ function SimulatorManagement() {
                                                 type="checkbox"
                                                 checked={formData.is_coaching_bay}
                                                 onChange={(e) => setFormData({...formData, is_coaching_bay: e.target.checked})}
-                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                                             />
-                                            <label className="ml-2 text-sm font-medium text-gray-700">
+                                            <label className="ml-2 text-sm font-medium text-text-primary">
                                                 Coaching Bay
                                             </label>
                                         </div>
                                     </div>
                                     {!formData.is_coaching_bay && (
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
                                                 Hourly Price (USD)
                                             </label>
                                             <input
@@ -211,27 +210,28 @@ function SimulatorManagement() {
                                                 min="0"
                                                 value={formData.hourly_price}
                                                 onChange={(e) => setFormData({...formData, hourly_price: e.target.value})}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 required
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-xs text-text-secondary mt-1">
                                                 Charge per hour for normal simulator bookings.
                                             </p>
                                         </div>
                                     )}
                                     <div className="flex gap-4 pt-4">
-                                        <button 
+                                        <Button 
                                             type="submit" 
                                             disabled={submitLoading}
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            variant="primary"
+                                            className="flex-1"
                                         >
                                             {submitLoading
                                                 ? (editingSimulator ? 'Updating...' : 'Creating...')
                                                 : `${editingSimulator ? 'Update' : 'Create'} Simulator`}
-                                        </button>
-                                        <button 
+                                        </Button>
+                                        <Button 
                                             type="button" 
-                                            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            variant="secondary"
+                                            className="flex-1"
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingSimulator(null);
@@ -239,7 +239,7 @@ function SimulatorManagement() {
                                             }}
                                         >
                                             Cancel
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             </div>
@@ -251,77 +251,69 @@ function SimulatorManagement() {
                 {loading ? (
                     <TableSkeleton rows={5} cols={5} />
                 ) : (
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div className="bg-surface rounded-card shadow-card overflow-hidden">
                         {simulators.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-gray-500 text-lg">No simulators found. Add your first simulator.</p>
+                                <p className="text-text-secondary text-lg">No simulators found. Add your first simulator.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
+                                <table className="min-w-full divide-y divide-border">
+                                    <thead className="bg-background">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Bay #
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Name
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Hourly Price
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Type
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Status
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-surface divide-y divide-border">
                                         {simulators.map(simulator => (
-                                            <tr key={simulator.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <tr key={simulator.id} className="hover:bg-background transition-colors">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
                                                     Bay {simulator.bay_number}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {simulator.name}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {simulator.is_coaching_bay ? '—' : `$${Number(simulator.hourly_price || 0).toFixed(2)}`}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                                        simulator.is_coaching_bay 
-                                                            ? 'bg-indigo-100 text-indigo-800' 
-                                                            : 'bg-purple-100 text-purple-800'
-                                                    }`}>
+                                                    <Badge status={simulator.is_coaching_bay ? 'personal' : 'pending'}>
                                                         {simulator.is_coaching_bay ? 'Coaching Bay' : 'Simulator Bay'}
-                                                    </span>
+                                                    </Badge>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                                        simulator.is_active 
-                                                            ? 'bg-green-100 text-green-800' 
-                                                            : 'bg-gray-100 text-gray-800'
-                                                    }`}>
+                                                    <Badge status={simulator.is_active ? 'confirmed' : 'cancelled'}>
                                                         {simulator.is_active ? 'Active' : 'Inactive'}
-                                                    </span>
+                                                    </Badge>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2 flex-wrap">
                                                         <button 
-                                                            className="text-blue-600 hover:text-blue-900"
+                                                            className="text-primary hover:text-primary-light transition-colors"
                                                             onClick={() => handleEdit(simulator)}
                                                         >
                                                             Edit
                                                         </button>
                                                         {!simulator.is_coaching_bay && (
                                                             <button 
-                                                                className="text-indigo-600 hover:text-indigo-900 inline-flex items-center gap-1"
+                                                                className="text-status-personal-text hover:text-status-personal-text/80 inline-flex items-center gap-1 transition-colors"
                                                                 onClick={() => navigate(`/admin/simulators/${simulator.id}/availability`)}
                                                             >
                                                                 <Clock className="w-4 h-4" />
@@ -331,15 +323,15 @@ function SimulatorManagement() {
                                                         <button 
                                                             className={`${
                                                                 simulator.is_active 
-                                                                    ? 'text-orange-600 hover:text-orange-900' 
-                                                                    : 'text-green-600 hover:text-green-900'
-                                                            }`}
+                                                                    ? 'text-accent hover:text-accent-dark' 
+                                                                    : 'text-status-confirmed-text hover:text-status-confirmed-text/80'
+                                                            } transition-colors`}
                                                             onClick={() => handleToggleActive(simulator.id, simulator.is_active)}
                                                         >
                                                             {simulator.is_active ? 'Deactivate' : 'Activate'}
                                                         </button>
                                                         <button 
-                                                            className="text-red-600 hover:text-red-900"
+                                                            className="text-danger hover:text-danger-light transition-colors"
                                                             onClick={() => handleDelete(simulator.id)}
                                                         >
                                                             Delete

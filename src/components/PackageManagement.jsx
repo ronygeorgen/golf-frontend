@@ -5,6 +5,8 @@ import { getStaff } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
 
 function PackageManagement() {
     const dispatch = useAppDispatch();
@@ -22,6 +24,7 @@ function PackageManagement() {
         staff_members: [],
         session_count: 5,
         session_duration_minutes: 60,
+        redirect_url: '',
         is_active: true
     };
     const [formData, setFormData] = useState(emptyForm);
@@ -104,6 +107,7 @@ function PackageManagement() {
             staff_members: staffMemberIds,
             session_count: pkg.session_count || 1,
             session_duration_minutes: pkg.session_duration_minutes || 60,
+            redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active
         });
         setShowForm(true);
@@ -136,17 +140,33 @@ function PackageManagement() {
         });
     };
 
+    const truncateUrl = (url, maxLength = 15) => {
+        try {
+          // Remove protocol (http:// or https://)
+          const noProtocol = url.replace(/^https?:\/\//, '');
+      
+          // If noProtocol is shorter than maxLength, just return it
+          if (noProtocol.length <= maxLength) return noProtocol;
+      
+          // Truncate with ellipsis, preserving start and some of the path
+          return noProtocol.slice(0, maxLength - 3) + '...';
+        } catch {
+          return url;
+        }
+      }
+      
+
     return (
         <>
         <div className="max-w-7xl mx-auto">
-                <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                        <button 
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                        <Button 
                             onClick={() => setShowForm(true)}
+                            variant="primary"
                         >
                             Add Package
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -157,38 +177,36 @@ function PackageManagement() {
                         setEditingPackage(null);
                         setFormData(emptyForm);
                     }}>
-                        <div ref={modalRef} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                                <h2 className="text-2xl font-bold text-text-primary mb-6">
                                     {editingPackage ? 'Edit Package' : 'Add Package'}
                                 </h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Package Title
                                         </label>
                                         <input
                                             type="text"
                                             value={formData.title}
                                             onChange={(e) => setFormData({...formData, title: e.target.value})}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Description
                                         </label>
                                         <textarea
                                             value={formData.description}
                                             onChange={(e) => setFormData({...formData, description: e.target.value})}
                                             rows="4"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Price ($)
                                         </label>
                                         <input
@@ -196,13 +214,12 @@ function PackageManagement() {
                                             step="0.01"
                                             value={formData.price}
                                             onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value)})}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             required
                                         />
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
                                                 Sessions Included
                                             </label>
                                             <input
@@ -210,12 +227,11 @@ function PackageManagement() {
                                                 min="1"
                                                 value={formData.session_count}
                                                 onChange={(e) => setFormData({...formData, session_count: parseInt(e.target.value, 10) || 1})}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
                                                 Session Duration (minutes)
                                             </label>
                                             <input
@@ -224,25 +240,38 @@ function PackageManagement() {
                                                 step="15"
                                                 value={formData.session_duration_minutes}
                                                 onChange={(e) => setFormData({...formData, session_duration_minutes: parseInt(e.target.value, 10) || 60})}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 required
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Redirect URL (Optional)
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={formData.redirect_url}
+                                            onChange={(e) => setFormData({...formData, redirect_url: e.target.value})}
+                                            placeholder="https://example.com/redirect"
+                                        />
+                                        <p className="mt-1 text-xs text-text-secondary">
+                                            URL to redirect users to after purchasing this package
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Assigned Staff
                                         </label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-border rounded-lg p-4">
                                             {staff.map(staffMember => (
-                                                <label key={staffMember.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                                <label key={staffMember.id} className="flex items-center space-x-2 cursor-pointer hover:bg-background p-2 rounded transition-colors">
                                                     <input
                                                         type="checkbox"
                                                         checked={formData.staff_members.includes(staffMember.id)}
                                                         onChange={() => handleStaffSelection(staffMember.id)}
-                                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                        className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                                                     />
-                                                    <span className="text-sm text-gray-700">
+                                                    <span className="text-sm text-text-primary">
                                                         {staffMember.first_name} {staffMember.last_name}
                                                     </span>
                                                 </label>
@@ -254,25 +283,27 @@ function PackageManagement() {
                                             type="checkbox"
                                             checked={formData.is_active}
                                             onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
                                         />
-                                        <label className="ml-2 text-sm font-medium text-gray-700">
+                                        <label className="ml-2 text-sm font-medium text-text-primary">
                                             Active
                                         </label>
                                     </div>
                                     <div className="flex gap-4 pt-4">
-                                        <button 
+                                        <Button 
                                             type="submit" 
                                             disabled={submitLoading}
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            variant="primary"
+                                            className="flex-1"
                                         >
                                             {submitLoading
                                                 ? (editingPackage ? 'Updating...' : 'Creating...')
                                                 : `${editingPackage ? 'Update' : 'Create'} Package`}
-                                        </button>
-                                        <button 
+                                        </Button>
+                                        <Button 
                                             type="button" 
-                                            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                            variant="secondary"
+                                            className="flex-1"
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingPackage(null);
@@ -280,7 +311,7 @@ function PackageManagement() {
                                             }}
                                         >
                                             Cancel
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             </div>
@@ -292,82 +323,95 @@ function PackageManagement() {
                 {packagesLoading ? (
                     <TableSkeleton rows={5} cols={6} />
                 ) : (
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div className="bg-surface rounded-card shadow-card overflow-hidden">
                         {packages.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-gray-500 text-lg">No packages found. Add your first package.</p>
+                                <p className="text-text-secondary text-lg">No packages found. Add your first package.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
+                                <table className="min-w-full divide-y divide-border">
+                                    <thead className="bg-background">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Title
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Description
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Price
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Sessions
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Session Length
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Redirect URL
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Staff Members
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Status
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-surface divide-y divide-border">
                                         {packages.map(pkg => (
-                                            <tr key={pkg.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <tr key={pkg.id} className="hover:bg-background transition-colors">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
                                                     {pkg.title}
                                                 </td>
-                                                <td className="px-4 py-4 text-sm text-gray-500 max-w-xs truncate">
+                                                <td className="px-4 py-4 text-sm text-text-secondary max-w-xs truncate">
                                                     {pkg.description}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-accent">
                                                     ${pkg.price}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {pkg.session_count}
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {pkg.session_duration_minutes} min
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-primary max-w-xs truncate">
+                                                    {pkg.redirect_url ? (
+                                                        <a 
+                                                            href={pkg.redirect_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="text-primary hover:text-primary-light underline transition-colors"
+                                                        >
+                                                            {truncateUrl(pkg.redirect_url, 20)}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-text-secondary">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <div className="flex flex-wrap gap-1">
                                                         {pkg.staff_members_details?.map(staff => (
-                                                            <span key={staff.id} className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                                            <Badge key={staff.id} status="pending">
                                                                 {staff.first_name} {staff.last_name}
-                                                            </span>
+                                                            </Badge>
                                                         ))}
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                                        pkg.is_active 
-                                                            ? 'bg-green-100 text-green-800' 
-                                                            : 'bg-gray-100 text-gray-800'
-                                                    }`}>
+                                                    <Badge status={pkg.is_active ? 'confirmed' : 'cancelled'}>
                                                         {pkg.is_active ? 'Active' : 'Inactive'}
-                                                    </span>
+                                                    </Badge>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
                                                         <button 
-                                                            className="text-blue-600 hover:text-blue-900"
+                                                            className="text-primary hover:text-primary-light transition-colors"
                                                             onClick={() => handleEdit(pkg)}
                                                         >
                                                             Edit
@@ -375,15 +419,15 @@ function PackageManagement() {
                                                         <button 
                                                             className={`${
                                                                 pkg.is_active 
-                                                                    ? 'text-orange-600 hover:text-orange-900' 
-                                                                    : 'text-green-600 hover:text-green-900'
-                                                            }`}
+                                                                    ? 'text-accent hover:text-accent-dark' 
+                                                                    : 'text-status-confirmed-text hover:text-status-confirmed-text/80'
+                                                            } transition-colors`}
                                                             onClick={() => handleToggleActive(pkg.id, pkg.is_active)}
                                                         >
                                                             {pkg.is_active ? 'Deactivate' : 'Activate'}
                                                         </button>
                                                         <button 
-                                                            className="text-red-600 hover:text-red-900"
+                                                            className="text-danger hover:text-danger-light transition-colors"
                                                             onClick={() => handleDelete(pkg.id)}
                                                         >
                                                             Delete

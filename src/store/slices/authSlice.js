@@ -40,10 +40,6 @@ export const requestOTP = createAsyncThunk(
     async (phone, { rejectWithValue }) => {
         try {
             const payload = { phone };
-            const locationId = localStorage.getItem('ghlLocationId');
-            if (locationId) {
-                payload.location_id = locationId;
-            }
             const response = await apiClient.post(endpoints.auth.requestOTP, payload);
             return response.data;
         } catch (error) {
@@ -57,14 +53,6 @@ export const verifyOTP = createAsyncThunk(
     async ({ phone, otp }, { rejectWithValue }) => {
         try {
             const payload = { phone, otp };
-            // Get location_id from localStorage (set from URL parameter ?location=)
-            const locationId = localStorage.getItem('ghlLocationId');
-            if (locationId && locationId.trim()) {
-                payload.location_id = locationId.trim();
-                console.log('Sending location_id to backend:', payload.location_id);
-            } else {
-                console.warn('No location_id found in localStorage for GHL sync');
-            }
             const response = await apiClient.post(endpoints.auth.verifyOTP, payload);
             if (response.data.token) {
                 localStorage.setItem('token', response.data.token);
@@ -89,6 +77,24 @@ export const getProfile = createAsyncThunk(
     }
 );
 
+export const autoLogin = createAsyncThunk(
+    'auth/autoLogin',
+    async (email, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.auth.autoLogin, {
+                params: { email }
+            });
+            if (response.data.token) {
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const logout = createAsyncThunk(
     'auth/logout',
     async (_, { rejectWithValue }) => {
@@ -96,12 +102,10 @@ export const logout = createAsyncThunk(
             await apiClient.post(endpoints.auth.logout);
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            localStorage.removeItem('ghlLocationId');  // Clear GHL location ID on logout
             return null;
         } catch (error) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            localStorage.removeItem('ghlLocationId');  // Clear GHL location ID even on error
             return rejectWithValue(error.response?.data || error.message);
         }
     }
@@ -212,6 +216,22 @@ const authSlice = createSlice({
                 state.user = action.payload;
             })
             .addCase(getProfile.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Auto Login
+        builder
+            .addCase(autoLogin.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(autoLogin.fulfilled, (state, action) => {
+                state.loading = false;
+                state.user = action.payload.user;
+                state.token = action.payload.token;
+            })
+            .addCase(autoLogin.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

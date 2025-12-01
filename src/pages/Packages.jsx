@@ -1,37 +1,51 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
     getActiveCoachingPackages,
     getMyPackagePurchases,
     getGiftsPending,
     getTransfersPending,
+    getMyOrganizationPurchases,
 } from '../store/slices/coachingSlice';
 import PackagePurchaseModal from '../components/PackagePurchaseModal';
+import OrganizationMemberManagement from '../components/OrganizationMemberManagement';
 import SessionTransfer from '../components/SessionTransfer';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
 import { Skeleton } from '../components/skeletons/SkeletonLoader';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
 
 function Packages() {
     const dispatch = useAppDispatch();
-    const { packages, purchases, loading, purchasesLoading } = useAppSelector((state) => state.coaching);
+    const navigate = useNavigate();
+    const { 
+        packages, 
+        purchases, 
+        purchasesPagination,
+        organizationPurchases,
+        organizationPurchasesPagination,
+        loading, 
+        purchasesLoading, 
+        organizationPurchasesLoading 
+    } = useAppSelector((state) => state.coaching);
 
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState('normal');
     const [selectedPackageId, setSelectedPackageId] = useState(null);
-    const [purchasePage, setPurchasePage] = useState(1);
-    const pageSize = 5;
+    const [memberManagementOpen, setMemberManagementOpen] = useState(false);
+    const [selectedPurchase, setSelectedPurchase] = useState(null);
+    const previewLimit = 5;
 
     useEffect(() => {
         dispatch(getActiveCoachingPackages());
-        dispatch(getMyPackagePurchases());
+        dispatch(getMyPackagePurchases({ page: 1 }));
+        dispatch(getMyOrganizationPurchases({ page: 1 }));
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
     }, [dispatch]);
 
-    useEffect(() => {
-        setPurchasePage(1);
-    }, [purchases.length]);
 
     const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId);
 
@@ -48,16 +62,28 @@ function Packages() {
 
     const handlePurchaseSuccess = () => {
         dispatch(getMyPackagePurchases());
+        dispatch(getMyOrganizationPurchases());
         dispatch(getGiftsPending());
+    };
+
+    const handleManageMembers = (purchase) => {
+        setSelectedPurchase(purchase);
+        setMemberManagementOpen(true);
+    };
+
+    const handleCloseMemberManagement = () => {
+        setMemberManagementOpen(false);
+        setSelectedPurchase(null);
+        // No need to refresh - Redux state is already updated when members are added/removed
     };
 
     return (
         <div className="p-4 md:p-6 lg:p-8 space-y-8">
-            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="bg-surface rounded-card shadow-card p-6">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Packages & Gifts</h1>
-                        <p className="text-gray-600 mt-1">
+                        <h1 className="text-2xl font-bold text-text-primary">Packages & Gifts</h1>
+                        <p className="text-text-secondary mt-1">
                             Buy packages for yourself, gift entire packages, or share sessions from your existing purchases.
                         </p>
                     </div>
@@ -66,7 +92,7 @@ function Packages() {
                 {loading && (
                     <div className="grid gap-6 md:grid-cols-2">
                         {Array.from({ length: 4 }).map((_, idx) => (
-                            <div key={idx} className="border border-gray-200 rounded-xl p-5 shadow-sm bg-white space-y-4">
+                            <div key={idx} className="rounded-card p-5 shadow-card bg-surface space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1 pr-4">
                                         <Skeleton height="24px" width="70%" className="mb-2" />
@@ -91,52 +117,87 @@ function Packages() {
                 )}
 
                 {!loading && packages.length === 0 && (
-                    <div className="text-center py-6 text-gray-500">
+                    <div className="text-center py-6 text-text-secondary">
                         No active packages available at the moment.
                     </div>
                 )}
 
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {packages.map((pkg) => {
                         const ownedSessions = purchases
                             .filter((purchase) => purchase.package === pkg.id)
                             .reduce((total, purchase) => total + (purchase.sessions_remaining || 0), 0);
 
                         return (
-                            <div key={pkg.id} className="border border-gray-200 rounded-xl p-5 shadow-sm bg-white">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <h3 className="text-xl font-semibold text-gray-900">{pkg.title}</h3>
-                                        <p className="text-sm text-gray-500">{pkg.description}</p>
+                            <div 
+                                key={pkg.id} 
+                                className="rounded-card shadow-card bg-surface border border-border hover:shadow-card-hover transition-all duration-200 flex flex-col"
+                            >
+                                {/* Header Section with Price */}
+                                <div className="bg-gradient-to-br from-primary/5 to-primary-light/5 p-4 border-b border-border">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex-1 pr-3 min-w-0">
+                                            <h3 className="text-lg font-bold text-text-primary mb-1 line-clamp-1">{pkg.title}</h3>
+                                            {pkg.description && (
+                                                <p className="text-xs text-text-secondary line-clamp-2">{pkg.description}</p>
+                                            )}
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                            <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
+                                            <p className="text-xs text-text-secondary mt-0.5">One-time</p>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-2xl font-bold text-blue-600">${pkg.price}</p>
-                                        <p className="text-sm text-gray-500">{pkg.session_count} sessions</p>
+                                    
+                                    {/* Package Stats */}
+                                    <div className="flex items-center gap-3 pt-2 border-t border-border/50">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-status-confirmed-text"></div>
+                                            <span className="text-xs font-medium text-text-primary">{pkg.session_count} Sessions</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                                            <span className="text-xs font-medium text-text-primary">{pkg.session_duration_minutes} min</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm text-gray-600">
-                                    <p>Session length: {pkg.session_duration_minutes} minutes</p>
-                                    <p>You currently have <span className="font-semibold text-gray-800">{ownedSessions}</span> session(s) remaining for this package.</p>
-                                </div>
-                                <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-                                    <button
-                                        onClick={() => handleOpenModal(pkg.id, 'normal')}
-                                        className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
-                                    >
-                                        Buy for Myself
-                                    </button>
-                                    <button
-                                        onClick={() => handleOpenModal(pkg.id, 'gift')}
-                                        className="w-full sm:flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
-                                    >
-                                        Gift Entire Package
-                                    </button>
-                                    <button
-                                        onClick={() => handleOpenModal(pkg.id, 'organization')}
-                                        className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200"
-                                    >
-                                        Buy for Organization
-                                    </button>
+
+                                {/* Content Section */}
+                                <div className="p-4 flex-1 flex flex-col">
+                                    {/* Your Sessions Info */}
+                                    {ownedSessions > 0 && (
+                                        <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-2.5 mb-3">
+                                            <p className="text-xs text-status-confirmed-text font-semibold">
+                                                You have <span className="text-base font-bold">{ownedSessions}</span> session{ownedSessions !== 1 ? 's' : ''} remaining
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Action Buttons */}
+                                    <div className="space-y-2 mt-auto">
+                                        <Button
+                                            onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                            variant="primary"
+                                            className="w-full py-2 text-sm"
+                                        >
+                                            Buy for Myself
+                                        </Button>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                variant="accent"
+                                                className="w-full py-2 text-sm"
+                                            >
+                                                Gift Package
+                                            </Button>
+                                            <Button
+                                                onClick={() => handleOpenModal(pkg.id, 'organization')}
+                                                variant="secondary"
+                                                className="w-full py-2 text-sm"
+                                            >
+                                                Group Purchase
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -149,26 +210,38 @@ function Packages() {
                 <div className="space-y-6">
                     <SessionTransfer />
                 </div>
-                <div className="space-y-6">
+                <div className="space-y-6 flex flex-col">
                     <GiftClaim />
                     <TransferClaim />
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="bg-surface rounded-card shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-gray-900">My Package Purchases</h2>
-                    <button
-                        onClick={() => dispatch(getMyPackagePurchases())}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
-                    >
-                        Refresh
-                    </button>
+                    <h2 className="text-xl font-bold text-text-primary">My Package Purchases</h2>
+                    <div className="flex items-center gap-3">
+                        {purchases.length > previewLimit && (
+                            <button
+                                onClick={() => navigate('/purchases/personal')}
+                                className="group text-sm text-primary hover:text-primary-light transition-colors font-medium cursor-pointer"
+                            >
+                                <span className="border-b border-current group-hover:border-primary-light transition-colors">
+                                    View All ({purchasesPagination.count || purchases.length})
+                                </span>
+                            </button>
+                        )}
+                        <button
+                            onClick={() => dispatch(getMyPackagePurchases({ page: 1 }))}
+                            className="text-sm text-primary hover:text-primary-light font-semibold transition-colors"
+                        >
+                            Refresh
+                        </button>
+                    </div>
                 </div>
                 {purchasesLoading ? (
                     <div className="grid gap-4">
-                        {Array.from({ length: 3 }).map((_, idx) => (
-                            <div key={idx} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
+                        {Array.from({ length: Math.min(3, previewLimit) }).map((_, idx) => (
+                            <div key={idx} className="rounded-card p-4 bg-surface shadow-card space-y-3">
                                 <Skeleton height="20px" width="50%" />
                                 <Skeleton height="16px" width="70%" />
                                 <Skeleton height="16px" width="60%" />
@@ -180,38 +253,36 @@ function Packages() {
                         ))}
                     </div>
                 ) : purchases.length === 0 ? (
-                    <div className="text-center text-gray-500 py-6">You haven&apos;t purchased any packages yet.</div>
+                    <div className="text-center text-text-secondary py-6">You haven&apos;t purchased any packages yet.</div>
                 ) : (
                     <div className="grid gap-4">
                         {purchases
-                            .slice((purchasePage - 1) * pageSize, purchasePage * pageSize)
+                            .slice(0, previewLimit)
                             .map((purchase) => {
                             const isGift = purchase.purchase_type === 'gift';
                             const owner = purchase.original_owner_details;
                             return (
-                                <div key={purchase.id} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
+                                <div key={purchase.id} className="rounded-card p-4 bg-surface shadow-card">
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                         <div>
-                                            <h3 className="text-lg font-semibold text-gray-900">{purchase.purchase_name}</h3>
-                                            <p className="text-sm text-gray-600">
+                                            <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
+                                            <p className="text-sm text-text-secondary">
                                                 Package: {purchase.package_details?.title}
                                             </p>
-                                            <p className="text-sm text-gray-600">
+                                            <p className="text-sm text-text-secondary">
                                                 Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
                                             </p>
                                             {isGift && owner && (
-                                                <p className="text-sm text-purple-700 mt-1">
+                                                <p className="text-sm text-accent mt-1">
                                                     Gifted by {owner.first_name} {owner.last_name}
                                                 </p>
                                             )}
                                         </div>
                                         <div className="flex flex-col items-end text-right space-y-1">
-                                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                                isGift ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                                            }`}>
+                                            <Badge status={isGift ? 'pending' : 'personal'}>
                                                 {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
-                                            </span>
-                                            <span className="text-xs text-gray-500">
+                                            </Badge>
+                                            <span className="text-xs text-text-secondary">
                                                 Purchased on {new Date(purchase.purchased_at).toLocaleDateString()}
                                             </span>
                                         </div>
@@ -219,33 +290,91 @@ function Packages() {
                                 </div>
                             );
                         })}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-gray-100">
-                            <p className="text-sm text-gray-600">
-                                Showing{' '}
-                                {purchases.length === 0
-                                    ? '0'
-                                    : `${(purchasePage - 1) * pageSize + 1} - ${Math.min(purchasePage * pageSize, purchases.length)}`} of {purchases.length} purchases
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setPurchasePage((prev) => Math.max(1, prev - 1))}
-                                    disabled={purchasePage === 1}
-                                    className="px-3 py-1 rounded-lg border border-gray-300 text-gray-700 bg-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                >
-                                    Previous
-                                </button>
-                                <span className="text-sm font-medium text-gray-700">
-                                    Page {purchasePage} of {Math.max(1, Math.ceil(purchases.length / pageSize))}
+                    </div>
+                )}
+            </div>
+
+            {/* Organization Purchases Section */}
+            <div className="bg-surface rounded-card shadow-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-xl font-bold text-text-primary">My Group Purchases</h2>
+                        <p className="text-sm text-text-secondary mt-1">
+                            Manage members for your group package purchases
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {organizationPurchases.length > previewLimit && (
+                            <button
+                                onClick={() => navigate('/purchases/organizations')}
+                                className="group text-sm text-primary hover:text-primary-light transition-colors font-medium cursor-pointer"
+                            >
+                                <span className="border-b border-current group-hover:border-primary-light transition-colors">
+                                    View All ({organizationPurchasesPagination.count || organizationPurchases.length})
                                 </span>
-                                <button
-                                    onClick={() => setPurchasePage((prev) => Math.min(Math.ceil(purchases.length / pageSize) || 1, prev + 1))}
-                                    disabled={purchasePage >= Math.ceil(purchases.length / pageSize)}
-                                    className="px-3 py-1 rounded-lg border border-blue-500 text-white bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                                >
-                                    Next
-                                </button>
+                            </button>
+                        )}
+                        <button
+                            onClick={() => dispatch(getMyOrganizationPurchases({ page: 1 }))}
+                            className="text-sm text-primary hover:text-primary-light font-semibold transition-colors"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                {organizationPurchasesLoading ? (
+                    <div className="grid gap-4">
+                        {Array.from({ length: Math.min(2, previewLimit) }).map((_, idx) => (
+                            <div key={idx} className="rounded-card p-4 bg-surface shadow-card space-y-3">
+                                <Skeleton height="20px" width="50%" />
+                                <Skeleton height="16px" width="70%" />
+                                <Skeleton height="16px" width="60%" />
+                                <Skeleton height="40px" width="150px" />
                             </div>
-                        </div>
+                        ))}
+                    </div>
+                ) : organizationPurchases.length === 0 ? (
+                    <div className="text-center text-text-secondary py-6">
+                        You haven&apos;t created any group purchases yet.
+                    </div>
+                ) : (
+                    <div className="grid gap-4">
+                        {organizationPurchases.slice(0, previewLimit).map((purchase) => {
+                            const memberCount = purchase.organization_members?.length || 0;
+                            return (
+                                <div key={purchase.id} className="rounded-card p-4 bg-background border border-border shadow-card">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
+                                                <Badge variant="accent">Group</Badge>
+                                            </div>
+                                            <p className="text-sm text-text-secondary">
+                                                Package: {purchase.package_details?.title}
+                                            </p>
+                                            <p className="text-sm text-text-secondary">
+                                                Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
+                                            </p>
+                                            <p className="text-sm text-text-secondary mt-1">
+                                                Members: <span className="font-semibold">{memberCount}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col items-end text-right space-y-2">
+                                            <Button
+                                                onClick={() => handleManageMembers(purchase)}
+                                                variant="primary"
+                                                className="w-full md:w-auto"
+                                            >
+                                                Manage Members
+                                            </Button>
+                                            <span className="text-xs text-text-secondary">
+                                                Created on {new Date(purchase.purchased_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -258,7 +387,13 @@ function Packages() {
                 onSuccess={handlePurchaseSuccess}
                 defaultType={modalType}
                 lockType={true}
-                titleText={modalType === 'gift' ? 'Gift Entire Package' : 'Buy Package for Yourself'}
+                titleText={modalType === 'gift' ? 'Gift Entire Package' : modalType === 'organization' ? 'Purchase for Group' : 'Buy Package for Yourself'}
+            />
+
+            <OrganizationMemberManagement
+                isOpen={memberManagementOpen}
+                onClose={handleCloseMemberManagement}
+                purchase={selectedPurchase}
             />
         </div>
     );

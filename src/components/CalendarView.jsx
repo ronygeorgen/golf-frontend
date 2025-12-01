@@ -36,19 +36,20 @@ function CalendarView({ isUserView = false }) {
     }, [dispatch, date, calendarType]);
 
     const eventStyleGetter = (event) => {
-        let backgroundColor = '#3174ad';
+        // Use design system colors
+        let backgroundColor = '#1B3D2C'; // primary-light for simulator
         
-        // For simulator calendar, use blue; for coaching calendar, use green
+        // For simulator calendar, use primary-light; for coaching calendar, use primary
         if (calendarType === 'coaching') {
-            backgroundColor = '#28a745';
+            backgroundColor = '#0F2A1D'; // primary
         } else {
-            backgroundColor = '#3174ad';
+            backgroundColor = '#1B3D2C'; // primary-light
         }
         
         if (event.status === 'cancelled') {
-            backgroundColor = '#dc3545';
+            backgroundColor = '#DC2626'; // danger
         } else if (event.status === 'completed') {
-            backgroundColor = '#6c757d';
+            backgroundColor = '#374151'; // no_show text color (gray)
         }
         
         return {
@@ -153,38 +154,38 @@ function CalendarView({ isUserView = false }) {
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
             <div className="w-full">
-                <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
                         {isUserView && (
-                            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 md:mb-0">
+                            <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-4 md:mb-0">
                                 My Bookings Calendar
                             </h1>
                         )}
                         <div className="flex flex-col gap-4 w-full md:w-auto">
                             {/* Calendar Type Toggle */}
-                            <div className="flex items-center justify-between gap-4 bg-gray-100 rounded-2xl p-2 shadow-inner">
+                            <div className="flex items-center justify-between gap-4 bg-background rounded-2xl p-2 shadow-inner">
                                 <button
                                     onClick={() => setCalendarType('simulator')}
                                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
                                         calendarType === 'simulator'
-                                            ? 'bg-blue-600 text-white shadow-md scale-[1.02]'
-                                            : 'text-gray-600 hover:bg-white'
+                                            ? 'bg-primary-light text-white shadow-md scale-[1.02]'
+                                            : 'text-text-secondary hover:bg-surface'
                                     }`}
                                     title="Normal Simulator Calendar"
                                 >
-                                    <span className="w-3 h-3 rounded-full bg-blue-400"></span>
+                                    <span className="w-3 h-3 rounded-full bg-primary-light"></span>
                                     <span className="hidden sm:inline">Simulators</span>
                                 </button>
                                 <button
                                     onClick={() => setCalendarType('coaching')}
                                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
                                         calendarType === 'coaching'
-                                            ? 'bg-green-600 text-white shadow-md scale-[1.02]'
-                                            : 'text-gray-600 hover:bg-white'
+                                            ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                            : 'text-text-secondary hover:bg-surface'
                                     }`}
                                     title="Coaching Simulator Calendar"
                                 >
-                                    <span className="w-3 h-3 rounded-full bg-green-400"></span>
+                                    <span className="w-3 h-3 rounded-full bg-primary"></span>
                                     <span className="hidden sm:inline">Coaching</span>
                                 </button>
                             </div>
@@ -192,7 +193,7 @@ function CalendarView({ isUserView = false }) {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-4 md:p-6 relative">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 relative">
                     <div style={{ height: '600px', position: 'relative' }}>
                         <Calendar
                             localizer={localizer}
@@ -221,7 +222,7 @@ function CalendarView({ isUserView = false }) {
                         />
                         {loading && (
                             <div 
-                                className="absolute bg-white bg-opacity-95 pointer-events-none z-10"
+                                className="absolute bg-surface bg-opacity-95 pointer-events-none z-10"
                                 style={{ 
                                     top: '50px', 
                                     left: 0, 
@@ -232,22 +233,22 @@ function CalendarView({ isUserView = false }) {
                                     justifyContent: 'center'
                                 }}
                             >
-                                <div className="w-full h-full bg-gray-100 animate-pulse rounded-lg"></div>
+                                <div className="w-full h-full bg-background animate-pulse rounded-lg"></div>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mt-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mt-6">
                     <div className="flex flex-wrap gap-4 md:gap-6">
                         {[
-                            { color: calendarType === 'simulator' ? 'bg-blue-500' : 'bg-green-500', label: calendarType === 'simulator' ? 'Simulator Bookings' : 'Coaching Sessions' },
-                            { color: 'bg-red-500', label: 'Cancelled' },
-                            { color: 'bg-gray-500', label: 'Completed' },
+                            { color: calendarType === 'simulator' ? 'bg-primary-light' : 'bg-primary', label: calendarType === 'simulator' ? 'Simulator Bookings' : 'Coaching Sessions' },
+                            { color: 'bg-danger', label: 'Cancelled' },
+                            { color: 'bg-status-no_show-text', label: 'Completed' },
                         ].map((item, idx) => (
                             <div key={idx} className="group relative flex items-center">
                                 <div className={`w-4 h-4 rounded-full ${item.color}`}></div>
-                                <div className="opacity-0 group-hover:opacity-100 transition duration-200 absolute top-full mt-2 px-2 py-1 rounded bg-gray-900 text-white text-xs whitespace-nowrap">
+                                <div className="opacity-0 group-hover:opacity-100 transition duration-200 absolute top-full mt-2 px-2 py-1 rounded bg-text-primary text-white text-xs whitespace-nowrap">
                                     {item.label}
                                 </div>
                             </div>
