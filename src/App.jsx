@@ -13,6 +13,7 @@ import StaffAvailability from './components/StaffAvailability';
 import SimulatorManagement from './components/SimulatorManagement';
 import SimulatorAvailability from './components/SimulatorAvailability';
 import PackageManagement from './components/PackageManagement';
+import UserManagement from './components/UserManagement';
 import CalendarView from './components/CalendarView';
 import AdminLayout from './components/AdminLayout';
 import UserLayout from './components/UserLayout';
@@ -149,6 +150,7 @@ function AppContent() {
                 }
             >
                 <Route index element={<AdminDashboard />} />
+                <Route path="users" element={<UserManagement />} />
                 <Route path="staff" element={<StaffManagement />} />
                 <Route path="staff/:id/availability" element={<StaffAvailability />} />
                 <Route path="simulators" element={<SimulatorManagement />} />
