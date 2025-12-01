@@ -58,11 +58,6 @@ export const endpoints = {
             coachingSessions: '/admin/overrides/coaching-sessions/',
             simulatorCredits: '/admin/overrides/simulator-credits/',
         },
-        users: {
-            list: '/admin/users/',
-            detail: (id) => `/admin/users/${id}/`,
-            togglePause: (id) => `/admin/users/${id}/toggle-pause/`,
-        },
     },
     
     // Booking endpoints
