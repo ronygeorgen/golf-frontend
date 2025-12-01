@@ -73,12 +73,12 @@ function AdminOverrides() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-surface shadow-card rounded-card p-6 border border-border flex flex-col">
+                <div className="bg-surface shadow-card rounded-card p-6 border border-border">
                     <h2 className="text-xl font-semibold text-text-primary mb-1">Restore Coaching Sessions</h2>
                     <p className="text-sm text-text-secondary mb-4">
                         Add sessions back to a client's package when you approve a late cancellation or goodwill credit.
                     </p>
-                    <form className="space-y-4 flex flex-col flex-1" onSubmit={handleCoachingSubmit}>
+                    <form className="space-y-4" onSubmit={handleCoachingSubmit}>
                         <div>
                             <label className="block text-sm font-medium text-text-primary mb-1">Client email or phone</label>
                             <input
@@ -139,19 +139,19 @@ function AdminOverrides() {
                             type="submit"
                             disabled={overrides.coaching.loading}
                             variant="primary"
-                            className="w-full mt-auto"
+                            className="w-full"
                         >
                             {overrides.coaching.loading ? 'Adding Sessions...' : 'Add Sessions'}
                         </Button>
                     </form>
                 </div>
 
-                <div className="bg-surface shadow-card rounded-card p-6 border border-border flex flex-col">
+                <div className="bg-surface shadow-card rounded-card p-6 border border-border">
                     <h2 className="text-xl font-semibold text-text-primary mb-1">Grant Simulator Credits</h2>
                     <p className="text-sm text-text-secondary mb-4">
                         Give clients a free simulator session credit for approved cancellations or goodwill gestures.
                     </p>
-                    <form className="space-y-4 flex flex-col flex-1" onSubmit={handleSimulatorSubmit}>
+                    <form className="space-y-4" onSubmit={handleSimulatorSubmit}>
                         <div>
                             <label className="block text-sm font-medium text-text-primary mb-1">Client email or phone</label>
                             <input
@@ -198,7 +198,7 @@ function AdminOverrides() {
                             type="submit"
                             disabled={overrides.simulator.loading}
                             variant="accent"
-                            className="w-full mt-auto"
+                            className="w-full"
                         >
                             {overrides.simulator.loading ? 'Granting Credits...' : 'Grant Credits'}
                         </Button>
