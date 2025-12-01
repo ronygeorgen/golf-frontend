@@ -7,7 +7,7 @@ import PopupMessage from '../components/PopupMessage';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
 import SessionTransfer from '../components/SessionTransfer';
-import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getMyOrganizationPurchases, getActiveCoachingPackages } from '../store/slices/coachingSlice';
+import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getOrganizationPackages, getActiveCoachingPackages } from '../store/slices/coachingSlice';
 import usePopup from '../hooks/usePopup';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -17,7 +17,7 @@ function ClientPortal() {
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
     const { upcomingBookings, loading, simulatorCredits, upcomingPagination } = useAppSelector((state) => state.booking);
-    const { giftsPending, transfersPending, purchases, organizationPurchases, packages, purchasesLoading, organizationPurchasesLoading } = useAppSelector((state) => state.coaching);
+    const { giftsPending, transfersPending, purchases, organizationPackages, packages, purchasesLoading, organizationPackagesLoading } = useAppSelector((state) => state.coaching);
     const { popup, openPopup, closePopup } = usePopup();
     const [cancellingId, setCancellingId] = useState(null);
     const [rescheduleTarget, setRescheduleTarget] = useState(null);
@@ -49,8 +49,8 @@ function ClientPortal() {
             return acc;
         }, {});
 
-    // Group organization purchases by package
-    const groupSessionsByPackage = organizationPurchases
+    // Group organization packages by package (where user is a member)
+    const groupSessionsByPackage = organizationPackages
         .reduce((acc, purchase) => {
             const packageId = purchase.package;
             if (!acc[packageId]) {
@@ -85,7 +85,7 @@ function ClientPortal() {
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
         dispatch(getMyPackagePurchases({ page: 1 }));
-        dispatch(getMyOrganizationPurchases({ page: 1 }));
+        dispatch(getOrganizationPackages());
         dispatch(getActiveCoachingPackages());
     }, [dispatch]);
 
@@ -506,7 +506,7 @@ function ClientPortal() {
                                     Credits are issued when you cancel simulator bookings at least 24 hours ahead.
                                 </p>
                             </div>
-                            {(purchasesLoading || organizationPurchasesLoading) ? (
+                             {(purchasesLoading || organizationPackagesLoading) ? (
                                 <PackagesSkeleton />
                             ) : (personalPackagesList.length > 0 || groupPackagesList.length > 0) ? (
                                 <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary space-y-4">
