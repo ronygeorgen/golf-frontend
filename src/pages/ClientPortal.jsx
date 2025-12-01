@@ -7,7 +7,7 @@ import PopupMessage from '../components/PopupMessage';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
 import SessionTransfer from '../components/SessionTransfer';
-import { getGiftsPending, getTransfersPending } from '../store/slices/coachingSlice';
+import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getMyOrganizationPurchases, getActiveCoachingPackages } from '../store/slices/coachingSlice';
 import usePopup from '../hooks/usePopup';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -17,7 +17,7 @@ function ClientPortal() {
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
     const { upcomingBookings, loading, simulatorCredits, upcomingPagination } = useAppSelector((state) => state.booking);
-    const { giftsPending, transfersPending } = useAppSelector((state) => state.coaching);
+    const { giftsPending, transfersPending, purchases, organizationPurchases, packages } = useAppSelector((state) => state.coaching);
     const { popup, openPopup, closePopup } = usePopup();
     const [cancellingId, setCancellingId] = useState(null);
     const [rescheduleTarget, setRescheduleTarget] = useState(null);
@@ -33,6 +33,46 @@ function ClientPortal() {
     const pageSize = upcomingPagination?.pageSize || 5; // 5 items per page for upcoming bookings
     const totalCount = upcomingPagination?.count ?? upcomingBookings.length;
 
+    // Group personal/transferred/gifted purchases by package
+    const personalSessionsByPackage = purchases
+        .filter((purchase) => purchase.purchase_type !== 'organization')
+        .reduce((acc, purchase) => {
+            const packageId = purchase.package;
+            if (!acc[packageId]) {
+                acc[packageId] = {
+                    packageId,
+                    packageTitle: purchase.package_details?.title || 'Unknown Package',
+                    sessionsRemaining: 0
+                };
+            }
+            acc[packageId].sessionsRemaining += purchase.sessions_remaining || 0;
+            return acc;
+        }, {});
+
+    // Group organization purchases by package
+    const groupSessionsByPackage = organizationPurchases
+        .reduce((acc, purchase) => {
+            const packageId = purchase.package;
+            if (!acc[packageId]) {
+                acc[packageId] = {
+                    packageId,
+                    packageTitle: purchase.package_details?.title || 'Unknown Package',
+                    sessionsRemaining: 0
+                };
+            }
+            acc[packageId].sessionsRemaining += purchase.sessions_remaining || 0;
+            return acc;
+        }, {});
+
+    // Convert to arrays and sort by package title
+    const personalPackagesList = Object.values(personalSessionsByPackage)
+        .filter(pkg => pkg.sessionsRemaining > 0)
+        .sort((a, b) => a.packageTitle.localeCompare(b.packageTitle));
+
+    const groupPackagesList = Object.values(groupSessionsByPackage)
+        .filter(pkg => pkg.sessionsRemaining > 0)
+        .sort((a, b) => a.packageTitle.localeCompare(b.packageTitle));
+
     useEffect(() => {
         dispatch(getUpcomingBookings({ page, bookingType }));
     }, [dispatch, page, bookingType]);
@@ -44,6 +84,9 @@ function ClientPortal() {
     useEffect(() => {
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
+        dispatch(getMyPackagePurchases({ page: 1 }));
+        dispatch(getMyOrganizationPurchases({ page: 1 }));
+        dispatch(getActiveCoachingPackages());
     }, [dispatch]);
 
     useEffect(() => {
@@ -488,6 +531,36 @@ function ClientPortal() {
                                     Credits are issued when you cancel simulator bookings at least 24 hours ahead.
                                 </p>
                             </div>
+                            {(personalPackagesList.length > 0 || groupPackagesList.length > 0) && (
+                                <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary space-y-4">
+                                    {personalPackagesList.length > 0 && (
+                                        <div>
+                                            <p className="font-semibold text-text-primary mb-2">Personal / Gifted / Transferred Packages</p>
+                                            <div className="space-y-2">
+                                                {personalPackagesList.map((pkg) => (
+                                                    <div key={pkg.packageId} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
+                                                        <span className="text-text-secondary">{pkg.packageTitle}</span>
+                                                        <span className="font-bold text-text-primary">{pkg.sessionsRemaining} session{pkg.sessionsRemaining === 1 ? '' : 's'}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {groupPackagesList.length > 0 && (
+                                        <div>
+                                            <p className="font-semibold text-text-primary mb-2">Group Purchase Packages</p>
+                                            <div className="space-y-2">
+                                                {groupPackagesList.map((pkg) => (
+                                                    <div key={pkg.packageId} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
+                                                        <span className="text-text-secondary">{pkg.packageTitle}</span>
+                                                        <span className="font-bold text-text-primary">{pkg.sessionsRemaining} session{pkg.sessionsRemaining === 1 ? '' : 's'}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
