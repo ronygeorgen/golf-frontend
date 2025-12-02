@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getSimulators, createSimulator, updateSimulator, deleteSimulator } from '../store/slices/adminSlice';
-import { Clock } from 'lucide-react';
+import { Clock, Edit, Trash2, Power, PowerOff, Calendar } from 'lucide-react';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -305,37 +305,64 @@ function SimulatorManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2 flex-wrap">
-                                                        <button 
-                                                            className="text-primary hover:text-primary-light transition-colors"
-                                                            onClick={() => handleEdit(simulator)}
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        {!simulator.is_coaching_bay && (
+                                                        <div className="relative group">
                                                             <button 
-                                                                className="text-status-personal-text hover:text-status-personal-text/80 inline-flex items-center gap-1 transition-colors"
-                                                                onClick={() => navigate(`/admin/simulators/${simulator.id}/availability`)}
+                                                                className="text-primary hover:text-primary-light transition-colors p-1 rounded-md hover:bg-background"
+                                                                onClick={() => handleEdit(simulator)}
+                                                                aria-label="Edit Simulator"
                                                             >
-                                                                <Clock className="w-4 h-4" />
-                                                                Availability
+                                                                <Edit className="w-5 h-5" />
                                                             </button>
+                                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                                Edit
+                                                            </span>
+                                                        </div>
+                                                        {!simulator.is_coaching_bay && (
+                                                            <div className="relative group">
+                                                                <button 
+                                                                    className="text-status-personal-text hover:text-status-personal-text/80 transition-colors p-1 rounded-md hover:bg-background"
+                                                                    onClick={() => navigate(`/admin/simulators/${simulator.id}/availability`)}
+                                                                    aria-label="View Availability"
+                                                                >
+                                                                    <Calendar className="w-5 h-5" />
+                                                                </button>
+                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                                    Availability
+                                                                </span>
+                                                            </div>
                                                         )}
-                                                        <button 
-                                                            className={`${
-                                                                simulator.is_active 
-                                                                    ? 'text-accent hover:text-accent-dark' 
-                                                                    : 'text-status-confirmed-text hover:text-status-confirmed-text/80'
-                                                            } transition-colors`}
-                                                            onClick={() => handleToggleActive(simulator.id, simulator.is_active)}
-                                                        >
-                                                            {simulator.is_active ? 'Deactivate' : 'Activate'}
-                                                        </button>
-                                                        <button 
-                                                            className="text-danger hover:text-danger-light transition-colors"
-                                                            onClick={() => handleDelete(simulator.id)}
-                                                        >
-                                                            Delete
-                                                        </button>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className={`${
+                                                                    simulator.is_active 
+                                                                        ? 'text-accent hover:text-accent-dark' 
+                                                                        : 'text-status-confirmed-text hover:text-status-confirmed-text/80'
+                                                                } transition-colors p-1 rounded-md hover:bg-background`}
+                                                                onClick={() => handleToggleActive(simulator.id, simulator.is_active)}
+                                                                aria-label={simulator.is_active ? 'Deactivate' : 'Activate'}
+                                                            >
+                                                                {simulator.is_active ? (
+                                                                    <PowerOff className="w-5 h-5" />
+                                                                ) : (
+                                                                    <Power className="w-5 h-5" />
+                                                                )}
+                                                            </button>
+                                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                                {simulator.is_active ? 'Deactivate' : 'Activate'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className="text-danger hover:text-danger-light transition-colors p-1 rounded-md hover:bg-background"
+                                                                onClick={() => handleDelete(simulator.id)}
+                                                                aria-label="Delete Simulator"
+                                                            >
+                                                                <Trash2 className="w-5 h-5" />
+                                                            </button>
+                                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                                Delete
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
