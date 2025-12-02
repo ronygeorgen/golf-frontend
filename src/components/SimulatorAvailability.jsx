@@ -216,7 +216,7 @@ function SimulatorAvailability() {
                         </h2>
                         <button
                             onClick={() => setShowAddDay(true)}
-                            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                            className="flex items-center space-x-2 bg-primary hover:bg-primary-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                         >
                             <Plus className="w-5 h-5" />
                             <span>Add Availability</span>
@@ -270,7 +270,7 @@ function SimulatorAvailability() {
                                 <div className="flex items-end space-x-2">
                                     <button
                                         onClick={handleAddAvailability}
-                                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                        className="flex-1 bg-primary hover:bg-primary-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                                     >
                                         Add
                                     </button>
@@ -279,7 +279,7 @@ function SimulatorAvailability() {
                                             setShowAddDay(false);
                                             setNewAvailability({ day_of_week: '', start_time: '09:00', end_time: '17:00' });
                                         }}
-                                        className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                        className="flex-1 bg-surface border border-primary text-primary hover:bg-primary/10 font-semibold py-2 px-4 rounded-lg transition duration-200"
                                     >
                                         Cancel
                                     </button>
@@ -298,7 +298,7 @@ function SimulatorAvailability() {
                             </p>
                             <button
                                 onClick={() => setShowAddDay(true)}
-                                className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+                                className="inline-flex items-center space-x-2 bg-primary hover:bg-primary-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                             >
                                 <Plus className="w-5 h-5" />
                                 <span>Add First Availability</span>
