@@ -202,7 +202,7 @@ function SimulatorManagement() {
                                     {!formData.is_coaching_bay && (
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-2">
-                                                Hourly Price (USD)
+                                                Hourly Price (CAD)
                                             </label>
                                             <input
                                                 type="number"
