@@ -15,11 +15,12 @@ function AdminOverrides() {
         clientIdentifier: '',
         packageId: '',
         sessionCount: 1,
+        simulatorHours: 0,
         note: '',
     });
     const [simForm, setSimForm] = useState({
         clientIdentifier: '',
-        tokenCount: 1,
+        hours: 1,
         note: '',
     });
 
@@ -39,14 +40,17 @@ function AdminOverrides() {
     const handleCoachingSubmit = (e) => {
         e.preventDefault();
         dispatch(resetOverrideStatus('coaching'));
-        dispatch(
-            grantCoachingSessions({
-                client_identifier: coachingForm.clientIdentifier,
-                package_id: coachingForm.packageId || undefined,
-                session_count: Number(coachingForm.sessionCount) || 1,
-                note: coachingForm.note,
-            })
-        );
+        const payload = {
+            client_identifier: coachingForm.clientIdentifier,
+            package_id: coachingForm.packageId || undefined,
+            session_count: Number(coachingForm.sessionCount) || 1,
+            note: coachingForm.note,
+        };
+        // Add simulator hours if provided
+        if (coachingForm.simulatorHours > 0) {
+            payload.simulator_hours = Number(coachingForm.simulatorHours);
+        }
+        dispatch(grantCoachingSessions(payload));
     };
 
     const handleSimulatorSubmit = (e) => {
@@ -55,7 +59,7 @@ function AdminOverrides() {
         dispatch(
             grantSimulatorCredits({
                 client_identifier: simForm.clientIdentifier,
-                token_count: Number(simForm.tokenCount) || 1,
+                hours: Number(simForm.hours) || 1,
                 note: simForm.note,
             })
         );
@@ -93,7 +97,7 @@ function AdminOverrides() {
                             <label className="block text-sm font-medium text-text-primary mb-1">Package</label>
                             <select
                                 value={coachingForm.packageId}
-                                onChange={(e) => setCoachingForm({ ...coachingForm, packageId: e.target.value })}
+                                onChange={(e) => setCoachingForm({ ...coachingForm, packageId: e.target.value, simulatorHours: 0 })}
                             >
                                 <option value="">Latest purchase for client</option>
                                 {packages.list.map((pkg) => (
@@ -113,15 +117,63 @@ function AdminOverrides() {
                                     onChange={(e) => setCoachingForm({ ...coachingForm, sessionCount: e.target.value })}
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-primary mb-1">Note</label>
-                                <input
-                                    type="text"
-                                    value={coachingForm.note}
-                                    onChange={(e) => setCoachingForm({ ...coachingForm, note: e.target.value })}
-                                    placeholder="Optional admin note"
-                                />
-                            </div>
+                            {(() => {
+                                if (!coachingForm.packageId) {
+                                    return null;
+                                }
+                                
+                                const selectedPackage = packages.list.find(pkg => pkg.id === Number(coachingForm.packageId));
+                                if (!selectedPackage) {
+                                    return null;
+                                }
+                                
+                                // Check if package has simulator hours (combo package)
+                                // Only show field if simulator_hours exists and is greater than 0
+                                const simulatorHours = selectedPackage.simulator_hours;
+                                const hoursValue = simulatorHours !== null && simulatorHours !== undefined 
+                                    ? parseFloat(simulatorHours) 
+                                    : 0;
+                                const hasSimulatorHours = hoursValue > 0;
+                                
+                                // Debug: Log package info (can be removed later)
+                                console.log('Package check:', {
+                                    packageId: selectedPackage.id,
+                                    packageTitle: selectedPackage.title,
+                                    simulator_hours: simulatorHours,
+                                    hoursValue: hoursValue,
+                                    hasSimulatorHours: hasSimulatorHours
+                                });
+                                
+                                // Only show simulator hours field if combo package is selected
+                                if (hasSimulatorHours) {
+                                    return (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1">Simulator Hours to add</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.5"
+                                                value={coachingForm.simulatorHours}
+                                                onChange={(e) => setCoachingForm({ ...coachingForm, simulatorHours: e.target.value })}
+                                                placeholder="0"
+                                            />
+                                            <p className="text-xs text-text-secondary mt-1">
+                                                Hours will be added back to the same package
+                                            </p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-1">Note</label>
+                            <input
+                                type="text"
+                                value={coachingForm.note}
+                                onChange={(e) => setCoachingForm({ ...coachingForm, note: e.target.value })}
+                                placeholder="Optional admin note"
+                            />
                         </div>
                         {overrides.coaching.error && (
                             <div className="text-sm text-danger bg-danger/10 border border-danger/20 rounded-lg p-3">
@@ -164,12 +216,13 @@ function AdminOverrides() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-text-primary mb-1">Credits to grant</label>
+                                <label className="block text-sm font-medium text-text-primary mb-1">Hours to grant</label>
                                 <input
                                     type="number"
-                                    min="1"
-                                    value={simForm.tokenCount}
-                                    onChange={(e) => setSimForm({ ...simForm, tokenCount: e.target.value })}
+                                    min="0.5"
+                                    step="0.5"
+                                    value={simForm.hours}
+                                    onChange={(e) => setSimForm({ ...simForm, hours: e.target.value })}
                                 />
                             </div>
                             <div>
@@ -200,7 +253,7 @@ function AdminOverrides() {
                             variant="accent"
                             className="w-full"
                         >
-                            {overrides.simulator.loading ? 'Granting Credits...' : 'Grant Credits'}
+                            {overrides.simulator.loading ? 'Granting Hours...' : 'Grant Hours'}
                         </Button>
                     </form>
                 </div>

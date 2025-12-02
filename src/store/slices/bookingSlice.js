@@ -143,7 +143,7 @@ export const rescheduleBooking = createAsyncThunk(
 
 export const getCalendarBookings = createAsyncThunk(
     'booking/getCalendarBookings',
-    async ({ startDate, endDate, bookingType }, { rejectWithValue }) => {
+    async ({ startDate, endDate, bookingType, coachId }, { rejectWithValue }) => {
         try {
             const params = {
                 start_date: startDate.toISOString(),
@@ -152,9 +152,31 @@ export const getCalendarBookings = createAsyncThunk(
             if (bookingType) {
                 params.booking_type = bookingType;
             }
+            if (coachId) {
+                params.coach_id = coachId;
+            }
             const response = await apiClient.get(endpoints.bookings.calendarEvents, {
                 params: params,
             });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getCoachingSessionsByCoach = createAsyncThunk(
+    'booking/getCoachingSessionsByCoach',
+    async ({ coachId, page = 1 } = {}, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams();
+            if (coachId) params.append('coach_id', coachId);
+            if (page) params.append('page', page);
+            const queryString = params.toString();
+            const url = queryString
+                ? `${endpoints.bookings.coachingSessionsByCoach}?${queryString}`
+                : endpoints.bookings.coachingSessionsByCoach;
+            const response = await apiClient.get(url);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -395,6 +417,32 @@ const bookingSlice = createSlice({
                 state.calendarEvents = action.payload;
             })
             .addCase(getCalendarBookings.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Coaching Sessions By Coach
+        builder
+            .addCase(getCoachingSessionsByCoach.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(getCoachingSessionsByCoach.fulfilled, (state, action) => {
+                state.loading = false;
+                const results = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
+                state.upcomingBookings = results;
+                const count = action.payload?.count ?? results.length ?? 0;
+                const pageSize = 5;
+                const currentPage = action.meta?.arg?.page || 1;
+                state.upcomingPagination = {
+                    count,
+                    pageSize,
+                    page: currentPage,
+                    totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
+                };
+            })
+            .addCase(getCoachingSessionsByCoach.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

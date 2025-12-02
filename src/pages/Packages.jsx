@@ -10,6 +10,7 @@ import {
 } from '../store/slices/coachingSlice';
 import PackagePurchaseModal from '../components/PackagePurchaseModal';
 import OrganizationMemberManagement from '../components/OrganizationMemberManagement';
+import PackageUsageDetails from '../components/PackageUsageDetails';
 import SessionTransfer from '../components/SessionTransfer';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
@@ -36,6 +37,8 @@ function Packages() {
     const [selectedPackageId, setSelectedPackageId] = useState(null);
     const [memberManagementOpen, setMemberManagementOpen] = useState(false);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
+    const [usageDetailsOpen, setUsageDetailsOpen] = useState(false);
+    const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState(null);
     const previewLimit = 5;
 
     useEffect(() => {
@@ -75,6 +78,16 @@ function Packages() {
         setMemberManagementOpen(false);
         setSelectedPurchase(null);
         // No need to refresh - Redux state is already updated when members are added/removed
+    };
+
+    const handleViewDetails = (purchase) => {
+        setSelectedPurchaseForDetails(purchase);
+        setUsageDetailsOpen(true);
+    };
+
+    const handleCloseUsageDetails = () => {
+        setUsageDetailsOpen(false);
+        setSelectedPurchaseForDetails(null);
     };
 
     return (
@@ -149,7 +162,7 @@ function Packages() {
                                     </div>
                                     
                                     {/* Package Stats */}
-                                    <div className="flex items-center gap-3 pt-2 border-t border-border/50">
+                                    <div className="flex items-center gap-3 pt-2 border-t border-border/50 flex-wrap">
                                         <div className="flex items-center gap-1.5">
                                             <div className="w-1.5 h-1.5 rounded-full bg-status-confirmed-text"></div>
                                             <span className="text-xs font-medium text-text-primary">{pkg.session_count} Sessions</span>
@@ -158,8 +171,15 @@ function Packages() {
                                             <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
                                             <span className="text-xs font-medium text-text-primary">{pkg.session_duration_minutes} min</span>
                                         </div>
+                                        {pkg.simulator_hours > 0 && (
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
+                                                <span className="text-xs font-medium text-text-primary">{pkg.simulator_hours} Simulator hrs</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+
 
                                 {/* Content Section */}
                                 <div className="p-4 flex-1 flex flex-col">
@@ -167,7 +187,10 @@ function Packages() {
                                     {ownedSessions > 0 && (
                                         <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-2.5 mb-3">
                                             <p className="text-xs text-status-confirmed-text font-semibold">
-                                                You have <span className="text-base font-bold">{ownedSessions}</span> session{ownedSessions !== 1 ? 's' : ''} remaining
+                                                You will get <span className="text-base font-bold">{ownedSessions}</span> coaching session{ownedSessions !== 1 ? 's' : ''}
+                                                {pkg.simulator_hours > 0 && (
+                                                    <> and <span className="text-base font-bold">{pkg.simulator_hours}</span> simulator hour{pkg.simulator_hours !== 1 ? 's' : ''}</>
+                                                )}
                                             </p>
                                         </div>
                                     )}
@@ -272,6 +295,11 @@ function Packages() {
                                             <p className="text-sm text-text-secondary">
                                                 Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
                                             </p>
+                                            {purchase.simulator_hours_total > 0 && (
+                                                <p className="text-sm text-text-secondary">
+                                                    Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                </p>
+                                            )}
                                             {isGift && owner && (
                                                 <p className="text-sm text-accent mt-1">
                                                     Gifted by {owner.first_name} {owner.last_name}
@@ -355,18 +383,32 @@ function Packages() {
                                             <p className="text-sm text-text-secondary">
                                                 Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
                                             </p>
+                                            {purchase.simulator_hours_total > 0 && (
+                                                <p className="text-sm text-text-secondary">
+                                                    Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                </p>
+                                            )}
                                             <p className="text-sm text-text-secondary mt-1">
                                                 Members: <span className="font-semibold">{memberCount}</span>
                                             </p>
                                         </div>
-                                        <div className="flex flex-col items-end text-right space-y-2">
-                                            <Button
-                                                onClick={() => handleManageMembers(purchase)}
-                                                variant="primary"
-                                                className="w-full md:w-auto"
-                                            >
-                                                Manage Members
-                                            </Button>
+                                        <div className="flex flex-col items-end text-right space-y-2 gap-2">
+                                            <div className="flex flex-col gap-2 w-full md:w-auto">
+                                                <Button
+                                                    onClick={() => handleManageMembers(purchase)}
+                                                    variant="primary"
+                                                    className="w-full md:w-auto"
+                                                >
+                                                    Manage Members
+                                                </Button>
+                                                <Button
+                                                    onClick={() => handleViewDetails(purchase)}
+                                                    variant="secondary"
+                                                    className="w-full md:w-auto"
+                                                >
+                                                    View Details
+                                                </Button>
+                                            </div>
                                             <span className="text-xs text-text-secondary">
                                                 Created on {new Date(purchase.purchased_at).toLocaleDateString()}
                                             </span>
@@ -394,6 +436,11 @@ function Packages() {
                 isOpen={memberManagementOpen}
                 onClose={handleCloseMemberManagement}
                 purchase={selectedPurchase}
+            />
+            <PackageUsageDetails
+                purchase={selectedPurchaseForDetails}
+                isOpen={usageDetailsOpen}
+                onClose={handleCloseUsageDetails}
             />
         </div>
     );

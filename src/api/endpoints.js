@@ -23,6 +23,7 @@ export const endpoints = {
             list: '/admin/staff/',
             detail: (id) => `/admin/staff/${id}/`,
             availability: (id) => `/admin/staff/${id}/availability/`,
+            dayAvailability: (id) => `/admin/staff/${id}/day-availability/`,
         },
         simulators: {
             list: '/admin/simulators/',
@@ -81,6 +82,7 @@ export const endpoints = {
         stats: '/bookings/stats/',
         checkSimulatorAvailability: '/bookings/check_simulator_availability/',
         checkCoachingAvailability: '/bookings/check_coaching_availability/',
+        coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
     },
     
     // Simulator endpoints (public)
@@ -111,6 +113,7 @@ export const endpoints = {
         tempPurchase: '/coaching/temp-purchase/',
         addMember: (id) => `/coaching/purchases/${id}/add_member/`,
         removeMember: (id) => `/coaching/purchases/${id}/remove_member/`,
+        usageDetails: (id) => `/coaching/purchases/${id}/usage_details/`,
     },
 
     ghl: {

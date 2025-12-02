@@ -241,6 +241,18 @@ export const claimTransfer = createAsyncThunk(
     }
 );
 
+export const getPackageUsageDetails = createAsyncThunk(
+    'coaching/getPackageUsageDetails',
+    async ({ purchaseId }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.usageDetails(purchaseId));
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Initial state
 const initialState = {
     packages: [],
@@ -270,6 +282,8 @@ const initialState = {
     giftsPending: [],
     transfersPending: [],
     phoneCheck: null,
+    usageDetails: null,
+    usageDetailsLoading: false,
     loading: false,
     purchasesLoading: false,
     organizationPackagesLoading: false,
@@ -521,6 +535,18 @@ const coachingSlice = createSlice({
                 if (action.payload.new_purchase) {
                     state.purchases = [action.payload.new_purchase, ...state.purchases];
                 }
+            })
+            .addCase(getPackageUsageDetails.pending, (state) => {
+                state.usageDetailsLoading = true;
+                state.error = null;
+            })
+            .addCase(getPackageUsageDetails.fulfilled, (state, action) => {
+                state.usageDetailsLoading = false;
+                state.usageDetails = action.payload;
+            })
+            .addCase(getPackageUsageDetails.rejected, (state, action) => {
+                state.usageDetailsLoading = false;
+                state.error = action.payload;
             });
     },
 });

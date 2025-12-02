@@ -152,6 +152,32 @@ function SimulatorBooking() {
 
         const result = await dispatch(createBooking(bookingData));
         if (createBooking.fulfilled.match(result)) {
+            const booking = result.payload;
+            
+            // Console log to check if package hours were used or price was charged
+            if (booking.package_purchase_details) {
+                console.log('✅ Simulator Booking: Using package hours from purchase:', {
+                    purchaseId: booking.package_purchase_details.id,
+                    purchaseName: booking.package_purchase_details.purchase_name,
+                    hoursUsed: (booking.duration_minutes / 60).toFixed(2),
+                    hoursRemaining: booking.package_purchase_details.simulator_hours_remaining,
+                    totalPrice: booking.total_price
+                });
+            } else if (booking.simulator_credit_details) {
+                console.log('✅ Simulator Booking: Using simulator credit:', {
+                    creditId: booking.simulator_credit_details.id,
+                    reason: booking.simulator_credit_details.reason,
+                    totalPrice: booking.total_price
+                });
+            } else {
+                console.log('✅ Simulator Booking: Charging normal price:', {
+                    duration: booking.duration_minutes,
+                    hours: (booking.duration_minutes / 60).toFixed(2),
+                    totalPrice: booking.total_price,
+                    simulator: booking.simulator_details?.name
+                });
+            }
+            
             // Clear availability slots and selected slot after successful booking
             dispatch(clearAvailability());
             setSelectedSlot(null);

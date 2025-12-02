@@ -72,6 +72,11 @@ function PersonalPurchases() {
                                                 <p className="text-sm text-text-secondary">
                                                     Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
                                                 </p>
+                                                {purchase.simulator_hours_total > 0 && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                    </p>
+                                                )}
                                                 {isGift && owner && (
                                                     <p className="text-sm text-accent mt-1">
                                                         Gifted by {owner.first_name} {owner.last_name}

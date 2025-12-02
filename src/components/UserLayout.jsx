@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
-import { LogOut, Calendar, Home, User, ChevronDown, Settings } from 'lucide-react';
+import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
 function UserLayout() {
@@ -14,6 +14,7 @@ function UserLayout() {
     const dropdownRef = useRef(null);
 
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
+    const isStaff = user?.role === 'staff';
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -40,6 +41,7 @@ function UserLayout() {
         if (path === '/calendar') return 'My Calendar';
         if (path === '/booking') return 'Book a Session';
         if (path === '/packages') return 'Packages & Gifts';
+        if (path === '/coaching-sessions' || path.startsWith('/coaching-sessions')) return 'My Coaching Sessions';
         return 'Dashboard';
     };
 
@@ -114,6 +116,21 @@ function UserLayout() {
                                 >
                                     Packages
                                 </button>
+                                {isStaff && (
+                                    <button
+                                        onClick={() => navigate('/coaching-sessions')}
+                                        className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
+                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
+                                                ? 'bg-primary-light text-white'
+                                                : 'text-text-secondary hover:bg-background'
+                                        }`}
+                                    >
+                                        <div className="flex items-center space-x-1">
+                                            <Users className="w-4 h-4" />
+                                            <span>My Coaching Sessions</span>
+                                        </div>
+                                    </button>
+                                )}
                             </nav>
 
                             {/* User Dropdown */}
@@ -220,6 +237,22 @@ function UserLayout() {
                                                     <User className="w-4 h-4" />
                                                     <span>Packages</span>
                                                 </button>
+                                                {isStaff && (
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/coaching-sessions');
+                                                            setDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                    >
+                                                        <Users className="w-4 h-4" />
+                                                        <span>My Coaching Sessions</span>
+                                                    </button>
+                                                )}
                                             </div>
 
                                             {/* Admin Options */}

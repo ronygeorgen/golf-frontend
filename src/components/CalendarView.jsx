@@ -9,14 +9,14 @@ import usePopup from '../hooks/usePopup';
 
 const localizer = momentLocalizer(moment);
 
-function CalendarView({ isUserView = false }) {
+function CalendarView({ isUserView = false, coachId = null, staffName = null }) {
     const dispatch = useAppDispatch();
     const { calendarEvents: events, loading } = useAppSelector((state) => state.booking);
     const { popup, openPopup, closePopup } = usePopup();
     
     const [view, setView] = useState('week');
     const [date, setDate] = useState(new Date());
-    const [calendarType, setCalendarType] = useState('simulator'); // 'simulator' or 'coaching'
+    const [calendarType, setCalendarType] = useState(coachId ? 'coaching' : 'simulator'); // 'simulator' or 'coaching'
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -31,9 +31,10 @@ function CalendarView({ isUserView = false }) {
         dispatch(getCalendarBookings({ 
             startDate: startOfWeek, 
             endDate: endOfWeek,
-            bookingType: calendarType 
+            bookingType: calendarType,
+            coachId: coachId 
         }));
-    }, [dispatch, date, calendarType]);
+    }, [dispatch, date, calendarType, coachId]);
 
     const eventStyleGetter = (event) => {
         // Use design system colors
@@ -156,40 +157,40 @@ function CalendarView({ isUserView = false }) {
             <div className="w-full">
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                        {isUserView && (
-                            <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-4 md:mb-0">
-                                My Bookings Calendar
-                            </h1>
-                        )}
-                        <div className="flex flex-col gap-4 w-full md:w-auto">
-                            {/* Calendar Type Toggle */}
-                            <div className="flex items-center justify-between gap-4 bg-background rounded-2xl p-2 shadow-inner">
-                                <button
-                                    onClick={() => setCalendarType('simulator')}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                                        calendarType === 'simulator'
-                                            ? 'bg-primary-light text-white shadow-md scale-[1.02]'
-                                            : 'text-text-secondary hover:bg-surface'
-                                    }`}
-                                    title="Normal Simulator Calendar"
-                                >
-                                    <span className="w-3 h-3 rounded-full bg-primary-light"></span>
-                                    <span className="hidden sm:inline">Simulators</span>
-                                </button>
-                                <button
-                                    onClick={() => setCalendarType('coaching')}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                                        calendarType === 'coaching'
-                                            ? 'bg-primary text-white shadow-md scale-[1.02]'
-                                            : 'text-text-secondary hover:bg-surface'
-                                    }`}
-                                    title="Coaching Simulator Calendar"
-                                >
-                                    <span className="w-3 h-3 rounded-full bg-primary"></span>
-                                    <span className="hidden sm:inline">Coaching</span>
-                                </button>
+                        <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-4 md:mb-0">
+                            {staffName ? `${staffName}'s Coaching Sessions Calendar` : isUserView ? 'My Bookings Calendar' : 'Bookings Calendar'}
+                        </h1>
+                        {!coachId && (
+                            <div className="flex flex-col gap-4 w-full md:w-auto">
+                                {/* Calendar Type Toggle */}
+                                <div className="flex items-center justify-between gap-4 bg-background rounded-2xl p-2 shadow-inner">
+                                    <button
+                                        onClick={() => setCalendarType('simulator')}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                                            calendarType === 'simulator'
+                                                ? 'bg-primary-light text-white shadow-md scale-[1.02]'
+                                                : 'text-text-secondary hover:bg-surface'
+                                        }`}
+                                        title="Normal Simulator Calendar"
+                                    >
+                                        <span className="w-3 h-3 rounded-full bg-primary-light"></span>
+                                        <span className="hidden sm:inline">Simulators</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setCalendarType('coaching')}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                                            calendarType === 'coaching'
+                                                ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                                : 'text-text-secondary hover:bg-surface'
+                                        }`}
+                                        title="Coaching Simulator Calendar"
+                                    >
+                                        <span className="w-3 h-3 rounded-full bg-primary"></span>
+                                        <span className="hidden sm:inline">Coaching</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 

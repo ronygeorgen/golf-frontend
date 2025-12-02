@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking } from '../store/slices/bookingSlice';
+import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking, checkCoachingAvailability, checkSimulatorAvailability, clearAvailability } from '../store/slices/bookingSlice';
 import { useNavigate } from 'react-router-dom';
 import { BookingCardSkeleton, PackagesSkeleton } from '../components/skeletons/SkeletonLoader';
 import PopupMessage from '../components/PopupMessage';
@@ -16,7 +16,7 @@ function ClientPortal() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
-    const { upcomingBookings, loading, simulatorCredits, upcomingPagination } = useAppSelector((state) => state.booking);
+    const { upcomingBookings, loading, simulatorCredits, upcomingPagination, availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
     const { giftsPending, transfersPending, purchases, organizationPurchases, packages, purchasesLoading, organizationPurchasesLoading } = useAppSelector((state) => state.coaching);
     const { popup, openPopup, closePopup } = usePopup();
     const [cancellingId, setCancellingId] = useState(null);
@@ -25,10 +25,16 @@ function ClientPortal() {
     const [rescheduleTime, setRescheduleTime] = useState('');
     const [rescheduleLoading, setRescheduleLoading] = useState(false);
     const [rescheduleError, setRescheduleError] = useState(null);
+    const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState(null);
+    const [rescheduleCheckingAvailability, setRescheduleCheckingAvailability] = useState(false);
     const [bookingType, setBookingType] = useState('all');
     const [page, setPage] = useState(1);
     const [activeTab, setActiveTab] = useState('bookings');
-    const availableSimCredits = simulatorCredits?.length || 0;
+    // Calculate total hours from all available simulator credits
+    const availableSimCredits = simulatorCredits?.reduce((total, credit) => {
+        const hours = parseFloat(credit.hours_remaining) || 0;
+        return total + hours;
+    }, 0) || 0;
     const totalPages = upcomingPagination?.totalPages || 1;
     const pageSize = upcomingPagination?.pageSize || 5; // 5 items per page for upcoming bookings
     const totalCount = upcomingPagination?.count ?? upcomingBookings.length;
@@ -76,6 +82,21 @@ function ClientPortal() {
     useEffect(() => {
         dispatch(getUpcomingBookings({ page, bookingType }));
     }, [dispatch, page, bookingType]);
+
+    // Filter bookings client-side as a safety measure (backend should already filter, but this ensures consistency)
+    // This prevents showing wrong booking types if there's a race condition or caching issue
+    const filteredBookings = useMemo(() => {
+        if (!upcomingBookings || upcomingBookings.length === 0) {
+            return [];
+        }
+        if (bookingType === 'all') {
+            return upcomingBookings;
+        }
+        // Filter by booking type and ensure we only show bookings that match
+        return upcomingBookings.filter(booking => {
+            return booking && booking.booking_type === bookingType;
+        });
+    }, [upcomingBookings, bookingType]);
 
     useEffect(() => {
         dispatch(getSimulatorCredits());
@@ -164,6 +185,8 @@ function ClientPortal() {
         setRescheduleDate(formatDateForInput(start));
         setRescheduleTime(formatTimeForInput(start));
         setRescheduleError(null);
+        setRescheduleSelectedSlot(null);
+        dispatch(clearAvailability());
     };
 
     const closeRescheduleModal = () => {
@@ -171,21 +194,152 @@ function ClientPortal() {
         setRescheduleDate('');
         setRescheduleTime('');
         setRescheduleError(null);
+        setRescheduleSelectedSlot(null);
+        dispatch(clearAvailability());
     };
+
+    const checkRescheduleAvailability = useCallback(async () => {
+        if (!rescheduleTarget || !rescheduleDate) {
+            setRescheduleError('Please select a date first.');
+            return;
+        }
+
+        setRescheduleCheckingAvailability(true);
+        setRescheduleError(null);
+        setRescheduleSelectedSlot(null);
+        dispatch(clearAvailability());
+
+        try {
+            if (rescheduleTarget.booking_type === 'coaching') {
+                const result = await dispatch(checkCoachingAvailability({
+                    date: rescheduleDate,
+                    packageId: rescheduleTarget.coaching_package,
+                    coachId: rescheduleTarget.coach,
+                    duration: rescheduleTarget.duration_minutes || 60
+                }));
+                
+                if (checkCoachingAvailability.fulfilled.match(result)) {
+                    const slots = result.payload || [];
+                    if (slots.length === 0) {
+                        setRescheduleError('No available time slots found for the selected date. Please try a different date.');
+                    }
+                } else {
+                    setRescheduleError(result.payload?.error || result.payload?.detail || 'Failed to check availability.');
+                }
+            } else if (rescheduleTarget.booking_type === 'simulator') {
+                const result = await dispatch(checkSimulatorAvailability({
+                    date: rescheduleDate,
+                    duration: rescheduleTarget.duration_minutes || 60
+                }));
+                
+                if (checkSimulatorAvailability.fulfilled.match(result)) {
+                    const slots = result.payload || [];
+                    if (slots.length === 0) {
+                        setRescheduleError('No available time slots found for the selected date. Please try a different date.');
+                    }
+                } else {
+                    setRescheduleError(result.payload?.error || result.payload?.detail || 'Failed to check availability.');
+                }
+            }
+        } catch (error) {
+            setRescheduleError('Failed to check availability. Please try again.');
+        } finally {
+            setRescheduleCheckingAvailability(false);
+        }
+    }, [rescheduleTarget, rescheduleDate, dispatch]);
+
+    const handleRescheduleSlotSelect = (slot) => {
+        if (rescheduleTarget.booking_type === 'coaching') {
+            // For coaching, check if slot is disabled
+            const startTime = new Date(slot.start_time);
+            const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
+            const maxAvailableEndTime = slot.availability_end_time 
+                ? new Date(slot.availability_end_time)
+                : new Date(slot.end_time);
+            
+            if (requestedEndTime > maxAvailableEndTime) {
+                return; // Don't allow selection of disabled slots
+            }
+        } else if (rescheduleTarget.booking_type === 'simulator') {
+            // For simulator, check if slot is disabled
+            const startTime = new Date(slot.start_time);
+            const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
+            const maxAvailableEndTime = slot.availability_end_time 
+                ? new Date(slot.availability_end_time)
+                : new Date(slot.end_time);
+            
+            if (requestedEndTime > maxAvailableEndTime) {
+                return; // Don't allow selection of disabled slots
+            }
+        }
+
+        // Check if this slot is already selected - if so, unselect it
+        const isCurrentlySelected = rescheduleSelectedSlot && new Date(rescheduleSelectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
+        if (isCurrentlySelected) {
+            setRescheduleSelectedSlot(null);
+            setRescheduleTime('');
+            return;
+        }
+
+        // When user clicks a slot, calculate end_time based on booking duration
+        const startTime = new Date(slot.start_time);
+        const endTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
+        
+        setRescheduleSelectedSlot({
+            ...slot,
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            duration_minutes: rescheduleTarget.duration_minutes || 60
+        });
+        
+        // Update the time input to match selected slot
+        setRescheduleTime(formatTimeForInput(startTime));
+    };
+
+    const isRescheduleSlotDisabled = (slot) => {
+        const startTime = new Date(slot.start_time);
+        const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
+        const maxAvailableEndTime = slot.availability_end_time 
+            ? new Date(slot.availability_end_time)
+            : new Date(slot.end_time);
+        return requestedEndTime > maxAvailableEndTime;
+    };
+
+    // Auto-check availability when date changes
+    useEffect(() => {
+        if (rescheduleTarget && rescheduleDate) {
+            // Debounce the availability check
+            const timeoutId = setTimeout(() => {
+                checkRescheduleAvailability();
+            }, 500);
+            
+            return () => clearTimeout(timeoutId);
+        }
+    }, [rescheduleDate, rescheduleTarget, checkRescheduleAvailability]);
 
     const handleRescheduleSubmit = async (e) => {
         e.preventDefault();
-        if (!rescheduleTarget || !rescheduleDate || !rescheduleTime) {
-            setRescheduleError('Please select a new date and time.');
+        if (!rescheduleTarget || !rescheduleDate) {
+            setRescheduleError('Please select a new date.');
             return;
         }
 
-        const newStart = new Date(`${rescheduleDate}T${rescheduleTime}`);
-        if (Number.isNaN(newStart.getTime())) {
-            setRescheduleError('Invalid date or time selected.');
+        // Use selected slot if available, otherwise use manual time input
+        let newStart, newEnd;
+        if (rescheduleSelectedSlot) {
+            newStart = new Date(rescheduleSelectedSlot.start_time);
+            newEnd = new Date(rescheduleSelectedSlot.end_time);
+        } else if (rescheduleTime) {
+            newStart = new Date(`${rescheduleDate}T${rescheduleTime}`);
+            if (Number.isNaN(newStart.getTime())) {
+                setRescheduleError('Invalid date or time selected.');
+                return;
+            }
+            newEnd = new Date(newStart.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
+        } else {
+            setRescheduleError('Please select a time slot or enter a time.');
             return;
         }
-        const newEnd = new Date(newStart.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
 
         const payload = {
             start_time: newStart.toISOString(),
@@ -310,9 +464,9 @@ function ClientPortal() {
                             </div>
                             {loading ? (
                                 <BookingCardSkeleton count={3} />
-                            ) : upcomingBookings.length > 0 ? (
+                            ) : filteredBookings.length > 0 ? (
                                 <div className="space-y-4">
-                                    {upcomingBookings.map(booking => {
+                                    {filteredBookings.map(booking => {
                                         const rescheduleAllowed = booking.status === 'confirmed' && canCancelBooking(booking);
                                         return (
                                         <div key={booking.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition duration-200 bg-surface">
@@ -427,9 +581,9 @@ function ClientPortal() {
                                 <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6">
                                     <p className="text-sm text-text-secondary">
                                         Showing{' '}
-                                        {totalCount === 0
+                                        {filteredBookings.length === 0
                                             ? '0'
-                                            : `${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, totalCount)}`} of {totalCount} bookings
+                                            : `${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, filteredBookings.length)}`} of {filteredBookings.length} {bookingType === 'all' ? 'bookings' : bookingType + ' booking' + (filteredBookings.length !== 1 ? 's' : '')}
                                     </p>
                                     <div className="flex items-center gap-2">
                                         <Button
@@ -496,14 +650,25 @@ function ClientPortal() {
                                         <span>View My Calendar</span>
                                     </div>
                                 </Button>
+                                {(user?.role === 'staff' || user?.role === 'admin') && (
+                                    <Button
+                                        onClick={() => navigate('/coaching-sessions')}
+                                        variant="primary"
+                                        className="w-full"
+                                    >
+                                        <div className="flex items-center justify-center space-x-2">
+                                            <span>My Coaching Sessions</span>
+                                        </div>
+                                    </Button>
+                                )}
                             </div>
                             <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary">
                                 <p className="font-semibold text-text-primary mb-1">Simulator credits</p>
                                 <p>
-                                    You currently have <span className="font-bold">{availableSimCredits}</span> credit{availableSimCredits === 1 ? '' : 's'} available.
+                                    You currently have <span className="font-bold">{availableSimCredits.toFixed(2)}</span> hour{availableSimCredits === 1 ? '' : 's'} available.
                                 </p>
                                 <p className="mt-1 text-text-secondary">
-                                    Credits are issued when you cancel simulator bookings at least 24 hours ahead.
+                                    Hours are issued when you cancel simulator bookings at least 24 hours ahead.
                                 </p>
                             </div>
                             {(purchasesLoading || organizationPurchasesLoading) ? (
@@ -560,52 +725,175 @@ function ClientPortal() {
                 onClose={closePopup}
             />
             {rescheduleTarget && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                    <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg p-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 py-4 overflow-y-auto">
+                    <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl p-6 my-auto">
                         <h3 className="text-xl font-semibold text-text-primary mb-2">
                             Change {rescheduleTarget.booking_type === 'simulator' ? 'Simulator' : 'Coaching'} Booking Time
                         </h3>
                         <p className="text-sm text-text-secondary mb-4">
-                            Select a new start time before the 24-hour lock window. Existing session duration will remain the same.
+                            Select a new date and time slot. Existing session duration ({rescheduleTarget.duration_minutes || 60} minutes) will remain the same.
                         </p>
                         <form className="space-y-4" onSubmit={handleRescheduleSubmit}>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">New Date</label>
-                                    <input
-                                        type="date"
-                                        value={rescheduleDate}
-                                        onChange={(e) => setRescheduleDate(e.target.value)}
-                                        min={new Date().toISOString().split('T')[0]}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">New Start Time</label>
-                                    <input
-                                        type="time"
-                                        value={rescheduleTime}
-                                        onChange={(e) => setRescheduleTime(e.target.value)}
-                                        required
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-1">New Date</label>
+                                <input
+                                    type="date"
+                                    value={rescheduleDate}
+                                    onChange={(e) => setRescheduleDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                    className="w-full"
+                                />
+                                <p className="text-xs text-text-secondary mt-1">
+                                    Availability will be checked automatically when you select a date.
+                                </p>
                             </div>
+
+                            {/* Availability checking indicator */}
+                            {rescheduleCheckingAvailability && (
+                                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>Checking availability...</span>
+                                </div>
+                            )}
+
+                            {/* Available Time Slots */}
+                            {!rescheduleCheckingAvailability && rescheduleDate && (
+                                <>
+                                    {rescheduleTarget.booking_type === 'coaching' && availability.coaching && availability.coaching.length > 0 && (
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-text-primary mb-3">Available Time Slots</h4>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4 max-h-64 overflow-y-auto p-2">
+                                                {availability.coaching.map((slot, index) => {
+                                                    const isDisabled = isRescheduleSlotDisabled(slot);
+                                                    const isSelected = rescheduleSelectedSlot && new Date(rescheduleSelectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${
+                                                                isDisabled
+                                                                    ? 'border-border bg-background cursor-not-allowed opacity-60'
+                                                                    : isSelected
+                                                                        ? 'border-primary bg-primary-light/20 shadow-card-hover'
+                                                                        : 'border-border hover:border-primary hover:bg-background'
+                                                            }`}
+                                                            onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
+                                                            title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
+                                                        >
+                                                            <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
+                                                                {new Date(slot.start_time).toLocaleTimeString('en-US', { 
+                                                                    hour: '2-digit', 
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </div>
+                                                            <div className="text-xs text-text-secondary">
+                                                                {slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {rescheduleTarget.booking_type === 'simulator' && availability.simulator && availability.simulator.length > 0 && (
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-text-primary mb-3">Available Time Slots</h4>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4 max-h-64 overflow-y-auto p-2">
+                                                {availability.simulator.map((slot, index) => {
+                                                    const isDisabled = isRescheduleSlotDisabled(slot);
+                                                    const isSelected = rescheduleSelectedSlot && new Date(rescheduleSelectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${
+                                                                isDisabled
+                                                                    ? 'border-border bg-background cursor-not-allowed opacity-60'
+                                                                    : isSelected
+                                                                        ? 'border-primary bg-primary-light/20 shadow-card-hover'
+                                                                        : 'border-border hover:border-primary hover:bg-background'
+                                                            }`}
+                                                            onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
+                                                            title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
+                                                        >
+                                                            <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
+                                                                {new Date(slot.start_time).toLocaleTimeString('en-US', { 
+                                                                    hour: '2-digit', 
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </div>
+                                                            <div className="text-xs text-text-secondary">
+                                                                Bay assigned automatically
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Manual time input fallback */}
+                                    {((rescheduleTarget.booking_type === 'coaching' && (!availability.coaching || availability.coaching.length === 0)) ||
+                                      (rescheduleTarget.booking_type === 'simulator' && (!availability.simulator || availability.simulator.length === 0))) && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1">New Start Time (Manual Entry)</label>
+                                            <input
+                                                type="time"
+                                                value={rescheduleTime}
+                                                onChange={(e) => {
+                                                    setRescheduleTime(e.target.value);
+                                                    setRescheduleSelectedSlot(null);
+                                                }}
+                                                className="w-full"
+                                            />
+                                            <p className="text-xs text-text-secondary mt-1">
+                                                No available slots found. You can manually enter a time, but it may not be available.
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Selected slot summary */}
+                            {rescheduleSelectedSlot && (
+                                <div className="bg-background border border-primary/20 rounded-card p-4">
+                                    <h5 className="font-semibold text-text-primary mb-2">Selected Time Slot</h5>
+                                    <div className="space-y-1 text-sm">
+                                        <p className="text-text-primary">
+                                            <span className="font-medium">Date:</span> {new Date(rescheduleSelectedSlot.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                        </p>
+                                        <p className="text-text-primary">
+                                            <span className="font-medium">Time:</span> {new Date(rescheduleSelectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - {new Date(rescheduleSelectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                        </p>
+                                        <p className="text-text-primary">
+                                            <span className="font-medium">Duration:</span> {rescheduleTarget.duration_minutes || 60} minutes
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
                             {rescheduleError && (
                                 <div className="text-sm text-danger bg-red-50 border border-danger/20 rounded-card p-3">
                                     {rescheduleError}
                                 </div>
                             )}
+
                             <div className="flex items-center justify-end gap-3 pt-2">
                                 <Button
                                     type="button"
                                     onClick={closeRescheduleModal}
                                     variant="secondary"
                                 >
-                                    Close
+                                    Cancel
                                 </Button>
                                 <Button
                                     type="submit"
-                                    disabled={rescheduleLoading}
+                                    disabled={rescheduleLoading || rescheduleCheckingAvailability || (!rescheduleSelectedSlot && !rescheduleTime)}
                                     variant="primary"
                                 >
                                     {rescheduleLoading ? 'Updating...' : 'Confirm New Time'}

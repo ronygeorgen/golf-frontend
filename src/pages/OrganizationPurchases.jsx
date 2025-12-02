@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getMyOrganizationPurchases } from '../store/slices/coachingSlice';
 import OrganizationMemberManagement from '../components/OrganizationMemberManagement';
+import PackageUsageDetails from '../components/PackageUsageDetails';
 import { Skeleton } from '../components/skeletons/SkeletonLoader';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -12,6 +13,8 @@ function OrganizationPurchases() {
     const [currentPage, setCurrentPage] = useState(1);
     const [memberManagementOpen, setMemberManagementOpen] = useState(false);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
+    const [usageDetailsOpen, setUsageDetailsOpen] = useState(false);
+    const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState(null);
 
     useEffect(() => {
         dispatch(getMyOrganizationPurchases({ page: currentPage }));
@@ -25,6 +28,16 @@ function OrganizationPurchases() {
     const handleCloseMemberManagement = () => {
         setMemberManagementOpen(false);
         setSelectedPurchase(null);
+    };
+
+    const handleViewDetails = (purchase) => {
+        setSelectedPurchaseForDetails(purchase);
+        setUsageDetailsOpen(true);
+    };
+
+    const handleCloseUsageDetails = () => {
+        setUsageDetailsOpen(false);
+        setSelectedPurchaseForDetails(null);
     };
 
     const totalPages = organizationPurchasesPagination.totalPages || 1;
@@ -84,18 +97,32 @@ function OrganizationPurchases() {
                                                 <p className="text-sm text-text-secondary">
                                                     Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
                                                 </p>
+                                                {purchase.simulator_hours_total > 0 && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                    </p>
+                                                )}
                                                 <p className="text-sm text-text-secondary mt-1">
                                                     Members: <span className="font-semibold">{memberCount}</span>
                                                 </p>
                                             </div>
-                                            <div className="flex flex-col items-end text-right space-y-2">
-                                                <Button
-                                                    onClick={() => handleManageMembers(purchase)}
-                                                    variant="primary"
-                                                    className="w-full md:w-auto"
-                                                >
-                                                    Manage Members
-                                                </Button>
+                                            <div className="flex flex-col items-end text-right space-y-2 gap-2">
+                                                <div className="flex flex-col gap-2 w-full md:w-auto">
+                                                    <Button
+                                                        onClick={() => handleManageMembers(purchase)}
+                                                        variant="primary"
+                                                        className="w-full md:w-auto"
+                                                    >
+                                                        Manage Members
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => handleViewDetails(purchase)}
+                                                        variant="secondary"
+                                                        className="w-full md:w-auto"
+                                                    >
+                                                        View Details
+                                                    </Button>
+                                                </div>
                                                 <span className="text-xs text-text-secondary">
                                                     Created on {new Date(purchase.purchased_at).toLocaleDateString()}
                                                 </span>
@@ -143,6 +170,11 @@ function OrganizationPurchases() {
                 isOpen={memberManagementOpen}
                 onClose={handleCloseMemberManagement}
                 purchase={selectedPurchase}
+            />
+            <PackageUsageDetails
+                purchase={selectedPurchaseForDetails}
+                isOpen={usageDetailsOpen}
+                onClose={handleCloseUsageDetails}
             />
         </div>
     );

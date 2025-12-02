@@ -22,6 +22,10 @@ import Packages from './pages/Packages';
 import PersonalPurchases from './pages/PersonalPurchases';
 import OrganizationPurchases from './pages/OrganizationPurchases';
 import TransferSessions from './pages/TransferSessions';
+import StaffCoachingSessions from './pages/StaffCoachingSessions';
+import StaffCoachingSessionsAdmin from './pages/StaffCoachingSessionsAdmin';
+import StaffCoachingSessionsCalendar from './pages/StaffCoachingSessionsCalendar';
+import StaffCoachingSessionsCalendarAdmin from './pages/StaffCoachingSessionsCalendarAdmin';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -134,6 +138,8 @@ function AppContent() {
                 <Route path="portal" element={<ClientPortal />} />
                 <Route path="booking" element={<Booking />} />
                 <Route path="calendar" element={<CalendarView isUserView={true} />} />
+                <Route path="coaching-sessions" element={<StaffCoachingSessions />} />
+                <Route path="coaching-sessions/calendar" element={<StaffCoachingSessionsCalendar />} />
                 <Route path="packages" element={<Packages />} />
                 <Route path="purchases/personal" element={<PersonalPurchases />} />
                 <Route path="purchases/organizations" element={<OrganizationPurchases />} />
@@ -153,6 +159,8 @@ function AppContent() {
                 <Route path="users" element={<UserManagement />} />
                 <Route path="staff" element={<StaffManagement />} />
                 <Route path="staff/:id/availability" element={<StaffAvailability />} />
+                <Route path="staff/:id/coaching-sessions" element={<StaffCoachingSessionsAdmin />} />
+                <Route path="staff/:id/coaching-sessions/calendar" element={<StaffCoachingSessionsCalendarAdmin />} />
                 <Route path="simulators" element={<SimulatorManagement />} />
                 <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
                 <Route path="packages" element={<PackageManagement />} />

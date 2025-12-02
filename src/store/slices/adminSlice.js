@@ -104,6 +104,34 @@ export const updateStaffAvailability = createAsyncThunk(
     }
 );
 
+// Staff Day Availability thunks (non-recurring)
+export const getStaffDayAvailability = createAsyncThunk(
+    'admin/getStaffDayAvailability',
+    async ({ staffId }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.admin.staff.dayAvailability(staffId));
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const updateStaffDayAvailability = createAsyncThunk(
+    'admin/updateStaffDayAvailability',
+    async ({ staffId, availabilityData }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.put(
+                endpoints.admin.staff.dayAvailability(staffId),
+                availabilityData
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Simulator thunks
 export const getSimulators = createAsyncThunk(
     'admin/getSimulators',
@@ -359,6 +387,7 @@ const initialState = {
         list: [],
         selectedStaff: null,
         availability: [],
+        dayAvailability: [],
         loading: false,
         error: null,
     },
@@ -521,6 +550,35 @@ const adminSlice = createSlice({
                 state.staff.availability = Array.isArray(action.payload) ? action.payload : [];
             })
             .addCase(updateStaffAvailability.rejected, (state, action) => {
+                state.staff.loading = false;
+                state.staff.error = action.payload;
+            });
+
+        // Staff Day Availability
+        builder
+            .addCase(getStaffDayAvailability.pending, (state) => {
+                state.staff.loading = true;
+                state.staff.error = null;
+            })
+            .addCase(getStaffDayAvailability.fulfilled, (state, action) => {
+                state.staff.loading = false;
+                // Ensure payload is always an array
+                state.staff.dayAvailability = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(getStaffDayAvailability.rejected, (state, action) => {
+                state.staff.loading = false;
+                state.staff.error = action.payload;
+            })
+            .addCase(updateStaffDayAvailability.pending, (state) => {
+                state.staff.loading = true;
+                state.staff.error = null;
+            })
+            .addCase(updateStaffDayAvailability.fulfilled, (state, action) => {
+                state.staff.loading = false;
+                // Ensure payload is always an array
+                state.staff.dayAvailability = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(updateStaffDayAvailability.rejected, (state, action) => {
                 state.staff.loading = false;
                 state.staff.error = action.payload;
             });

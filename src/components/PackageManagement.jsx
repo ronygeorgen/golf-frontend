@@ -24,6 +24,7 @@ function PackageManagement() {
         staff_members: [],
         session_count: 5,
         session_duration_minutes: 60,
+        simulator_hours: 0,
         redirect_url: '',
         is_active: true
     };
@@ -107,6 +108,7 @@ function PackageManagement() {
             staff_members: staffMemberIds,
             session_count: pkg.session_count || 1,
             session_duration_minutes: pkg.session_duration_minutes || 60,
+            simulator_hours: pkg.simulator_hours || 0,
             redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active
         });
@@ -246,6 +248,21 @@ function PackageManagement() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Simulator Hours Included
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.5"
+                                            value={formData.simulator_hours}
+                                            onChange={(e) => setFormData({...formData, simulator_hours: parseFloat(e.target.value) || 0})}
+                                        />
+                                        <p className="mt-1 text-xs text-text-secondary">
+                                            Number of simulator hours included in this package (for simulator bookings)
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
                                             Redirect URL (Optional)
                                         </label>
                                         <input
@@ -349,6 +366,9 @@ function PackageManagement() {
                                                 Session Length
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Simulator Hours
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Redirect URL
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -379,6 +399,9 @@ function PackageManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {pkg.session_duration_minutes} min
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
+                                                    {pkg.simulator_hours || 0} hrs
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-text-primary max-w-xs truncate">
                                                     {pkg.redirect_url ? (

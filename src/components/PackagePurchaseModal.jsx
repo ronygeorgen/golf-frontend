@@ -265,6 +265,12 @@ function PackagePurchaseModal({
                                     <span className="text-text-secondary">Sessions:</span>
                                     <span className="font-medium text-text-primary">{packageData.session_count}</span>
                                 </div>
+                                {packageData.simulator_hours > 0 && (
+                                    <div className="mt-1 flex justify-between text-sm">
+                                        <span className="text-text-secondary">Simulator Hours:</span>
+                                        <span className="font-medium text-text-primary">{packageData.simulator_hours} hrs</span>
+                                    </div>
+                                )}
                                 <div className="mt-1 flex justify-between text-sm">
                                     <span className="text-text-secondary">Price:</span>
                                     <span className="font-medium text-accent">${packageData.price}</span>

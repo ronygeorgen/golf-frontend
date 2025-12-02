@@ -100,11 +100,11 @@ function AdminLayout() {
         navigate('/signin');
     };
 
-    const handleGHLOnboard = () => {
-        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
-        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
-        window.open(onboardURL, '_blank', 'noopener,noreferrer');
-    };
+    // const handleGHLOnboard = () => {
+    //     const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+    //     const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
+    //     window.open(onboardURL, '_blank', 'noopener,noreferrer');
+    // };
 
     const getPageTitle = () => {
         const path = location.pathname;
@@ -404,7 +404,7 @@ function AdminLayout() {
                                                     <Home className="w-4 h-4" />
                                                     <span>Switch to User Side</span>
                                                 </button>
-                                                <button
+                                                {/* <button
                                                     onClick={() => {
                                                         handleGHLOnboard();
                                                         setDropdownOpen(false);
@@ -413,7 +413,7 @@ function AdminLayout() {
                                                 >
                                                     <Link2 className="w-4 h-4" />
                                                     <span>Onboard GHL</span>
-                                                </button>
+                                                </button> */}
                                                 <button
                                                     onClick={() => {
                                                         handleLogout();

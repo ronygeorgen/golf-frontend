@@ -7,6 +7,7 @@ import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import { Edit, Trash2, Calendar, Users } from 'lucide-react';
 
 function StaffManagement() {
     const dispatch = useAppDispatch();
@@ -265,24 +266,74 @@ function StaffManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
-                                                        <button 
-                                                            className="text-primary hover:text-primary-light transition-colors"
-                                                            onClick={() => handleEdit(staffMember)}
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button 
-                                                            className="text-danger hover:text-danger-light transition-colors"
-                                                            onClick={() => handleDelete(staffMember.id)}
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                        <button 
-                                                            className="text-status-personal-text hover:text-status-personal-text/80 transition-colors"
-                                                            onClick={() => navigate(`/admin/staff/${staffMember.id}/availability`)}
-                                                        >
-                                                            Availability
-                                                        </button>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className="p-2 text-primary hover:text-primary-light hover:bg-primary-light/10 rounded-button transition-colors"
+                                                                onClick={() => handleEdit(staffMember)}
+                                                                aria-label="Edit staff member"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                                                <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                                                    Edit
+                                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className="p-2 text-danger hover:text-danger-light hover:bg-danger/10 rounded-button transition-colors"
+                                                                onClick={() => handleDelete(staffMember.id)}
+                                                                aria-label="Delete staff member"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                                                <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                                                    Delete
+                                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className="p-2 text-status-personal-text hover:text-status-personal-text/80 hover:bg-status-personal-bg/20 rounded-button transition-colors"
+                                                                onClick={() => navigate(`/admin/staff/${staffMember.id}/availability`)}
+                                                                aria-label="View availability"
+                                                            >
+                                                                <Calendar className="w-4 h-4" />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                                                <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                                                    Availability
+                                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className="p-2 text-status-confirmed-text hover:text-status-confirmed-text/80 hover:bg-status-confirmed-bg/20 rounded-button transition-colors"
+                                                                onClick={() => navigate(`/admin/staff/${staffMember.id}/coaching-sessions`)}
+                                                                aria-label="View coaching sessions"
+                                                            >
+                                                                <Users className="w-4 h-4" />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                                                <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                                                    Coaching Sessions
+                                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
