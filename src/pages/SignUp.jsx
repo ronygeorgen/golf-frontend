@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, clearError } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
+import { X } from 'lucide-react';
 
 function SignUp() {
     const dispatch = useAppDispatch();
@@ -19,11 +20,62 @@ function SignUp() {
         role: 'client'
     });
     
+    const [toast, setToast] = useState({ show: false, messages: [] });
+    
     const navigate = useNavigate();
+
+    // Helper function to parse error messages from API response
+    const parseErrorMessages = (error) => {
+        if (!error) return [];
+        
+        // If error is a string, return it as is
+        if (typeof error === 'string') {
+            return [error];
+        }
+        
+        // If error is an object, extract all messages
+        const messages = [];
+        
+        // Handle nested error objects like { password: ["error1", "error2"] }
+        for (const [key, value] of Object.entries(error)) {
+            if (Array.isArray(value)) {
+                // If value is an array, add each message
+                value.forEach(msg => {
+                    const fieldName = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                    messages.push(`${fieldName}: ${msg}`);
+                });
+            } else if (typeof value === 'string') {
+                const fieldName = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                messages.push(`${fieldName}: ${value}`);
+            } else if (typeof value === 'object' && value !== null) {
+                // Recursively handle nested objects
+                const nestedMessages = parseErrorMessages(value);
+                messages.push(...nestedMessages);
+            }
+        }
+        
+        return messages.length > 0 ? messages : ['An error occurred during signup'];
+    };
+
+    useEffect(() => {
+        if (error) {
+            const errorMessages = parseErrorMessages(error);
+            // Show all error messages as toast
+            if (errorMessages.length > 0) {
+                setToast({ show: true, messages: errorMessages });
+                // Auto-hide after 8 seconds (longer for multiple messages)
+                const timer = setTimeout(() => {
+                    setToast({ show: false, messages: [] });
+                }, 8000);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [error]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         dispatch(clearError());
+        setToast({ show: false, messages: [] });
         const result = await dispatch(signup(formData));
         if (signup.fulfilled.match(result)) {
             navigate('/booking');
@@ -126,11 +178,35 @@ function SignUp() {
                     </Button>
                 </form>
                 
-                {error && (
-                    <div className="mt-4 p-3 bg-red-50 border border-danger/20 rounded-card">
-                        <p className="text-sm text-danger text-center">
-                            {typeof error === 'string' ? error : error?.error || 'An error occurred'}
-                        </p>
+                {/* Toast Notification */}
+                {toast.show && toast.messages.length > 0 && (
+                    <div className="fixed top-4 right-4 z-50 animate-slide-in-right max-w-md">
+                        <div className="bg-red-50 border-l-4 border-danger p-4 rounded-lg shadow-lg">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-5 w-5 text-danger" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div className="ml-3 flex-1">
+                                    <p className="text-sm text-red-700 font-medium mb-2">Signup Error</p>
+                                    <ul className="list-disc list-inside space-y-1">
+                                        {toast.messages.map((message, index) => (
+                                            <li key={index} className="text-sm text-red-600">{message}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div className="ml-4 flex-shrink-0">
+                                    <button
+                                        onClick={() => setToast({ show: false, messages: [] })}
+                                        className="inline-flex text-red-400 hover:text-red-600 focus:outline-none"
+                                        aria-label="Close"
+                                    >
+                                        <X className="h-5 w-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
                 
