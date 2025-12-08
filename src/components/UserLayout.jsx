@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
-import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users } from 'lucide-react';
+import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
 function UserLayout() {
@@ -11,16 +11,21 @@ function UserLayout() {
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.auth);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const packagesMenuRef = useRef(null);
 
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
     const isStaff = user?.role === 'staff';
 
-    // Close dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdownOpen(false);
+            }
+            if (packagesMenuRef.current && !packagesMenuRef.current.contains(event.target)) {
+                setPackagesMenuOpen(false);
             }
         };
 
@@ -41,6 +46,7 @@ function UserLayout() {
         if (path === '/calendar') return 'My Calendar';
         if (path === '/booking') return 'Book a Session';
         if (path === '/packages') return 'Packages & Gifts';
+        if (path === '/special-events') return 'Special Events';
         if (path === '/coaching-sessions' || path.startsWith('/coaching-sessions')) return 'My Coaching Sessions';
         return 'Dashboard';
     };
@@ -106,15 +112,64 @@ function UserLayout() {
                                         <span>Calendar</span>
                                     </div>
                                 </button>
+                                {/* Packages Dropdown */}
+                                <div className="relative" ref={packagesMenuRef}>
+                                    <button
+                                        onClick={() => setPackagesMenuOpen(!packagesMenuOpen)}
+                                        className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${
+                                            location.pathname === '/packages'
+                                                ? 'bg-primary-light text-white'
+                                                : 'text-text-secondary hover:bg-background'
+                                        }`}
+                                    >
+                                        <Package className="w-4 h-4" />
+                                        <span>Packages</span>
+                                        <ChevronDown className={`w-3 h-3 transition-transform ${packagesMenuOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {/* Packages Dropdown Menu */}
+                                    {packagesMenuOpen && (
+                                        <div className="absolute top-full left-0 mt-1 min-w-56 w-auto bg-surface rounded-card shadow-card border border-border py-2 z-[60] whitespace-nowrap">
+                                            <button
+                                                onClick={() => {
+                                                    navigate('/packages?view=packages');
+                                                    setPackagesMenuOpen(false);
+                                                }}
+                                                className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                    location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
+                                                        ? 'bg-primary-light/10 text-primary font-semibold'
+                                                        : 'text-text-primary hover:bg-background'
+                                                }`}
+                                            >
+                                                <Package className="w-4 h-4" />
+                                                <span>View Packages</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    navigate('/packages?view=purchases');
+                                                    setPackagesMenuOpen(false);
+                                                }}
+                                                className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                    location.pathname === '/packages' && location.search.includes('view=purchases')
+                                                        ? 'bg-primary-light/10 text-primary font-semibold'
+                                                        : 'text-text-primary hover:bg-background'
+                                                }`}
+                                            >
+                                                <User className="w-4 h-4" />
+                                                <span>Manage Purchased Packages</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <button
-                                    onClick={() => navigate('/packages')}
+                                    onClick={() => navigate('/special-events')}
                                     className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                        location.pathname === '/packages'
+                                        location.pathname === '/special-events'
                                             ? 'bg-primary-light text-white'
                                             : 'text-text-secondary hover:bg-background'
                                     }`}
                                 >
-                                    Packages
+                                    Special Events
                                 </button>
                                 {isStaff && (
                                     <button
@@ -223,19 +278,50 @@ function UserLayout() {
                                                     <Calendar className="w-4 h-4" />
                                                     <span>Calendar</span>
                                                 </button>
+                                                {/* Packages Dropdown for Mobile */}
+                                                <div className="border-b border-border pb-2 mb-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/packages?view=packages');
+                                                            setDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                            location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                    >
+                                                        <Package className="w-4 h-4" />
+                                                        <span>View Packages</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/packages?view=purchases');
+                                                            setDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                            location.pathname === '/packages' && location.search.includes('view=purchases')
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                    >
+                                                        <User className="w-4 h-4" />
+                                                        <span>Manage Purchased Packages</span>
+                                                    </button>
+                                                </div>
                                                 <button
                                                     onClick={() => {
-                                                        navigate('/packages');
+                                                        navigate('/special-events');
                                                         setDropdownOpen(false);
                                                     }}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/packages'
+                                                        location.pathname === '/special-events'
                                                             ? 'bg-primary-light text-white font-medium'
                                                             : 'text-text-primary hover:bg-background'
                                                     }`}
                                                 >
-                                                    <User className="w-4 h-4" />
-                                                    <span>Packages</span>
+                                                    <Calendar className="w-4 h-4" />
+                                                    <span>Special Events</span>
                                                 </button>
                                                 {isStaff && (
                                                     <button

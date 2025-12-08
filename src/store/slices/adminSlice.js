@@ -241,7 +241,7 @@ export const updatePackage = createAsyncThunk(
     'admin/updatePackage',
     async ({ id, packageData }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.put(
+            const response = await apiClient.patch(
                 endpoints.admin.packages.detail(id),
                 packageData
             );

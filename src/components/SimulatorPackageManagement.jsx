@@ -1,0 +1,490 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from '../api/axios';
+import { endpoints } from '../api/endpoints';
+import { TableSkeleton } from './skeletons/SkeletonLoader';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
+import { Edit, Power, PowerOff, Trash2, X, FileText, Plus } from 'lucide-react';
+
+function SimulatorPackageManagement() {
+    const { popup, openPopup, closePopup } = usePopup();
+    const { toast, showSuccess, showError, hideToast } = useToast();
+    const modalRef = useRef(null);
+    
+    const [packages, setPackages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showForm, setShowForm] = useState(false);
+    const [editingPackage, setEditingPackage] = useState(null);
+    const emptyForm = {
+        title: '',
+        description: '',
+        price: '',
+        hours: '',
+        redirect_url: '',
+        is_active: true
+    };
+    const [formData, setFormData] = useState(emptyForm);
+    const [submitLoading, setSubmitLoading] = useState(false);
+    const [togglingActive, setTogglingActive] = useState({});
+    const [deleting, setDeleting] = useState({});
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+    const [selectedDescription, setSelectedDescription] = useState('');
+    const [selectedPackageTitle, setSelectedPackageTitle] = useState('');
+
+    useEffect(() => {
+        fetchPackages();
+    }, []);
+
+    // Close modal when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                setShowForm(false);
+                setEditingPackage(null);
+                setFormData(emptyForm);
+            }
+        };
+
+        if (showForm) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showForm]);
+
+    const fetchPackages = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.get(endpoints.admin.simulatorPackages.list);
+            setPackages(response.data);
+        } catch (error) {
+            console.error('Error fetching simulator packages:', error);
+            showError('Failed to load simulator packages');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        const submitData = {
+            ...formData,
+            price: parseFloat(formData.price),
+            hours: parseFloat(formData.hours),
+        };
+
+        setSubmitLoading(true);
+        try {
+            if (editingPackage) {
+                await axios.patch(endpoints.admin.simulatorPackages.detail(editingPackage.id), submitData);
+            } else {
+                await axios.post(endpoints.admin.simulatorPackages.list, submitData);
+            }
+            setShowForm(false);
+            setEditingPackage(null);
+            setFormData(emptyForm);
+            await fetchPackages();
+            showSuccess(editingPackage ? 'Simulator package updated successfully' : 'Simulator package created successfully');
+        } catch (error) {
+            console.error('Error saving simulator package:', error);
+            showError(error.response?.data?.error || 'Failed to save simulator package');
+        } finally {
+            setSubmitLoading(false);
+        }
+    };
+
+    const handleEdit = (pkg) => {
+        setEditingPackage(pkg);
+        setFormData({
+            title: pkg.title || '',
+            description: pkg.description || '',
+            price: pkg.price !== null && pkg.price !== undefined ? parseFloat(pkg.price) : '',
+            hours: pkg.hours !== null && pkg.hours !== undefined ? parseFloat(pkg.hours) : '',
+            redirect_url: pkg.redirect_url || '',
+            is_active: pkg.is_active !== undefined ? pkg.is_active : true
+        });
+        setShowForm(true);
+    };
+
+    const handleToggleActive = async (packageId, isActive) => {
+        setTogglingActive({ ...togglingActive, [packageId]: true });
+        try {
+            await axios.post(endpoints.admin.simulatorPackages.toggleActive(packageId));
+            await fetchPackages();
+            showSuccess(`Simulator package ${!isActive ? 'activated' : 'deactivated'} successfully`);
+        } catch (error) {
+            console.error('Error toggling package status:', error);
+            showError('Failed to update package status');
+        } finally {
+            setTogglingActive({ ...togglingActive, [packageId]: false });
+        }
+    };
+
+    const handleDelete = async (packageId) => {
+        openPopup({
+            type: 'warning',
+            title: 'Delete Simulator Package?',
+            message: 'This will permanently delete the simulator package. This action cannot be undone.',
+            showCancel: true,
+            confirmText: 'Yes, Delete',
+            cancelText: 'Cancel',
+            onConfirm: async () => {
+                closePopup();
+                setDeleting({ ...deleting, [packageId]: true });
+                try {
+                    await axios.delete(endpoints.admin.simulatorPackages.detail(packageId));
+                    await fetchPackages();
+                    showSuccess('Simulator package deleted successfully');
+                } catch (error) {
+                    console.error('Error deleting package:', error);
+                    showError('Failed to delete simulator package');
+                } finally {
+                    setDeleting({ ...deleting, [packageId]: false });
+                }
+            },
+        });
+    };
+
+    return (
+        <>
+            <div>
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                        <Button 
+                            onClick={() => {
+                                setEditingPackage(null);
+                                setFormData(emptyForm);
+                                setShowForm(true);
+                            }}
+                            loading={submitLoading}
+                            className="flex items-center"
+                        >
+                            <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
+                            <span>Add Simulator Only Package</span>
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Packages List */}
+                {loading ? (
+                    <TableSkeleton rows={5} cols={6} />
+                ) : (
+                    <div className="bg-surface rounded-card shadow-card overflow-hidden">
+                        {packages.length === 0 ? (
+                            <div className="text-center py-12">
+                                <p className="text-text-secondary text-lg">No simulator packages found. Add your first package.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-border">
+                                    <thead className="bg-background">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Title
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Description
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Price
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Hours
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Redirect URL
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Status
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-surface divide-y divide-border">
+                                        {packages.map(pkg => (
+                                            <tr key={pkg.id} className="hover:bg-background transition-colors">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
+                                                    {pkg.title}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-secondary max-w-xs">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedDescription(pkg.description || 'No description available');
+                                                            setSelectedPackageTitle(pkg.title);
+                                                            setShowDescriptionModal(true);
+                                                        }}
+                                                        className="text-text-secondary hover:text-primary transition-colors cursor-pointer text-left truncate block w-full"
+                                                        title="Click to view full description"
+                                                    >
+                                                        {pkg.description || <span className="text-text-secondary italic">No description</span>}
+                                                    </button>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-accent">
+                                                    ${pkg.price}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
+                                                    {pkg.hours} hrs
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-primary max-w-xs truncate">
+                                                    {pkg.redirect_url ? (
+                                                        <a 
+                                                            href={pkg.redirect_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="text-primary hover:text-primary-light underline transition-colors"
+                                                        >
+                                                            {pkg.redirect_url.length > 20 ? pkg.redirect_url.substring(0, 20) + '...' : pkg.redirect_url}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-text-secondary">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    <Badge status={pkg.is_active ? 'confirmed' : 'cancelled'}>
+                                                        {pkg.is_active ? 'Active' : 'Inactive'}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            className="text-primary hover:text-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            onClick={() => handleEdit(pkg)}
+                                                            disabled={togglingActive[pkg.id] || deleting[pkg.id]}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            className={`${
+                                                                pkg.is_active 
+                                                                    ? 'text-accent hover:text-accent-dark' 
+                                                                    : 'text-status-confirmed-text hover:text-status-confirmed-text/80'
+                                                            } transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                            onClick={() => handleToggleActive(pkg.id, pkg.is_active)}
+                                                            disabled={togglingActive[pkg.id] || deleting[pkg.id]}
+                                                            title={pkg.is_active ? 'Deactivate' : 'Activate'}
+                                                        >
+                                                            {togglingActive[pkg.id] ? (
+                                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                </svg>
+                                                            ) : pkg.is_active ? (
+                                                                <PowerOff className="w-4 h-4" />
+                                                            ) : (
+                                                                <Power className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                        <button 
+                                                            className="text-danger hover:text-danger-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            onClick={() => handleDelete(pkg.id)}
+                                                            disabled={togglingActive[pkg.id] || deleting[pkg.id]}
+                                                            title="Delete"
+                                                        >
+                                                            {deleting[pkg.id] ? (
+                                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                </svg>
+                                                            ) : (
+                                                                <Trash2 className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Add/Edit Form Modal */}
+                {showForm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div ref={modalRef} className="bg-surface rounded-card shadow-card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <h2 className="text-xl font-bold text-text-primary mb-4">
+                                {editingPackage ? 'Edit Simulator Only Package' : 'Add New Simulator Only Package'}
+                            </h2>
+                            <form onSubmit={handleSubmit}>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            Package Title *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.title}
+                                            onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                            required
+                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            Description *
+                                        </label>
+                                        <textarea
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                            rows="4"
+                                            required
+                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                Price ($) *
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={formData.price}
+                                                onChange={(e) => setFormData({...formData, price: e.target.value})}
+                                                required
+                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                Hours *
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                min="0.5"
+                                                value={formData.hours}
+                                                onChange={(e) => setFormData({...formData, hours: e.target.value})}
+                                                required
+                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            Redirect URL (Optional)
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={formData.redirect_url}
+                                            onChange={(e) => setFormData({...formData, redirect_url: e.target.value})}
+                                            placeholder="https://example.com/redirect"
+                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        />
+                                    </div>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_active}
+                                            onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                                            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                                        />
+                                        <label className="ml-2 text-sm font-medium text-text-primary">
+                                            Active
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 mt-6">
+                                    <Button 
+                                        type="button" 
+                                        variant="secondary"
+                                        onClick={() => {
+                                            setShowForm(false);
+                                            setEditingPackage(null);
+                                            setFormData(emptyForm);
+                                        }}
+                                        loading={submitLoading}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" loading={submitLoading}>
+                                        {editingPackage ? 'Update' : 'Create'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Description Modal */}
+                {showDescriptionModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDescriptionModal(false)}>
+                        <div className="bg-surface rounded-card shadow-card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                                    <FileText className="w-5 h-5" />
+                                    Package Description
+                                </h2>
+                                <button
+                                    onClick={() => setShowDescriptionModal(false)}
+                                    className="text-text-secondary hover:text-text-primary transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="mb-4">
+                                <p className="text-sm font-medium text-text-secondary mb-1">Package:</p>
+                                <p className="text-lg font-semibold text-text-primary">{selectedPackageTitle}</p>
+                            </div>
+                            <div className="bg-background rounded-button border border-border p-4">
+                                <p className="text-text-primary whitespace-pre-wrap break-words">
+                                    {selectedDescription}
+                                </p>
+                            </div>
+                            <div className="mt-6 flex justify-end">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowDescriptionModal(false)}
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? async () => {
+                    const action = popup.onConfirm;
+                    closePopup();
+                    if (action) {
+                        await action();
+                    }
+                } : closePopup}
+                onClose={closePopup}
+            />
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
+            )}
+        </>
+    );
+}
+
+export default SimulatorPackageManagement;
+

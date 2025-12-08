@@ -105,7 +105,7 @@ function UserManagement() {
 
     return (
         <>
-            <div className="max-w-7xl mx-auto">
+            <div>
                 {/* Filters */}
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     {/* Desktop: Search + Button left, Filters right */}

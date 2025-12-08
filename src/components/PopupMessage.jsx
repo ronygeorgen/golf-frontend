@@ -76,9 +76,9 @@ function PopupMessage({
                             {title || DEFAULT_TITLES[type] || DEFAULT_TITLES.info}
                         </h3>
                         {message && (
-                            <p className="mt-1 text-sm text-text-secondary">
+                            <div className="mt-1 text-sm text-text-secondary whitespace-pre-line">
                                 {typeof message === 'string' ? message : message}
-                            </p>
+                            </div>
                         )}
                     </div>
                 </div>

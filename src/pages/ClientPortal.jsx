@@ -7,7 +7,7 @@ import PopupMessage from '../components/PopupMessage';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
 import SessionTransfer from '../components/SessionTransfer';
-import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getOrganizationPackages, getActiveCoachingPackages } from '../store/slices/coachingSlice';
+import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getMySimulatorPurchases, getOrganizationPackages, getActiveCoachingPackages } from '../store/slices/coachingSlice';
 import usePopup from '../hooks/usePopup';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -17,7 +17,7 @@ function ClientPortal() {
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
     const { upcomingBookings, loading, simulatorCredits, upcomingPagination, availability, loading: bookingLoading } = useAppSelector((state) => state.booking);
-    const { giftsPending, transfersPending, purchases, organizationPackages, packages, purchasesLoading, organizationPackagesLoading } = useAppSelector((state) => state.coaching);
+    const { giftsPending, transfersPending, purchases, simulatorPurchases, organizationPackages, packages, purchasesLoading, simulatorPurchasesLoading, organizationPackagesLoading } = useAppSelector((state) => state.coaching);
     const { popup, openPopup, closePopup } = usePopup();
     const [cancellingId, setCancellingId] = useState(null);
     const [rescheduleTarget, setRescheduleTarget] = useState(null);
@@ -79,6 +79,27 @@ function ClientPortal() {
         .filter(pkg => pkg.sessionsRemaining > 0)
         .sort((a, b) => a.packageTitle.localeCompare(b.packageTitle));
 
+    // Group simulator-only packages by package
+    const simulatorPackagesByPackage = (simulatorPurchases || [])
+        .filter((purchase) => purchase.package_status === 'active' && purchase.hours_remaining > 0)
+        .reduce((acc, purchase) => {
+            const packageId = purchase.package;
+            if (!acc[packageId]) {
+                acc[packageId] = {
+                    packageId,
+                    packageTitle: purchase.package_details?.title || 'Unknown Package',
+                    hoursRemaining: 0
+                };
+            }
+            acc[packageId].hoursRemaining += parseFloat(purchase.hours_remaining) || 0;
+            return acc;
+        }, {});
+
+    // Convert to array and sort by package title
+    const simulatorPackagesList = Object.values(simulatorPackagesByPackage)
+        .filter(pkg => pkg.hoursRemaining > 0)
+        .sort((a, b) => a.packageTitle.localeCompare(b.packageTitle));
+
     useEffect(() => {
         dispatch(getUpcomingBookings({ page, bookingType }));
     }, [dispatch, page, bookingType]);
@@ -106,6 +127,7 @@ function ClientPortal() {
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
         dispatch(getMyPackagePurchases({ page: 1 }));
+        dispatch(getMySimulatorPurchases({ page: 1 }));
         dispatch(getOrganizationPackages());
         dispatch(getActiveCoachingPackages());
     }, [dispatch]);
@@ -219,12 +241,26 @@ function ClientPortal() {
                 }));
                 
                 if (checkCoachingAvailability.fulfilled.match(result)) {
-                    const slots = result.payload || [];
-                    if (slots.length === 0) {
-                        setRescheduleError('No available time slots found for the selected date. Please try a different date.');
+                    const payload = result.payload || {};
+                    const slots = payload.slots || [];
+                    // Show API message if available
+                    if (payload.message) {
+                        setRescheduleError(payload.message);
+                    } else if (payload.error) {
+                        setRescheduleError(payload.error);
+                    } else if (slots.length === 0) {
+                        setRescheduleError(payload.specialEventMessage || 'No available time slots found for the selected date. Please try a different date.');
+                    } else if (payload.specialEventMessage) {
+                        setRescheduleError(payload.specialEventMessage);
                     }
                 } else {
-                    setRescheduleError(result.payload?.error || result.payload?.detail || 'Failed to check availability.');
+                    // Handle rejected case
+                    const errorMessage = result.payload?.error || 
+                                        result.payload?.message || 
+                                        result.payload?.detail ||
+                                        result.payload ||
+                                        'Failed to check availability';
+                    setRescheduleError(typeof errorMessage === 'string' ? errorMessage : 'Failed to check availability');
                 }
             } else if (rescheduleTarget.booking_type === 'simulator') {
                 const result = await dispatch(checkSimulatorAvailability({
@@ -233,12 +269,26 @@ function ClientPortal() {
                 }));
                 
                 if (checkSimulatorAvailability.fulfilled.match(result)) {
-                    const slots = result.payload || [];
-                    if (slots.length === 0) {
-                        setRescheduleError('No available time slots found for the selected date. Please try a different date.');
+                    const payload = result.payload || {};
+                    const slots = payload.slots || [];
+                    // Show API message if available
+                    if (payload.message) {
+                        setRescheduleError(payload.message);
+                    } else if (payload.error) {
+                        setRescheduleError(payload.error);
+                    } else if (slots.length === 0) {
+                        setRescheduleError(payload.specialEventMessage || 'No available time slots found for the selected date. Please try a different date.');
+                    } else if (payload.specialEventMessage) {
+                        setRescheduleError(payload.specialEventMessage);
                     }
                 } else {
-                    setRescheduleError(result.payload?.error || result.payload?.detail || 'Failed to check availability.');
+                    // Handle rejected case
+                    const errorMessage = result.payload?.error || 
+                                        result.payload?.message || 
+                                        result.payload?.detail ||
+                                        result.payload ||
+                                        'Failed to check availability';
+                    setRescheduleError(typeof errorMessage === 'string' ? errorMessage : 'Failed to check availability');
                 }
             }
         } catch (error) {
@@ -671,6 +721,21 @@ function ClientPortal() {
                                     Hours are issued when you cancel simulator bookings at least 24 hours ahead.
                                 </p>
                             </div>
+                            {(simulatorPurchasesLoading) ? (
+                                <PackagesSkeleton />
+                            ) : simulatorPackagesList.length > 0 ? (
+                                <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary">
+                                    <p className="font-semibold text-text-primary mb-2">Simulator-Only Packages</p>
+                                    <div className="space-y-2">
+                                        {simulatorPackagesList.map((pkg) => (
+                                            <div key={pkg.packageId} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
+                                                <span className="text-text-secondary">{pkg.packageTitle}</span>
+                                                <span className="font-bold text-text-primary">{pkg.hoursRemaining.toFixed(2)} hour{pkg.hoursRemaining === 1 ? '' : 's'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
                              {(purchasesLoading || organizationPackagesLoading) ? (
                                 <PackagesSkeleton />
                             ) : (personalPackagesList.length > 0 || groupPackagesList.length > 0) ? (

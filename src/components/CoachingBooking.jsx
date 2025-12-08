@@ -132,11 +132,12 @@ function CoachingBooking() {
         
         // Check if no slots are available
         if (checkCoachingAvailability.fulfilled.match(result)) {
-            const slots = result.payload || [];
+            const payload = result.payload || {};
+            const slots = payload.slots || [];
             if (slots.length === 0) {
                 setToast({
                     show: true,
-                    message: 'No available time slots found for the selected date and package. Please try a different date or package.'
+                    message: payload.specialEventMessage || 'No available time slots found for the selected date and package. Please try a different date or package.'
                 });
                 // Auto-hide toast after 5 seconds
                 setTimeout(() => {
@@ -514,6 +515,11 @@ function CoachingBooking() {
                 </div>
             </div>
 
+            {availability.specialEventMessage && (
+                <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-6">
+                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
+                </div>
+            )}
             {availability.coaching && availability.coaching.length > 0 && (
                 <div className="bg-surface rounded-card shadow-card p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
@@ -642,6 +648,7 @@ function CoachingBooking() {
                             <Button 
                                 onClick={handleBooking}
                                 disabled={bookingLoading}
+                                loading={bookingLoading}
                                 variant="primary"
                                 className="w-full py-3 flex items-center justify-center gap-2"
                             >

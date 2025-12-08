@@ -1,33 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits } from '../store/slices/bookingSlice';
+import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours } from '../store/slices/bookingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
 import Button from './ui/Button';
 
 function SimulatorBooking() {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
-    const { availability, loading: bookingLoading, simulatorCredits, creditsLoading } = useAppSelector((state) => state.booking);
+    const { toast, showSuccess, showError, hideToast } = useToast();
+    const { user } = useAppSelector((state) => state.auth);
+    const { 
+        availability, 
+        loading: bookingLoading, 
+        simulatorCredits, 
+        creditsLoading,
+        totalAvailableHours,
+        availableHoursLoading
+    } = useAppSelector((state) => state.booking);
     
     const [date, setDate] = useState('');
     const [duration, setDuration] = useState(60);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [loading, setLoading] = useState(false);
     const [bookingSuccess, setBookingSuccess] = useState(false);
-    const [useCredit, setUseCredit] = useState(false);
-    
-    const availableCredits = simulatorCredits?.length || 0;
+    const [usePrepaidHours, setUsePrepaidHours] = useState(null); // null = not selected, true = use prepaid, false = pay
     
     useEffect(() => {
         dispatch(getSimulatorCredits());
+        dispatch(getAvailableSimulatorHours({ use_organization: true }));
     }, [dispatch]);
-    
-    useEffect(() => {
-        if (availableCredits === 0 && useCredit) {
-            setUseCredit(false);
-        }
-    }, [availableCredits, useCredit]);
 
     const checkAvailability = async () => {
         if (!date) {
@@ -44,8 +48,36 @@ function SimulatorBooking() {
         dispatch(clearAvailability()); // Clear previous availability slots
 
         setLoading(true);
-        await dispatch(checkSimulatorAvailability({ date, duration }));
+        const result = await dispatch(checkSimulatorAvailability({ date, duration }));
         setLoading(false);
+        
+        // Check if the API returned a message or error
+        if (checkSimulatorAvailability.fulfilled.match(result)) {
+            const payload = result.payload || {};
+            const slots = payload.slots || [];
+            // Show message from API if available (e.g., "No simulators available for this day")
+            // Priority: message > error > specialEventMessage > default message
+            if (payload.message) {
+                // Always show API message if present
+                showError(payload.message);
+            } else if (payload.error) {
+                showError(payload.error);
+            } else if (payload.specialEventMessage) {
+                // Show special event message if no regular message
+                showError(payload.specialEventMessage);
+            } else if (slots.length === 0) {
+                // If no slots and no messages, show a default message
+                showError('No available time slots found for the selected date. Please try a different date.');
+            }
+        } else if (checkSimulatorAvailability.rejected.match(result)) {
+            // Handle rejected case (API error)
+            const errorMessage = result.payload?.error || 
+                                result.payload?.message || 
+                                result.payload?.detail ||
+                                result.payload ||
+                                'Failed to check availability';
+            showError(typeof errorMessage === 'string' ? errorMessage : 'Failed to check availability');
+        }
     };
 
     const isSlotDisabled = (slot) => {
@@ -138,6 +170,16 @@ function SimulatorBooking() {
             return;
         }
 
+        // Validate payment method selection
+        if (usePrepaidHours === null) {
+            openPopup({
+                type: 'warning',
+                title: 'Select Payment Method',
+                message: 'Please choose whether to use pre-paid hours or pay for this session.',
+            });
+            return;
+        }
+
         const bookingData = {
             booking_type: 'simulator',
             start_time: selectedSlot.start_time,
@@ -146,13 +188,57 @@ function SimulatorBooking() {
             // total_price will be calculated on backend based on duration
         };
         
-        if (useCredit) {
-            bookingData.use_simulator_credit = true;
-        }
+        // Set use_prepaid_hours based on user's choice
+        bookingData.use_prepaid_hours = usePrepaidHours;
 
         const result = await dispatch(createBooking(bookingData));
+        
+        // Debug logging
+        console.log('Booking result:', result);
+        console.log('Result type:', result.type);
+        console.log('Is fulfilled?', createBooking.fulfilled.match(result));
+        console.log('Is rejected?', createBooking.rejected.match(result));
+        if (result.payload) {
+            console.log('Response payload:', result.payload);
+            console.log('Payload type:', typeof result.payload);
+            console.log('Has temp_id?', !!result.payload.temp_id);
+            console.log('Has redirect_url?', !!result.payload.redirect_url);
+            console.log('temp_id value:', result.payload.temp_id);
+            console.log('redirect_url value:', result.payload.redirect_url);
+        }
+        
         if (createBooking.fulfilled.match(result)) {
-            const booking = result.payload;
+            const response = result.payload;
+            
+            // Check if this is a redirect response (temp booking created for payment)
+            if (response && response.temp_id && response.redirect_url) {
+                console.log('✅ Redirect response detected:', response);
+                // Build redirect URL with query params (similar to package purchases)
+                const buyerPhone = user?.phone;
+                if (!buyerPhone) {
+                    showError('Phone number not found. Please ensure you are logged in.');
+                    return;
+                }
+                
+                const url = new URL(response.redirect_url);
+                url.searchParams.set('phone', buyerPhone); // Current user's phone
+                url.searchParams.set('recipient_phone', response.temp_id); // recipient_phone contains temp_id
+                
+                openPopup({
+                    type: 'success',
+                    title: 'Redirecting to Payment...',
+                    message: 'You will be redirected to complete your booking payment.',
+                });
+                
+                // Redirect after short delay
+                setTimeout(() => {
+                    window.location.href = url.toString();
+                }, 1000);
+                return;
+            }
+            
+            // Normal booking creation (using prepaid hours)
+            const booking = response;
             
             // Console log to check if package hours were used or price was charged
             if (booking.package_purchase_details) {
@@ -182,27 +268,25 @@ function SimulatorBooking() {
             dispatch(clearAvailability());
             setSelectedSlot(null);
             setBookingSuccess(true);
-            setUseCredit(false);
+            setUsePrepaidHours(null); // Reset selection
             dispatch(getSimulatorCredits());
-        } else {
+            dispatch(getAvailableSimulatorHours({ use_organization: true }));
+            showSuccess('Booking confirmed successfully!');
+        } else if (createBooking.rejected.match(result)) {
             const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
             if (typeof errorMessage === 'object') {
                 // Handle validation errors object
                 const errorText = Object.entries(errorMessage)
                     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-                    .join('\n');
-                openPopup({
-                    type: 'error',
-                    title: 'Booking failed',
-                    message: `Error creating booking:\n${errorText}`,
-                });
+                    .join(', ');
+                showError(`Booking failed: ${errorText}`);
             } else {
-                openPopup({
-                    type: 'error',
-                    title: 'Booking failed',
-                    message: `Error creating booking: ${errorMessage}`,
-                });
+                showError(`Booking failed: ${errorMessage}`);
             }
+        } else {
+            // Handle case where result is neither fulfilled nor rejected
+            console.error('Unexpected booking result state:', result);
+            showError('Unexpected response from server. Please try again.');
         }
     };
 
@@ -281,6 +365,11 @@ function SimulatorBooking() {
                 </div>
             </div>
 
+            {availability.specialEventMessage && (
+                <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-6">
+                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
+                </div>
+            )}
             {availability.simulator && availability.simulator.length > 0 && (
                 <div className="bg-surface rounded-card shadow-card p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
@@ -342,31 +431,59 @@ function SimulatorBooking() {
                         })}
                     </div>
                     
-                    {availableCredits > 0 && (
-                        <div className="bg-status-personal-bg border border-status-personal-text/20 rounded-card p-4 mb-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-status-personal-text font-semibold">You have {availableCredits} simulator credit{availableCredits > 1 ? 's' : ''}</p>
-                                    <p className="text-sm text-status-personal-text/80">
-                                        Use a credit to waive payment for this booking.
-                                    </p>
-                                </div>
-                                <label className="flex items-center gap-2 text-status-personal-text font-medium">
-                                    <input 
-                                        type="checkbox" 
-                                        className="h-5 w-5 text-status-personal-text"
-                                        checked={useCredit}
-                                        onChange={(e) => setUseCredit(e.target.checked)}
-                                        disabled={creditsLoading}
-                                    />
-                                    Apply credit
-                                </label>
-                            </div>
-                        </div>
-                    )}
                     {selectedSlot && (
-                        <div className="bg-background rounded-card p-6">
-                            <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
+                        <>
+                            <div className="bg-status-personal-bg border border-status-personal-text/20 rounded-card p-4 mb-4">
+                                <div className="space-y-3">
+                                    <div>
+                                        <p className="text-status-personal-text font-semibold mb-2">
+                                            Payment Method
+                                        </p>
+                                        {totalAvailableHours > 0 ? (
+                                            <p className="text-sm text-status-personal-text/80 mb-3">
+                                                You have {totalAvailableHours.toFixed(2)} pre-paid simulator hour{totalAvailableHours !== 1 ? 's' : ''} available
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm text-text-secondary mb-3">
+                                                No pre-paid hours available. You can pay for this session.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        {totalAvailableHours > 0 && (
+                                            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                                <input 
+                                                    type="radio" 
+                                                    name="paymentMethod"
+                                                    className="h-4 w-4 text-status-personal-text"
+                                                    checked={usePrepaidHours === true}
+                                                    onChange={() => setUsePrepaidHours(true)}
+                                                    disabled={availableHoursLoading}
+                                                />
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-text-primary">Use Pre-paid Hours</div>
+                                                    <div className="text-xs text-text-secondary">Use {totalAvailableHours.toFixed(2)} available hours</div>
+                                                </div>
+                                            </label>
+                                        )}
+                                        <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                            <input 
+                                                type="radio" 
+                                                name="paymentMethod"
+                                                className="h-4 w-4 text-primary"
+                                                checked={usePrepaidHours === false}
+                                                onChange={() => setUsePrepaidHours(false)}
+                                            />
+                                            <div className="flex-1">
+                                                <div className="font-medium text-text-primary">Pay for Session</div>
+                                                <div className="text-xs text-text-secondary">Pay at standard simulator rate</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-background rounded-card p-6">
+                                <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
                             <div className="space-y-2 mb-4">
                                 <p className="text-text-primary">
                                     <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
@@ -381,14 +498,25 @@ function SimulatorBooking() {
                                     <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                                 </p>
                             </div>
-                            {useCredit && (
+                            {usePrepaidHours === true && totalAvailableHours > 0 && (
                                 <div className="text-sm text-status-confirmed-text bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-3 mb-4">
-                                    This booking will use one simulator credit. No additional payment is required.
+                                    This booking will use {(duration / 60).toFixed(2)} hour{(duration / 60) !== 1 ? 's' : ''} from your pre-paid hours. No additional payment is required.
+                                </div>
+                            )}
+                            {usePrepaidHours === false && (
+                                <div className="text-sm text-text-secondary bg-background border border-border rounded-card p-3 mb-4">
+                                    This booking will be charged at the standard simulator rate.
+                                </div>
+                            )}
+                            {usePrepaidHours === null && (
+                                <div className="text-sm text-warning bg-warning-bg border border-warning-text/20 rounded-card p-3 mb-4">
+                                    Please select a payment method above.
                                 </div>
                             )}
                             <Button 
                                 onClick={handleBooking}
-                                disabled={bookingLoading}
+                                disabled={bookingLoading || usePrepaidHours === null}
+                                loading={bookingLoading}
                                 variant="primary"
                                 className="w-full py-3 flex items-center justify-center gap-2"
                             >
@@ -405,8 +533,17 @@ function SimulatorBooking() {
                                 )}
                             </Button>
                         </div>
+                        </>
                     )}
                 </div>
+            )}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
             )}
             <PopupMessage
                 open={popup.open}

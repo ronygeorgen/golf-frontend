@@ -29,6 +29,71 @@ export const getActivePackages = createAsyncThunk(
 
 export const getActiveCoachingPackages = getActivePackages; // Alias for consistency
 
+export const getSimulatorPackages = createAsyncThunk(
+    'coaching/getSimulatorPackages',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.simulatorPackages);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getActiveSimulatorPackages = createAsyncThunk(
+    'coaching/getActiveSimulatorPackages',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.simulatorPackagesActive);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const createSimulatorPackagePurchase = createAsyncThunk(
+    'coaching/createSimulatorPackagePurchase',
+    async ({ packageId, notes, purchaseType = 'normal', recipientPhone, purchaseName }, { rejectWithValue }) => {
+        try {
+            const payload = {
+                package: packageId,
+                purchase_type: purchaseType,
+                purchase_name: purchaseName,
+            };
+            if (notes) {
+                payload.notes = notes;
+            }
+            if (purchaseType === 'gift' && recipientPhone) {
+                payload.recipient_phone = recipientPhone;
+            }
+            const locationId = localStorage.getItem('ghlLocationId');
+            if (locationId) {
+                payload.location_id = locationId;
+            }
+            const response = await apiClient.post(endpoints.coaching.simulatorPurchases, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getMySimulatorPurchases = createAsyncThunk(
+    'coaching/getMySimulatorPurchases',
+    async ({ page = 1 } = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.mySimulatorPurchases, {
+                params: { page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const getMyPackagePurchases = createAsyncThunk(
     'coaching/getMyPackagePurchases',
     async ({ page = 1 } = {}, { rejectWithValue }) => {
@@ -123,6 +188,37 @@ export const getTransferablePurchases = createAsyncThunk(
         try {
             const response = await apiClient.get(endpoints.coaching.transferablePurchases, {
                 params: { page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getTransferableSimulatorPurchases = createAsyncThunk(
+    'coaching/getTransferableSimulatorPurchases',
+    async ({ page = 1 } = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.transferableSimulatorPurchases, {
+                params: { page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const createSimulatorHoursTransfer = createAsyncThunk(
+    'coaching/createSimulatorHoursTransfer',
+    async ({ packagePurchaseId, toUserPhone, hours, notes }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.coaching.simulatorTransfers, {
+                package_purchase: packagePurchaseId,
+                to_user_phone: toUserPhone,
+                hours: hours,
+                notes: notes || undefined,
             });
             return response.data;
         } catch (error) {
@@ -257,7 +353,11 @@ export const getPackageUsageDetails = createAsyncThunk(
 const initialState = {
     packages: [],
     activePackages: [],
+    simulatorPackages: [],
+    simulatorPackagesLoading: false,
     purchases: [],
+    simulatorPurchases: [],
+    simulatorPurchasesLoading: false,
     purchasesPagination: {
         count: 0,
         totalPages: 0,
@@ -274,6 +374,13 @@ const initialState = {
     },
     transferablePurchases: [],
     transferablePurchasesPagination: {
+        count: 0,
+        totalPages: 0,
+        currentPage: 1,
+        pageSize: 10,
+    },
+    transferableSimulatorPurchases: [],
+    transferableSimulatorPurchasesPagination: {
         count: 0,
         totalPages: 0,
         currentPage: 1,
@@ -546,6 +653,93 @@ const coachingSlice = createSlice({
             })
             .addCase(getPackageUsageDetails.rejected, (state, action) => {
                 state.usageDetailsLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getSimulatorPackages.pending, (state) => {
+                state.simulatorPackagesLoading = true;
+                state.error = null;
+            })
+            .addCase(getSimulatorPackages.fulfilled, (state, action) => {
+                state.simulatorPackagesLoading = false;
+                state.simulatorPackages = action.payload;
+            })
+            .addCase(getSimulatorPackages.rejected, (state, action) => {
+                state.simulatorPackagesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getActiveSimulatorPackages.pending, (state) => {
+                state.simulatorPackagesLoading = true;
+                state.error = null;
+            })
+            .addCase(getActiveSimulatorPackages.fulfilled, (state, action) => {
+                state.simulatorPackagesLoading = false;
+                state.simulatorPackages = action.payload;
+            })
+            .addCase(getActiveSimulatorPackages.rejected, (state, action) => {
+                state.simulatorPackagesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(createSimulatorPackagePurchase.pending, (state) => {
+                state.purchaseSubmitting = true;
+                state.error = null;
+            })
+            .addCase(createSimulatorPackagePurchase.fulfilled, (state, action) => {
+                state.purchaseSubmitting = false;
+                // Simulator purchases could be added to a separate list if needed
+            })
+            .addCase(createSimulatorPackagePurchase.rejected, (state, action) => {
+                state.purchaseSubmitting = false;
+                state.error = action.payload;
+            })
+            .addCase(getMySimulatorPurchases.pending, (state) => {
+                state.simulatorPurchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getMySimulatorPurchases.fulfilled, (state, action) => {
+                state.simulatorPurchasesLoading = false;
+                // Handle paginated response
+                if (action.payload.results !== undefined) {
+                    state.simulatorPurchases = action.payload.results;
+                } else {
+                    // Fallback for non-paginated response
+                    state.simulatorPurchases = action.payload;
+                }
+            })
+            .addCase(getMySimulatorPurchases.rejected, (state, action) => {
+                state.simulatorPurchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getTransferableSimulatorPurchases.pending, (state) => {
+                state.transferablePurchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getTransferableSimulatorPurchases.fulfilled, (state, action) => {
+                state.transferablePurchasesLoading = false;
+                if (action.payload.results !== undefined) {
+                    state.transferableSimulatorPurchases = action.payload.results;
+                    state.transferableSimulatorPurchasesPagination = {
+                        count: action.payload.count || 0,
+                        totalPages: action.payload.total_pages || 0,
+                        currentPage: action.payload.current_page || 1,
+                        pageSize: action.payload.page_size || 10,
+                    };
+                } else {
+                    state.transferableSimulatorPurchases = action.payload;
+                }
+            })
+            .addCase(getTransferableSimulatorPurchases.rejected, (state, action) => {
+                state.transferablePurchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(createSimulatorHoursTransfer.pending, (state) => {
+                state.purchaseSubmitting = true;
+                state.error = null;
+            })
+            .addCase(createSimulatorHoursTransfer.fulfilled, (state) => {
+                state.purchaseSubmitting = false;
+            })
+            .addCase(createSimulatorHoursTransfer.rejected, (state, action) => {
+                state.purchaseSubmitting = false;
                 state.error = action.payload;
             });
     },

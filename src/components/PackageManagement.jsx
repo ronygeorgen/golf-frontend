@@ -5,12 +5,16 @@ import { getStaff } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import { Edit, Power, PowerOff, Trash2, X, Users, FileText } from 'lucide-react';
 
 function PackageManagement() {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
+    const { toast, showSuccess, showError, hideToast } = useToast();
     const { list: packages, loading: packagesLoading } = useAppSelector((state) => state.admin.packages);
     const { list: staff } = useAppSelector((state) => state.admin.staff);
     const modalRef = useRef(null);
@@ -30,6 +34,13 @@ function PackageManagement() {
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [togglingActive, setTogglingActive] = useState({});
+    const [deleting, setDeleting] = useState({});
+    const [showStaffModal, setShowStaffModal] = useState(false);
+    const [selectedPackageStaff, setSelectedPackageStaff] = useState([]);
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+    const [selectedDescription, setSelectedDescription] = useState('');
+    const [selectedPackageTitle, setSelectedPackageTitle] = useState('');
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -77,14 +88,28 @@ function PackageManagement() {
         setSubmitLoading(true);
         try {
             if (editingPackage) {
-                await dispatch(updatePackage({ id: editingPackage.id, packageData: cleanedFormData }));
+                const result = await dispatch(updatePackage({ id: editingPackage.id, packageData: cleanedFormData }));
+                if (updatePackage.fulfilled.match(result)) {
+                    showSuccess('Package updated successfully');
+                    setShowForm(false);
+                    setEditingPackage(null);
+                    setFormData(emptyForm);
+                } else {
+                    showError(result.payload?.error || 'Failed to update package');
+                }
             } else {
-                await dispatch(createPackage(cleanedFormData));
+                const result = await dispatch(createPackage(cleanedFormData));
+                if (createPackage.fulfilled.match(result)) {
+                    showSuccess('Package created successfully');
+                    setShowForm(false);
+                    setEditingPackage(null);
+                    setFormData(emptyForm);
+                } else {
+                    showError(result.payload?.error || 'Failed to create package');
+                }
             }
-            setShowForm(false);
-            setEditingPackage(null);
-            setFormData(emptyForm);
-            // No need to refetch - Redux already updates the state optimistically
+        } catch (error) {
+            showError('An unexpected error occurred');
         } finally {
             setSubmitLoading(false);
         }
@@ -124,8 +149,19 @@ function PackageManagement() {
     };
 
     const handleToggleActive = async (packageId, isActive) => {
-        await dispatch(updatePackage({ id: packageId, packageData: { is_active: !isActive } }));
-        // No need to refetch - Redux already updates the state optimistically
+        setTogglingActive({ ...togglingActive, [packageId]: true });
+        try {
+            const result = await dispatch(updatePackage({ id: packageId, packageData: { is_active: !isActive } }));
+            if (updatePackage.fulfilled.match(result)) {
+                showSuccess(`Package ${!isActive ? 'activated' : 'deactivated'} successfully`);
+            } else {
+                showError(result.payload?.error || `Failed to ${!isActive ? 'activate' : 'deactivate'} package`);
+            }
+        } catch (error) {
+            showError('An unexpected error occurred');
+        } finally {
+            setTogglingActive({ ...togglingActive, [packageId]: false });
+        }
     };
 
     const handleDelete = async (packageId) => {
@@ -137,7 +173,20 @@ function PackageManagement() {
             cancelText: 'Cancel',
             showCancel: true,
             onConfirm: async () => {
-                await dispatch(deletePackage(packageId));
+                closePopup();
+                setDeleting({ ...deleting, [packageId]: true });
+                try {
+                    const result = await dispatch(deletePackage(packageId));
+                    if (deletePackage.fulfilled.match(result)) {
+                        showSuccess('Package deleted successfully');
+                    } else {
+                        showError(result.payload?.error || 'Failed to delete package');
+                    }
+                } catch (error) {
+                    showError('An unexpected error occurred');
+                } finally {
+                    setDeleting({ ...deleting, [packageId]: false });
+                }
             },
         });
     };
@@ -160,7 +209,7 @@ function PackageManagement() {
 
     return (
         <>
-        <div className="max-w-7xl mx-auto">
+        <div>
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <Button 
@@ -388,8 +437,18 @@ function PackageManagement() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
                                                     {pkg.title}
                                                 </td>
-                                                <td className="px-4 py-4 text-sm text-text-secondary max-w-xs truncate">
-                                                    {pkg.description}
+                                                <td className="px-4 py-4 text-sm text-text-secondary max-w-xs">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedDescription(pkg.description || 'No description available');
+                                                            setSelectedPackageTitle(pkg.title);
+                                                            setShowDescriptionModal(true);
+                                                        }}
+                                                        className="text-text-secondary hover:text-primary transition-colors cursor-pointer text-left truncate block w-full"
+                                                        title="Click to view full description"
+                                                    >
+                                                        {pkg.description || <span className="text-text-secondary italic">No description</span>}
+                                                    </button>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-accent">
                                                     ${pkg.price}
@@ -418,13 +477,21 @@ function PackageManagement() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-4">
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {pkg.staff_members_details?.map(staff => (
-                                                            <Badge key={staff.id} status="pending">
-                                                                {staff.first_name} {staff.last_name}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
+                                                    {pkg.staff_members_details && pkg.staff_members_details.length > 0 ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedPackageStaff(pkg.staff_members_details);
+                                                                setShowStaffModal(true);
+                                                            }}
+                                                            className="text-primary hover:text-primary-light transition-colors cursor-pointer text-sm"
+                                                            title="Click to view all staff members"
+                                                        >
+                                                            {pkg.staff_members_details[0].first_name} {pkg.staff_members_details[0].last_name}
+                                                            {pkg.staff_members_details.length > 1 && ' ...'}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-text-secondary text-sm">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
                                                     <Badge status={pkg.is_active ? 'confirmed' : 'cancelled'}>
@@ -434,26 +501,48 @@ function PackageManagement() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
                                                         <button 
-                                                            className="text-primary hover:text-primary-light transition-colors"
+                                                            className="text-primary hover:text-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                             onClick={() => handleEdit(pkg)}
+                                                            disabled={togglingActive[pkg.id] || deleting[pkg.id]}
+                                                            title="Edit"
                                                         >
-                                                            Edit
+                                                            <Edit className="w-4 h-4" />
                                                         </button>
                                                         <button 
                                                             className={`${
                                                                 pkg.is_active 
                                                                     ? 'text-accent hover:text-accent-dark' 
                                                                     : 'text-status-confirmed-text hover:text-status-confirmed-text/80'
-                                                            } transition-colors`}
+                                                            } transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                                                             onClick={() => handleToggleActive(pkg.id, pkg.is_active)}
+                                                            disabled={togglingActive[pkg.id] || deleting[pkg.id]}
+                                                            title={pkg.is_active ? 'Deactivate' : 'Activate'}
                                                         >
-                                                            {pkg.is_active ? 'Deactivate' : 'Activate'}
+                                                            {togglingActive[pkg.id] ? (
+                                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                </svg>
+                                                            ) : pkg.is_active ? (
+                                                                <PowerOff className="w-4 h-4" />
+                                                            ) : (
+                                                                <Power className="w-4 h-4" />
+                                                            )}
                                                         </button>
                                                         <button 
-                                                            className="text-danger hover:text-danger-light transition-colors"
+                                                            className="text-danger hover:text-danger-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                             onClick={() => handleDelete(pkg.id)}
+                                                            disabled={togglingActive[pkg.id] || deleting[pkg.id]}
+                                                            title="Delete"
                                                         >
-                                                            Delete
+                                                            {deleting[pkg.id] ? (
+                                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                </svg>
+                                                            ) : (
+                                                                <Trash2 className="w-4 h-4" />
+                                                            )}
                                                         </button>
                                                     </div>
                                                 </td>
@@ -477,6 +566,101 @@ function PackageManagement() {
                 onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
                 onClose={closePopup}
             />
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
+            )}
+
+            {/* Staff Members Modal */}
+            {showStaffModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowStaffModal(false)}>
+                    <div className="bg-surface rounded-card shadow-card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                                <Users className="w-5 h-5" />
+                                Staff Members
+                            </h2>
+                            <button
+                                onClick={() => setShowStaffModal(false)}
+                                className="text-text-secondary hover:text-text-primary transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {selectedPackageStaff.length > 0 ? (
+                                selectedPackageStaff.map((staff, index) => (
+                                    <div
+                                        key={staff.id}
+                                        className="flex items-center gap-3 p-3 bg-background rounded-button border border-border hover:border-primary transition-colors"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium text-text-primary">
+                                                {staff.first_name} {staff.last_name}
+                                            </p>
+                                            {staff.email && (
+                                                <p className="text-xs text-text-secondary mt-1">{staff.email}</p>
+                                            )}
+                                        </div>
+                                        <Badge status="pending">Staff</Badge>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-text-secondary text-center py-4">No staff members assigned</p>
+                            )}
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowStaffModal(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Description Modal */}
+            {showDescriptionModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDescriptionModal(false)}>
+                    <div className="bg-surface rounded-card shadow-card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                                <FileText className="w-5 h-5" />
+                                Package Description
+                            </h2>
+                            <button
+                                onClick={() => setShowDescriptionModal(false)}
+                                className="text-text-secondary hover:text-text-primary transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="mb-4">
+                            <p className="text-sm font-medium text-text-secondary mb-1">Package:</p>
+                            <p className="text-lg font-semibold text-text-primary">{selectedPackageTitle}</p>
+                        </div>
+                        <div className="bg-background rounded-button border border-border p-4">
+                            <p className="text-text-primary whitespace-pre-wrap break-words">
+                                {selectedDescription}
+                            </p>
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowDescriptionModal(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

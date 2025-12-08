@@ -41,19 +41,38 @@ function SimulatorAvailability() {
         if (id && simulators.length > 0) {
             const simulator = simulators.find(s => s.id === parseInt(id));
             if (simulator) {
+                // Prevent loading coaching bays
+                if (simulator.is_coaching_bay) {
+                    openPopup({
+                        type: 'warning',
+                        title: 'Invalid Simulator',
+                        message: 'Coaching bays cannot be managed from this page. Please select a simulator bay.',
+                    });
+                    navigate('/admin/simulators');
+                    dispatch(setSelectedSimulator(null));
+                    return;
+                }
                 dispatch(setSelectedSimulator(simulator));
             }
         }
-    }, [id, simulators, dispatch]);
+    }, [id, simulators, dispatch, navigate, openPopup]);
 
     useEffect(() => {
-        if (selectedSimulator) {
+        if (selectedSimulator && !selectedSimulator.is_coaching_bay) {
             dispatch(getSimulatorAvailability({ simulatorId: selectedSimulator.id }));
         }
     }, [dispatch, selectedSimulator]);
 
     const handleSimulatorSelect = (simulatorId) => {
         const simulator = simulators.find(s => s.id === simulatorId);
+        if (simulator && simulator.is_coaching_bay) {
+            openPopup({
+                type: 'warning',
+                title: 'Invalid Simulator',
+                message: 'Coaching bays cannot be managed from this page. Please select a simulator bay.',
+            });
+            return;
+        }
         dispatch(setSelectedSimulator(simulator));
         setShowAddDay(false);
     };
@@ -174,7 +193,7 @@ function SimulatorAvailability() {
     });
 
     return (
-        <div className="max-w-6xl mx-auto">
+        <div>
             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <button
@@ -199,7 +218,7 @@ function SimulatorAvailability() {
                         className="w-full md:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                     >
                         <option value="" className="text-gray-900">Choose a simulator</option>
-                        {simulators.map(simulator => (
+                        {simulators.filter(simulator => !simulator.is_coaching_bay).map(simulator => (
                             <option key={simulator.id} value={simulator.id} className="text-gray-900">
                                 {simulator.name} (Bay {simulator.bay_number})
                             </option>
@@ -208,7 +227,7 @@ function SimulatorAvailability() {
                 </div>
             </div>
 
-            {selectedSimulator && (
+            {selectedSimulator && !selectedSimulator.is_coaching_bay && (
                 <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                         <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-0">

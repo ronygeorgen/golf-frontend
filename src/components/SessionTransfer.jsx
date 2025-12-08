@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getTransferablePurchases, createSessionTransfer, checkPhoneExists, getMyPackagePurchases } from '../store/slices/coachingSlice';
+import { getTransferablePurchases, getTransferableSimulatorPurchases, createSessionTransfer, createSimulatorHoursTransfer, checkPhoneExists, getMyPackagePurchases } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import { FormSkeleton } from './skeletons/SkeletonLoader';
@@ -11,12 +11,14 @@ function SessionTransfer({ showAll = false }) {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
-    const { transferablePurchases, transferablePurchasesPagination, transferablePurchasesLoading, phoneChecking, phoneCheck } = useAppSelector((state) => state.coaching);
+    const { transferablePurchases, transferablePurchasesPagination, transferableSimulatorPurchases, transferableSimulatorPurchasesPagination, transferablePurchasesLoading, phoneChecking, phoneCheck } = useAppSelector((state) => state.coaching);
     
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
+    const [isSimulatorPackage, setIsSimulatorPackage] = useState(false);
     const [toUserPhone, setToUserPhone] = useState('');
     const [sessionCount, setSessionCount] = useState(1);
+    const [hoursToTransfer, setHoursToTransfer] = useState(1);
     const [phoneValidated, setPhoneValidated] = useState(false);
     const [notes, setNotes] = useState('');
     const [transferLoading, setTransferLoading] = useState(false);
@@ -24,13 +26,16 @@ function SessionTransfer({ showAll = false }) {
 
     useEffect(() => {
         dispatch(getTransferablePurchases({ page: 1 }));
+        dispatch(getTransferableSimulatorPurchases({ page: 1 }));
     }, [dispatch]);
 
     useEffect(() => {
         if (!showTransferModal) {
             setSelectedPurchase(null);
+            setIsSimulatorPackage(false);
             setToUserPhone('');
             setSessionCount(1);
+            setHoursToTransfer(1);
             setPhoneValidated(false);
             setNotes('');
             setTransferLoading(false);
@@ -101,6 +106,48 @@ function SessionTransfer({ showAll = false }) {
             return;
         }
 
+        if (isSimulatorPackage) {
+            const hours = parseFloat(hoursToTransfer);
+            if (hours < 0.5 || hours > selectedPurchase.hours_remaining) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Invalid Hours',
+                    message: `Please enter a valid hours amount (0.5-${selectedPurchase.hours_remaining}).`,
+                });
+                return;
+            }
+
+            setTransferLoading(true);
+            const result = await dispatch(createSimulatorHoursTransfer({
+                packagePurchaseId: selectedPurchase.id,
+                toUserPhone: toUserPhone.trim(),
+                hours: hours,
+                notes: notes.trim() || undefined,
+            }));
+            setTransferLoading(false);
+            
+            if (createSimulatorHoursTransfer.fulfilled.match(result)) {
+                openPopup({
+                    type: 'success',
+                    title: 'Transfer Initiated!',
+                    message: 'The transfer request has been sent. The recipient will receive a notification.',
+                });
+                dispatch(getTransferableSimulatorPurchases({ page: 1 }));
+                setShowTransferModal(false);
+            } else {
+                const errorMsg = result.payload?.to_user_phone?.[0] || 
+                               result.payload?.hours?.[0] ||
+                               result.payload?.error || 
+                               'Unable to create transfer.';
+                openPopup({
+                    type: 'error',
+                    title: 'Transfer Failed',
+                    message: errorMsg,
+                });
+            }
+            return;
+        }
+
         if (sessionCount < 1 || sessionCount > selectedPurchase.sessions_remaining) {
             openPopup({
                 type: 'warning',
@@ -149,7 +196,11 @@ function SessionTransfer({ showAll = false }) {
         );
     }
 
-    const displayedPurchases = showAll ? transferablePurchases : transferablePurchases.slice(0, previewLimit);
+    const allTransferablePurchases = [
+        ...transferablePurchases.map(p => ({ ...p, isSimulator: false })),
+        ...transferableSimulatorPurchases.map(p => ({ ...p, isSimulator: true }))
+    ];
+    const displayedPurchases = showAll ? allTransferablePurchases : allTransferablePurchases.slice(0, previewLimit);
 
     return (
         <div className="bg-surface rounded-card shadow-card p-6 h-full flex flex-col">
@@ -167,9 +218,9 @@ function SessionTransfer({ showAll = false }) {
                 )}
             </div>
             
-            {transferablePurchases.length === 0 ? (
+            {allTransferablePurchases.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center py-8">
-                    <p className="text-text-secondary">You have no packages with transferable sessions.</p>
+                    <p className="text-text-secondary">You have no packages with transferable sessions or hours.</p>
                 </div>
             ) : (
                 <div className="flex-1 space-y-4">
@@ -185,20 +236,31 @@ function SessionTransfer({ showAll = false }) {
                                             package: {purchase.package_details?.title || 'Unknown package'}
                                         </p>
                                     )}
-                                    <p className="text-sm text-text-secondary mt-1">
-                                        {purchase.sessions_remaining} of {purchase.sessions_total} sessions remaining
-                                    </p>
+                                    {purchase.isSimulator ? (
+                                        <p className="text-sm text-text-secondary mt-1">
+                                            {purchase.hours_remaining} of {purchase.hours_total} hours remaining
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-text-secondary mt-1">
+                                            {purchase.sessions_remaining} of {purchase.sessions_total} sessions remaining
+                                        </p>
+                                    )}
                                 </div>
                                 <Button
                                     onClick={() => {
                                         setSelectedPurchase(purchase);
-                                        setSessionCount(Math.min(1, purchase.sessions_remaining));
+                                        setIsSimulatorPackage(purchase.isSimulator);
+                                        if (purchase.isSimulator) {
+                                            setHoursToTransfer(Math.min(1, purchase.hours_remaining));
+                                        } else {
+                                            setSessionCount(Math.min(1, purchase.sessions_remaining));
+                                        }
                                         setShowTransferModal(true);
                                     }}
                                     variant="primary"
                                     className="ml-4"
                                 >
-                                    Transfer Sessions
+                                    {purchase.isSimulator ? 'Transfer Hours' : 'Transfer Sessions'}
                                 </Button>
                             </div>
                         </div>
@@ -236,9 +298,15 @@ function SessionTransfer({ showAll = false }) {
                                     <p className="text-xs text-text-secondary">
                                         package: {selectedPurchase.package_details?.title || 'Unknown package'}
                                     </p>
-                                    <p className="text-sm text-text-secondary mt-1">
-                                        Available: {selectedPurchase.sessions_remaining} sessions
-                                    </p>
+                                    {isSimulatorPackage ? (
+                                        <p className="text-sm text-text-secondary mt-1">
+                                            Available: {selectedPurchase.hours_remaining} hours
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-text-secondary mt-1">
+                                            Available: {selectedPurchase.sessions_remaining} sessions
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-4">
@@ -273,21 +341,43 @@ function SessionTransfer({ showAll = false }) {
                                         )}
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-2">
-                                            Number of Sessions
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max={selectedPurchase.sessions_remaining}
-                                            value={sessionCount}
-                                            onChange={(e) => setSessionCount(Math.max(1, Math.min(selectedPurchase.sessions_remaining, parseInt(e.target.value) || 1)))}
-                                        />
-                                        <p className="text-xs text-text-secondary mt-1">
-                                            Maximum: {selectedPurchase.sessions_remaining} sessions
-                                        </p>
-                                    </div>
+                                    {isSimulatorPackage ? (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Number of Hours
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                min="0.5"
+                                                max={selectedPurchase.hours_remaining}
+                                                value={hoursToTransfer}
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value) || 0.5;
+                                                    setHoursToTransfer(Math.max(0.5, Math.min(selectedPurchase.hours_remaining, val)));
+                                                }}
+                                            />
+                                            <p className="text-xs text-text-secondary mt-1">
+                                                Maximum: {selectedPurchase.hours_remaining} hours (minimum: 0.5 hours)
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Number of Sessions
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max={selectedPurchase.sessions_remaining}
+                                                value={sessionCount}
+                                                onChange={(e) => setSessionCount(Math.max(1, Math.min(selectedPurchase.sessions_remaining, parseInt(e.target.value) || 1)))}
+                                            />
+                                            <p className="text-xs text-text-secondary mt-1">
+                                                Maximum: {selectedPurchase.sessions_remaining} sessions
+                                            </p>
+                                        </div>
+                                    )}
 
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -311,7 +401,7 @@ function SessionTransfer({ showAll = false }) {
                                     variant="primary"
                                     className="w-full sm:w-auto"
                                 >
-                                    {transferLoading ? 'Transferring...' : 'Transfer Sessions'}
+                                    {transferLoading ? 'Transferring...' : (isSimulatorPackage ? 'Transfer Hours' : 'Transfer Sessions')}
                                 </Button>
                                 <Button
                                     type="button"

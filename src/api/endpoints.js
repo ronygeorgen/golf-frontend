@@ -44,6 +44,12 @@ export const endpoints = {
             assignStaff: (id) => `/admin/packages/${id}/assign_staff/`,
             removeStaff: (id) => `/admin/packages/${id}/remove_staff/`,
         },
+        simulatorPackages: {
+            list: '/coaching/simulator-packages/',
+            detail: (id) => `/coaching/simulator-packages/${id}/`,
+            active: '/coaching/simulator-packages/active/',
+            toggleActive: (id) => `/coaching/simulator-packages/${id}/toggle_active/`,
+        },
         bookings: {
             list: '/admin/bookings/',
             detail: (id) => `/admin/bookings/${id}/`,
@@ -64,6 +70,15 @@ export const endpoints = {
             detail: (id) => `/admin/users/${id}/`,
             togglePause: (id) => `/admin/users/${id}/toggle-pause/`,
         },
+        closedDays: {
+            list: '/admin/closed-days/',
+            detail: (id) => `/admin/closed-days/${id}/`,
+            create: '/admin/closed-days/',
+            update: (id) => `/admin/closed-days/${id}/`,
+            delete: (id) => `/admin/closed-days/${id}/`,
+            checkDate: '/admin/closed-days/check-date/',
+            checkDatetime: '/admin/closed-days/check-datetime/',
+        },
     },
     
     // Booking endpoints
@@ -83,6 +98,7 @@ export const endpoints = {
         checkSimulatorAvailability: '/bookings/check_simulator_availability/',
         checkCoachingAvailability: '/bookings/check_coaching_availability/',
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
+        availableSimulatorHours: '/bookings/available-simulator-hours/',
     },
     
     // Simulator endpoints (public)
@@ -114,10 +130,35 @@ export const endpoints = {
         addMember: (id) => `/coaching/purchases/${id}/add_member/`,
         removeMember: (id) => `/coaching/purchases/${id}/remove_member/`,
         usageDetails: (id) => `/coaching/purchases/${id}/usage_details/`,
+        simulatorPackages: '/coaching/simulator-packages/',
+        simulatorPackagesActive: '/coaching/simulator-packages/active/',
+        simulatorPurchases: '/coaching/simulator-purchases/',
+        simulatorPurchaseDetail: (id) => `/coaching/simulator-purchases/${id}/`,
+        mySimulatorPurchases: '/coaching/simulator-purchases/my/',
+        transferableSimulatorPurchases: '/coaching/simulator-purchases/transferable_purchases/',
+        simulatorTransfers: '/coaching/simulator-transfers/',
+        simulatorTransfersPending: '/coaching/simulator-transfers/pending/',
+        simulatorTransferClaim: (id) => `/coaching/simulator-transfers/${id}/claim/`,
     },
 
     ghl: {
         onboard: '/ghlpage/onboard/',
+    },
+    
+    // Special Events endpoints
+    specialEvents: {
+        list: '/special-events/events/',
+        detail: (id) => `/special-events/events/${id}/`,
+        create: '/special-events/events/',
+        update: (id) => `/special-events/events/${id}/`,
+        delete: (id) => `/special-events/events/${id}/`,
+        upcoming: '/special-events/events/upcoming/',
+        register: (id) => `/special-events/events/${id}/register/`,
+        registerUser: (id) => `/special-events/events/${id}/register_user/`,
+        cancelRegistration: (id) => `/special-events/events/${id}/cancel_registration/`,
+        registrations: (id) => `/special-events/events/${id}/registrations/`,
+        updateRegistrationStatus: (id) => `/special-events/events/${id}/update_registration_status/`,
+        myRegistrations: '/special-events/registrations/',
     },
 };
 

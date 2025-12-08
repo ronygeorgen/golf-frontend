@@ -6,6 +6,8 @@ import { Clock, Edit, Trash2, Power, PowerOff, Calendar } from 'lucide-react';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 
@@ -13,6 +15,7 @@ function SimulatorManagement() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
+    const { toast, showSuccess, showError, hideToast } = useToast();
     const { list: simulators, loading } = useAppSelector((state) => state.admin.simulators);
     const modalRef = useRef(null);
     
@@ -24,7 +27,8 @@ function SimulatorManagement() {
         is_active: true,
         is_coaching_bay: false,
         description: '',
-        hourly_price: ''
+        hourly_price: '',
+        redirect_url: ''
     };
     const [formData, setFormData] = useState(defaultFormState);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -69,15 +73,97 @@ function SimulatorManagement() {
         e.preventDefault();
         setSubmitLoading(true);
         try {
+            let result;
             if (editingSimulator) {
-                await dispatch(updateSimulator({ id: editingSimulator.id, simulatorData: formData }));
+                result = await dispatch(updateSimulator({ id: editingSimulator.id, simulatorData: formData }));
             } else {
-                await dispatch(createSimulator(formData));
+                result = await dispatch(createSimulator(formData));
             }
-            setShowForm(false);
-            setEditingSimulator(null);
-            setFormData(defaultFormState);
-            // No need to refetch - Redux already updates the state optimistically
+            
+            // Check if the action was successful or failed
+            if (editingSimulator) {
+                if (updateSimulator.fulfilled.match(result)) {
+                    setShowForm(false);
+                    setEditingSimulator(null);
+                    setFormData(defaultFormState);
+                    showSuccess('Simulator updated successfully');
+                } else if (updateSimulator.rejected.match(result)) {
+                    // Extract error message from DRF validation errors
+                    const payload = result.payload || {};
+                    let errorMessage = 'Failed to update simulator';
+                    
+                    if (typeof payload === 'string') {
+                        errorMessage = payload;
+                    } else if (payload.error) {
+                        errorMessage = payload.error;
+                    } else if (payload.message) {
+                        errorMessage = payload.message;
+                    } else if (payload.detail) {
+                        errorMessage = payload.detail;
+                    } else if (payload.non_field_errors) {
+                        errorMessage = Array.isArray(payload.non_field_errors) 
+                            ? payload.non_field_errors[0] 
+                            : payload.non_field_errors;
+                    } else {
+                        // Check for field-specific errors (e.g., bay_number, name, etc.)
+                        const fieldErrors = Object.keys(payload).find(key => 
+                            Array.isArray(payload[key]) && payload[key].length > 0
+                        );
+                        if (fieldErrors) {
+                            errorMessage = `${fieldErrors}: ${payload[fieldErrors][0]}`;
+                        } else if (Object.keys(payload).length > 0) {
+                            // Try to get first error value
+                            const firstKey = Object.keys(payload)[0];
+                            const firstValue = payload[firstKey];
+                            errorMessage = Array.isArray(firstValue) ? firstValue[0] : String(firstValue);
+                        }
+                    }
+                    
+                    showError(errorMessage);
+                }
+            } else {
+                if (createSimulator.fulfilled.match(result)) {
+                    setShowForm(false);
+                    setEditingSimulator(null);
+                    setFormData(defaultFormState);
+                    showSuccess('Simulator created successfully');
+                } else if (createSimulator.rejected.match(result)) {
+                    // Extract error message from DRF validation errors
+                    const payload = result.payload || {};
+                    let errorMessage = 'Failed to create simulator';
+                    
+                    if (typeof payload === 'string') {
+                        errorMessage = payload;
+                    } else if (payload.error) {
+                        errorMessage = payload.error;
+                    } else if (payload.message) {
+                        errorMessage = payload.message;
+                    } else if (payload.detail) {
+                        errorMessage = payload.detail;
+                    } else if (payload.non_field_errors) {
+                        errorMessage = Array.isArray(payload.non_field_errors) 
+                            ? payload.non_field_errors[0] 
+                            : payload.non_field_errors;
+                    } else {
+                        // Check for field-specific errors (e.g., bay_number, name, etc.)
+                        const fieldErrors = Object.keys(payload).find(key => 
+                            Array.isArray(payload[key]) && payload[key].length > 0
+                        );
+                        if (fieldErrors) {
+                            errorMessage = `${fieldErrors}: ${payload[fieldErrors][0]}`;
+                        } else if (Object.keys(payload).length > 0) {
+                            // Try to get first error value
+                            const firstKey = Object.keys(payload)[0];
+                            const firstValue = payload[firstKey];
+                            errorMessage = Array.isArray(firstValue) ? firstValue[0] : String(firstValue);
+                        }
+                    }
+                    
+                    showError(errorMessage);
+                }
+            }
+        } catch (error) {
+            showError('An unexpected error occurred. Please try again.');
         } finally {
             setSubmitLoading(false);
         }
@@ -91,14 +177,34 @@ function SimulatorManagement() {
             is_active: simulator.is_active,
             is_coaching_bay: simulator.is_coaching_bay,
             description: simulator.description || '',
-            hourly_price: simulator.hourly_price || ''
+            hourly_price: simulator.hourly_price || '',
+            redirect_url: simulator.redirect_url || ''
         });
         setShowForm(true);
     };
 
     const handleToggleActive = async (simulatorId, isActive) => {
-        await dispatch(updateSimulator({ id: simulatorId, simulatorData: { is_active: !isActive } }));
-        // No need to refetch - Redux already updates the state optimistically
+        const result = await dispatch(updateSimulator({ id: simulatorId, simulatorData: { is_active: !isActive } }));
+        if (updateSimulator.rejected.match(result)) {
+            const payload = result.payload || {};
+            let errorMessage = 'Failed to update simulator status';
+            
+            if (typeof payload === 'string') {
+                errorMessage = payload;
+            } else if (payload.error) {
+                errorMessage = payload.error;
+            } else if (payload.message) {
+                errorMessage = payload.message;
+            } else if (payload.detail) {
+                errorMessage = payload.detail;
+            } else if (payload.non_field_errors) {
+                errorMessage = Array.isArray(payload.non_field_errors) 
+                    ? payload.non_field_errors[0] 
+                    : payload.non_field_errors;
+            }
+            
+            showError(errorMessage);
+        }
     };
 
     const handleDelete = async (simulatorId) => {
@@ -110,13 +216,35 @@ function SimulatorManagement() {
             cancelText: 'Cancel',
             showCancel: true,
             onConfirm: async () => {
-                await dispatch(deleteSimulator(simulatorId));
+                const result = await dispatch(deleteSimulator(simulatorId));
+                if (deleteSimulator.rejected.match(result)) {
+                    const payload = result.payload || {};
+                    let errorMessage = 'Failed to delete simulator';
+                    
+                    if (typeof payload === 'string') {
+                        errorMessage = payload;
+                    } else if (payload.error) {
+                        errorMessage = payload.error;
+                    } else if (payload.message) {
+                        errorMessage = payload.message;
+                    } else if (payload.detail) {
+                        errorMessage = payload.detail;
+                    } else if (payload.non_field_errors) {
+                        errorMessage = Array.isArray(payload.non_field_errors) 
+                            ? payload.non_field_errors[0] 
+                            : payload.non_field_errors;
+                    }
+                    
+                    showError(errorMessage);
+                } else if (deleteSimulator.fulfilled.match(result)) {
+                    showSuccess('Simulator deleted successfully');
+                }
             },
         });
     };
 
     return (
-        <div className="max-w-7xl mx-auto">
+        <div>
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <Button 
@@ -200,22 +328,38 @@ function SimulatorManagement() {
                                         </div>
                                     </div>
                                     {!formData.is_coaching_bay && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                                Hourly Price (CAD)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={formData.hourly_price}
-                                                onChange={(e) => setFormData({...formData, hourly_price: e.target.value})}
-                                                required
-                                            />
-                                            <p className="text-xs text-text-secondary mt-1">
-                                                Charge per hour for normal simulator bookings.
-                                            </p>
-                                        </div>
+                                        <>
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                                    Hourly Price (CAD)
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={formData.hourly_price}
+                                                    onChange={(e) => setFormData({...formData, hourly_price: e.target.value})}
+                                                    required
+                                                />
+                                                <p className="text-xs text-text-secondary mt-1">
+                                                    Charge per hour for normal simulator bookings.
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                                    Redirect URL (Optional)
+                                                </label>
+                                                <input
+                                                    type="url"
+                                                    value={formData.redirect_url}
+                                                    onChange={(e) => setFormData({...formData, redirect_url: e.target.value})}
+                                                    placeholder="https://example.com/payment"
+                                                />
+                                                <p className="text-xs text-text-secondary mt-1">
+                                                    URL to redirect users to after paying for a simulator booking. Required for paid simulator bookings.
+                                                </p>
+                                            </div>
+                                        </>
                                     )}
                                     <div className="flex gap-4 pt-4">
                                         <Button 
@@ -271,6 +415,9 @@ function SimulatorManagement() {
                                                 Hourly Price
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Redirect URL
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Type
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -292,6 +439,23 @@ function SimulatorManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {simulator.is_coaching_bay ? '—' : `$${Number(simulator.hourly_price || 0).toFixed(2)}`}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-primary">
+                                                    {simulator.is_coaching_bay ? (
+                                                        <span className="text-text-secondary">—</span>
+                                                    ) : simulator.redirect_url ? (
+                                                        <a 
+                                                            href={simulator.redirect_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="text-primary hover:text-primary-light underline truncate block max-w-xs"
+                                                            title={simulator.redirect_url}
+                                                        >
+                                                            {simulator.redirect_url}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-text-secondary italic">Not set</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
                                                     <Badge status={simulator.is_coaching_bay ? 'personal' : 'pending'}>
@@ -384,6 +548,14 @@ function SimulatorManagement() {
                     onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
                     onClose={closePopup}
                 />
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
+            )}
             </div>
     );
 }

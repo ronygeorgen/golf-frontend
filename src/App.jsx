@@ -13,12 +13,17 @@ import StaffAvailability from './components/StaffAvailability';
 import SimulatorManagement from './components/SimulatorManagement';
 import SimulatorAvailability from './components/SimulatorAvailability';
 import PackageManagement from './components/PackageManagement';
+import SimulatorPackageManagement from './components/SimulatorPackageManagement';
 import UserManagement from './components/UserManagement';
 import CalendarView from './components/CalendarView';
 import AdminLayout from './components/AdminLayout';
 import UserLayout from './components/UserLayout';
 import AdminOverrides from './components/AdminOverrides';
+import SpecialEventsManagement from './components/SpecialEventsManagement';
+import ClosedDaysManagement from './components/ClosedDaysManagement';
+import EventRegistrations from './pages/EventRegistrations';
 import Packages from './pages/Packages';
+import SpecialEvents from './pages/SpecialEvents';
 import PersonalPurchases from './pages/PersonalPurchases';
 import OrganizationPurchases from './pages/OrganizationPurchases';
 import TransferSessions from './pages/TransferSessions';
@@ -141,6 +146,7 @@ function AppContent() {
                 <Route path="coaching-sessions" element={<StaffCoachingSessions />} />
                 <Route path="coaching-sessions/calendar" element={<StaffCoachingSessionsCalendar />} />
                 <Route path="packages" element={<Packages />} />
+                <Route path="special-events" element={<SpecialEvents />} />
                 <Route path="purchases/personal" element={<PersonalPurchases />} />
                 <Route path="purchases/organizations" element={<OrganizationPurchases />} />
                 <Route path="transfers/sessions" element={<TransferSessions />} />
@@ -164,6 +170,10 @@ function AppContent() {
                 <Route path="simulators" element={<SimulatorManagement />} />
                 <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
                 <Route path="packages" element={<PackageManagement />} />
+                <Route path="simulator-packages" element={<SimulatorPackageManagement />} />
+                <Route path="special-events" element={<SpecialEventsManagement />} />
+                <Route path="special-events/:eventId/registrations" element={<EventRegistrations />} />
+                <Route path="closed-days" element={<ClosedDaysManagement />} />
                 <Route path="bookings" element={<BookingManagement />} />
                 <Route path="calendar" element={<CalendarView />} />
                 <Route path="overrides" element={<AdminOverrides />} />

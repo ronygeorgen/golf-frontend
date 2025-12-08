@@ -15,6 +15,7 @@ function Button({
     variant = 'primary',
     type = 'button',
     disabled = false,
+    loading = false,
     className = '',
     onClick,
     ...props
@@ -39,11 +40,12 @@ function Button({
     };
     
     const classes = `${baseClasses} ${variantClasses[variant]} ${className}`;
+    const isDisabled = disabled || loading;
     
     return (
         <button
             type={type}
-            disabled={disabled}
+            disabled={isDisabled}
             onClick={onClick}
             className={classes}
             {...props}

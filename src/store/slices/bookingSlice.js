@@ -206,7 +206,12 @@ export const checkSimulatorAvailability = createAsyncThunk(
                     duration: duration,
                 },
             });
-            return response.data.available_slots || [];
+            return {
+                slots: response.data.available_slots || [],
+                specialEventMessage: response.data.special_event_message || null,
+                message: response.data.message || null, // Include API message
+                error: response.data.error || null, // Include API error if present
+            };
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
         }
@@ -224,7 +229,12 @@ export const checkCoachingAvailability = createAsyncThunk(
             const response = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
                 params: params,
             });
-            return response.data.available_slots || [];
+            return {
+                slots: response.data.available_slots || [],
+                specialEventMessage: response.data.special_event_message || null,
+                message: response.data.message || null, // Include API message
+                error: response.data.error || null, // Include API error if present
+            };
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
         }
@@ -238,6 +248,24 @@ export const getSimulatorCredits = createAsyncThunk(
             const response = await apiClient.get(endpoints.simulators.credits, {
                 params: { status: 'available' },
             });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getAvailableSimulatorHours = createAsyncThunk(
+    'booking/getAvailableSimulatorHours',
+    async ({ use_organization = false } = {}, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams();
+            if (use_organization) params.append('use_organization', 'true');
+            const queryString = params.toString();
+            const url = queryString
+                ? `${endpoints.bookings.availableSimulatorHours}?${queryString}`
+                : endpoints.bookings.availableSimulatorHours;
+            const response = await apiClient.get(url);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -262,11 +290,14 @@ const initialState = {
     availability: {
         simulator: [],
         coaching: [],
+        specialEventMessage: null,
     },
     loading: false,
     error: null,
     simulatorCredits: [],
     creditsLoading: false,
+    totalAvailableHours: 0,
+    availableHoursLoading: false,
 };
 
 // Booking slice
@@ -281,7 +312,7 @@ const bookingSlice = createSlice({
             state.error = null;
         },
         clearAvailability: (state) => {
-            state.availability = { simulator: [], coaching: [] };
+            state.availability = { simulator: [], coaching: [], specialEventMessage: null };
         },
     },
     extraReducers: (builder) => {
@@ -460,7 +491,8 @@ const bookingSlice = createSlice({
             })
             .addCase(checkSimulatorAvailability.fulfilled, (state, action) => {
                 state.loading = false;
-                state.availability.simulator = action.payload;
+                state.availability.simulator = action.payload.slots || [];
+                state.availability.specialEventMessage = action.payload.specialEventMessage || null;
             })
             .addCase(checkSimulatorAvailability.rejected, (state, action) => {
                 state.loading = false;
@@ -471,7 +503,8 @@ const bookingSlice = createSlice({
             })
             .addCase(checkCoachingAvailability.fulfilled, (state, action) => {
                 state.loading = false;
-                state.availability.coaching = action.payload;
+                state.availability.coaching = action.payload.slots || [];
+                state.availability.specialEventMessage = action.payload.specialEventMessage || null;
             })
             .addCase(checkCoachingAvailability.rejected, (state, action) => {
                 state.loading = false;
@@ -489,6 +522,17 @@ const bookingSlice = createSlice({
             })
             .addCase(getSimulatorCredits.rejected, (state, action) => {
                 state.creditsLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getAvailableSimulatorHours.pending, (state) => {
+                state.availableHoursLoading = true;
+            })
+            .addCase(getAvailableSimulatorHours.fulfilled, (state, action) => {
+                state.availableHoursLoading = false;
+                state.totalAvailableHours = action.payload?.total_available_hours || 0;
+            })
+            .addCase(getAvailableSimulatorHours.rejected, (state, action) => {
+                state.availableHoursLoading = false;
                 state.error = action.payload;
             });
     },

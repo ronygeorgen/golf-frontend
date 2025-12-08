@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { createPackagePurchase, createTempPurchase, clearPhoneCheck } from '../store/slices/coachingSlice';
+import { createPackagePurchase, createSimulatorPackagePurchase, createTempPurchase, clearPhoneCheck } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
@@ -14,6 +14,7 @@ function PackagePurchaseModal({
     defaultType = 'normal',
     lockType = false,
     titleText = 'Purchase Package',
+    isSimulatorPackage = false,
 }) {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
@@ -194,16 +195,24 @@ function PackagePurchaseModal({
             }
         } else {
             // No redirect URL - use normal purchase flow
-            const result = await dispatch(createPackagePurchase({
+            const purchaseAction = isSimulatorPackage ? createSimulatorPackagePurchase : createPackagePurchase;
+            const purchasePayload = {
                 packageId,
                 notes: notes.trim() || undefined,
                 purchaseType,
                 recipientPhone: purchaseType === 'gift' ? recipientPhone.trim() : undefined,
                 purchaseName: purchaseName.trim(),
-                memberPhones: purchaseType === 'organization' ? memberPhones.map(m => m.phone) : undefined,
-            }));
+            };
+            
+            // Only add memberPhones for coaching packages (organization type)
+            if (!isSimulatorPackage && purchaseType === 'organization') {
+                purchasePayload.memberPhones = memberPhones.map(m => m.phone);
+            }
+            
+            const result = await dispatch(purchaseAction(purchasePayload));
 
-            if (createPackagePurchase.fulfilled.match(result)) {
+            const fulfilledAction = isSimulatorPackage ? createSimulatorPackagePurchase.fulfilled : createPackagePurchase.fulfilled;
+            if (fulfilledAction.match(result)) {
                 // Reset form state immediately
                 setRecipientPhone('');
                 // setPhoneValidated(false);
@@ -261,11 +270,18 @@ function PackagePurchaseModal({
                             <div className="mb-4 p-3 bg-background rounded-lg">
                                 <h4 className="font-semibold text-text-primary">{packageData.title}</h4>
                                 <p className="text-sm text-text-secondary mt-1">{packageData.description}</p>
-                                <div className="mt-2 flex justify-between text-sm">
-                                    <span className="text-text-secondary">Sessions:</span>
-                                    <span className="font-medium text-text-primary">{packageData.session_count}</span>
-                                </div>
-                                {packageData.simulator_hours > 0 && (
+                                {!isSimulatorPackage && (
+                                    <div className="mt-2 flex justify-between text-sm">
+                                        <span className="text-text-secondary">Sessions:</span>
+                                        <span className="font-medium text-text-primary">{packageData.session_count}</span>
+                                    </div>
+                                )}
+                                {isSimulatorPackage ? (
+                                    <div className="mt-2 flex justify-between text-sm">
+                                        <span className="text-text-secondary">Simulator Hours:</span>
+                                        <span className="font-medium text-text-primary">{packageData.hours} hrs</span>
+                                    </div>
+                                ) : packageData.simulator_hours > 0 && (
                                     <div className="mt-1 flex justify-between text-sm">
                                         <span className="text-text-secondary">Simulator Hours:</span>
                                         <span className="font-medium text-text-primary">{packageData.simulator_hours} hrs</span>
@@ -296,6 +312,7 @@ function PackagePurchaseModal({
                                         Purchase Type
                                     </label>
                                     <div className="space-y-2">
+                                        {/* Normal purchase option */}
                                         <label className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
                                             <input
                                                 type="radio"
@@ -324,20 +341,22 @@ function PackagePurchaseModal({
                                                 <div className="text-sm text-text-secondary">Send this package to someone else</div>
                                             </div>
                                         </label>
-                                        <label className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
-                                            <input
-                                                type="radio"
-                                                name="purchaseType"
-                                                value="organization"
-                                                checked={purchaseType === 'organization'}
-                                                onChange={(e) => setPurchaseType(e.target.value)}
-                                                className="mr-3"
-                                            />
-                                            <div>
-                                                <div className="font-medium text-text-primary">Buy for Group</div>
-                                                <div className="text-sm text-text-secondary">Share this package with multiple members</div>
-                                            </div>
-                                        </label>
+                                        {!isSimulatorPackage && (
+                                            <label className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                                <input
+                                                    type="radio"
+                                                    name="purchaseType"
+                                                    value="organization"
+                                                    checked={purchaseType === 'organization'}
+                                                    onChange={(e) => setPurchaseType(e.target.value)}
+                                                    className="mr-3"
+                                                />
+                                                <div>
+                                                    <div className="font-medium text-text-primary">Buy for Group</div>
+                                                    <div className="text-sm text-text-secondary">Share this package with multiple members</div>
+                                                </div>
+                                            </label>
+                                        )}
                                     </div>
                                 </div>
                             )}

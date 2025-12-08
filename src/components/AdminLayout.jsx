@@ -17,7 +17,9 @@ import {
     ChevronDown,
     Home,
     Settings,
-    UserCog
+    UserCog,
+    Clock,
+    CalendarOff
 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
@@ -69,7 +71,10 @@ function AdminLayout() {
                 { path: '/admin/users', label: 'Manage Users', icon: UserCog },
                 { path: '/admin/staff', label: 'Manage Staff', icon: Users },
                 { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
-                { path: '/admin/packages', label: 'Manage Packages', icon: Package },
+                { path: '/admin/packages', label: 'Manage Coaching/Combo Packages', icon: Package },
+                { path: '/admin/simulator-packages', label: 'Manage Simulator Only Packages', icon: Clock },
+                { path: '/admin/special-events', label: 'Manage Special Events', icon: CalendarDays },
+                { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },
             ]
         },
         bookings: {
@@ -191,7 +196,7 @@ function AdminLayout() {
 
                                 {/* Manage Dropdown Menu */}
                                 {manageMenuOpen && (
-                                    <div className="absolute top-full left-0 mt-1 w-56 bg-surface rounded-card shadow-card border border-border py-2 z-[60]">
+                                    <div className="absolute top-full left-0 mt-1 min-w-56 w-auto bg-surface rounded-card shadow-card border border-border py-2 z-[60] whitespace-nowrap">
                                         {navigationItems.manage.items.map((item) => {
                                             const active = isActive(item.path);
                                             return (
@@ -204,8 +209,10 @@ function AdminLayout() {
                                                             : 'text-text-primary hover:bg-background'
                                                     }`}
                                                 >
-                                                    <item.icon className="w-4 h-4" />
-                                                    <span>{item.label}</span>
+                                                    <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                                                        <item.icon className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="text-left flex-1">{item.label}</span>
                                                 </button>
                                             );
                                         })}
@@ -447,13 +454,11 @@ function AdminLayout() {
             {/* Main Content */}
             <main className="min-h-[calc(100vh-64px)]">
                 <div className="px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8 pt-4 md:pt-6 w-full">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Page Title */}
-                        <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-6">
-                            {getPageTitle()}
-                        </h1>
-                        <Outlet />
-                    </div>
+                    {/* Page Title */}
+                    <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-6">
+                        {getPageTitle()}
+                    </h1>
+                    <Outlet />
                 </div>
             </main>
         </div>

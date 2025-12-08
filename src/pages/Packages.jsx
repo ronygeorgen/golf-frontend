@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
     getActiveCoachingPackages,
+    getActiveSimulatorPackages,
     getMyPackagePurchases,
+    getMySimulatorPurchases,
     getGiftsPending,
     getTransfersPending,
     getMyOrganizationPurchases,
@@ -21,17 +23,24 @@ import Badge from '../components/ui/Badge';
 function Packages() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { 
         packages, 
+        simulatorPackages,
         purchases, 
+        simulatorPurchases,
         purchasesPagination,
         organizationPurchases,
         organizationPurchasesPagination,
         loading, 
+        simulatorPackagesLoading,
         purchasesLoading, 
         organizationPurchasesLoading 
     } = useAppSelector((state) => state.coaching);
 
+    // Get view mode from URL params, default to 'view-packages'
+    const viewMode = searchParams.get('view') === 'purchases' ? 'manage-purchases' : 'view-packages';
+    const [packageFilter, setPackageFilter] = useState('all'); // 'all', 'coaching', 'simulator', 'combo'
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState('normal');
     const [selectedPackageId, setSelectedPackageId] = useState(null);
@@ -43,14 +52,18 @@ function Packages() {
 
     useEffect(() => {
         dispatch(getActiveCoachingPackages());
+        dispatch(getActiveSimulatorPackages());
         dispatch(getMyPackagePurchases({ page: 1 }));
+        dispatch(getMySimulatorPurchases({ page: 1 }));
         dispatch(getMyOrganizationPurchases({ page: 1 }));
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
     }, [dispatch]);
 
 
-    const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId);
+    const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId) 
+        || (simulatorPackages || []).find((pkg) => pkg.id === selectedPackageId);
+    const isSimulatorPackage = (simulatorPackages || []).some((pkg) => pkg.id === selectedPackageId);
 
     const handleOpenModal = (pkgId, type) => {
         setSelectedPackageId(pkgId);
@@ -90,53 +103,110 @@ function Packages() {
         setSelectedPurchaseForDetails(null);
     };
 
+    // Filter packages based on selected filter
+    const getFilteredPackages = () => {
+        if (packageFilter === 'all') {
+            return packages;
+        } else if (packageFilter === 'coaching') {
+            // Coaching packages (no simulator hours)
+            return packages.filter(pkg => !pkg.simulator_hours || parseFloat(pkg.simulator_hours) === 0);
+        } else if (packageFilter === 'combo') {
+            // Combo packages (have simulator hours)
+            return packages.filter(pkg => pkg.simulator_hours && parseFloat(pkg.simulator_hours) > 0);
+        }
+        return [];
+    };
+
+    const getFilteredSimulatorPackages = () => {
+        if (packageFilter === 'all' || packageFilter === 'simulator') {
+            return simulatorPackages || [];
+        }
+        return [];
+    };
+
+    const filteredPackages = getFilteredPackages();
+    const filteredSimulatorPackages = getFilteredSimulatorPackages();
+    const hasAnyPackages = filteredPackages.length > 0 || filteredSimulatorPackages.length > 0;
+
     return (
         <div className="p-4 md:p-6 lg:p-8 space-y-8">
+            {/* Header */}
             <div className="bg-surface rounded-card shadow-card p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-text-primary">Packages & Gifts</h1>
-                        <p className="text-text-secondary mt-1">
-                            Buy packages for yourself, gift entire packages, or share sessions from your existing purchases.
-                        </p>
-                    </div>
+                <div className="mb-6">
+                    <h1 className="text-2xl font-bold text-text-primary">Packages & Gifts</h1>
+                    <p className="text-text-secondary mt-1">
+                        {viewMode === 'view-packages' 
+                            ? 'Buy packages for yourself, gift entire packages, or share sessions from your existing purchases.'
+                            : 'Manage your purchased packages, transfer sessions, and claim gifts.'}
+                    </p>
                 </div>
 
-                {loading && (
-                    <div className="grid gap-6 md:grid-cols-2">
-                        {Array.from({ length: 4 }).map((_, idx) => (
-                            <div key={idx} className="rounded-card p-5 shadow-card bg-surface space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1 pr-4">
-                                        <Skeleton height="24px" width="70%" className="mb-2" />
-                                        <Skeleton height="16px" width="90%" />
-                                    </div>
-                                    <div className="text-right space-y-2">
-                                        <Skeleton height="28px" width="80px" />
-                                        <Skeleton height="16px" width="60px" />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Skeleton height="16px" width="60%" />
-                                    <Skeleton height="16px" width="80%" />
-                                </div>
-                                <div className="flex flex-col gap-3">
-                                    <Skeleton height="44px" />
-                                    <Skeleton height="44px" />
-                                </div>
+                {viewMode === 'view-packages' && (
+                    <>
+                        {/* Filter Toggles */}
+                        <div className="mb-6">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium text-text-secondary mr-2">Filter:</span>
+                                {[
+                                    { id: 'all', label: 'All Packages' },
+                                    { id: 'coaching', label: 'Coaching Packages' },
+                                    { id: 'simulator', label: 'Simulator Only Packages' },
+                                    { id: 'combo', label: 'Combo Packages' },
+                                ].map((filter) => (
+                                    <button
+                                        key={filter.id}
+                                        onClick={() => setPackageFilter(filter.id)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                            packageFilter === filter.id
+                                                ? 'bg-primary text-white shadow-md'
+                                                : 'bg-background text-text-secondary hover:bg-background/80 border border-border'
+                                        }`}
+                                    >
+                                        {filter.label}
+                                    </button>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
+                        </div>
 
-                {!loading && packages.length === 0 && (
-                    <div className="text-center py-6 text-text-secondary">
-                        No active packages available at the moment.
-                    </div>
-                )}
+                        {loading && (
+                            <div className="grid gap-6 md:grid-cols-2">
+                                {Array.from({ length: 4 }).map((_, idx) => (
+                                    <div key={idx} className="rounded-card p-5 shadow-card bg-surface space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 pr-4">
+                                                <Skeleton height="24px" width="70%" className="mb-2" />
+                                                <Skeleton height="16px" width="90%" />
+                                            </div>
+                                            <div className="text-right space-y-2">
+                                                <Skeleton height="28px" width="80px" />
+                                                <Skeleton height="16px" width="60px" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Skeleton height="16px" width="60%" />
+                                            <Skeleton height="16px" width="80%" />
+                                        </div>
+                                        <div className="flex flex-col gap-3">
+                                            <Skeleton height="44px" />
+                                            <Skeleton height="44px" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {packages.map((pkg) => {
+                        {!loading && !simulatorPackagesLoading && !hasAnyPackages && (
+                            <div className="text-center py-6 text-text-secondary">
+                                {packageFilter === 'all' 
+                                    ? 'No active packages available at the moment.'
+                                    : `No ${packageFilter === 'coaching' ? 'coaching' : packageFilter === 'simulator' ? 'simulator only' : 'combo'} packages available.`}
+                            </div>
+                        )}
+
+                        {!loading && !simulatorPackagesLoading && hasAnyPackages && (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {/* Coaching/Combo Packages */}
+                        {filteredPackages.map((pkg) => {
                         const ownedSessions = purchases
                             .filter((purchase) => purchase.package === pkg.id)
                             .reduce((total, purchase) => total + (purchase.sessions_remaining || 0), 0);
@@ -224,22 +294,87 @@ function Packages() {
                                 </div>
                             </div>
                         );
-                    })}
-                </div>
+                        })}
+                        {/* Simulator-Only Packages */}
+                        {filteredSimulatorPackages.map((pkg) => {
+                            return (
+                                <div 
+                                    key={`sim-${pkg.id}`} 
+                                    className="rounded-card shadow-card bg-surface border border-border hover:shadow-card-hover transition-all duration-200 flex flex-col"
+                                >
+                                    {/* Header Section with Price */}
+                                    <div className="bg-gradient-to-br from-accent/5 to-accent-light/5 p-4 border-b border-border">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex-1 pr-3 min-w-0">
+                                                <h3 className="text-lg font-bold text-text-primary mb-1 line-clamp-1">{pkg.title}</h3>
+                                                {pkg.description && (
+                                                    <p className="text-xs text-text-secondary line-clamp-2">{pkg.description}</p>
+                                                )}
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
+                                                <p className="text-xs text-text-secondary mt-0.5">One-time</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Package Stats */}
+                                        <div className="flex items-center gap-3 pt-2 border-t border-border/50 flex-wrap">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
+                                                <span className="text-xs font-medium text-text-primary">{pkg.hours} Simulator Hours</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Content Section */}
+                                    <div className="p-4 flex-1 flex flex-col">
+                                        <div className="mb-3">
+                                            <p className="text-xs text-text-secondary">
+                                                Simulator-only package. Hours can be used for simulator bookings only.
+                                            </p>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="grid grid-cols-2 gap-2 mt-auto">
+                                            <Button
+                                                onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                                variant="primary"
+                                                className="w-full py-2 text-sm"
+                                            >
+                                                Buy for Myself
+                                            </Button>
+                                            <Button
+                                                onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                variant="accent"
+                                                className="w-full py-2 text-sm"
+                                            >
+                                                Gift Package
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        </div>
+                        )}
+                    </>
+                )}
             </div>
 
+            {/* Manage Purchased Packages View */}
+            {viewMode === 'manage-purchases' && (
+                <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="space-y-6">
+                            <SessionTransfer />
+                        </div>
+                        <div className="space-y-6 flex flex-col">
+                            <GiftClaim />
+                            <TransferClaim />
+                        </div>
+                    </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                    <SessionTransfer />
-                </div>
-                <div className="space-y-6 flex flex-col">
-                    <GiftClaim />
-                    <TransferClaim />
-                </div>
-            </div>
-
-            <div className="bg-surface rounded-card shadow-card p-6">
+                    <div className="bg-surface rounded-card shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold text-text-primary">My Package Purchases</h2>
                     <div className="flex items-center gap-3">
@@ -275,10 +410,11 @@ function Packages() {
                             </div>
                         ))}
                     </div>
-                ) : purchases.length === 0 ? (
+                ) : purchases.length === 0 && simulatorPurchases.length === 0 ? (
                     <div className="text-center text-text-secondary py-6">You haven&apos;t purchased any packages yet.</div>
                 ) : (
                     <div className="grid gap-4">
+                        {/* Coaching Package Purchases */}
                         {purchases
                             .slice(0, previewLimit)
                             .map((purchase) => {
@@ -318,12 +454,47 @@ function Packages() {
                                 </div>
                             );
                         })}
+                        {/* Simulator Package Purchases */}
+                        {simulatorPurchases
+                            .slice(0, previewLimit)
+                            .map((purchase) => {
+                            const isGift = purchase.purchase_type === 'gift';
+                            const owner = purchase.original_owner_details;
+                            return (
+                                <div key={`sim-${purchase.id}`} className="rounded-card p-4 bg-surface shadow-card border-l-4 border-accent">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
+                                            <p className="text-sm text-text-secondary">
+                                                Package: {purchase.package_details?.title || 'Simulator Package'}
+                                            </p>
+                                            <p className="text-sm text-text-secondary">
+                                                Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
+                                            </p>
+                                            {isGift && owner && (
+                                                <p className="text-sm text-accent mt-1">
+                                                    Gifted by {owner.first_name} {owner.last_name}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col items-end text-right space-y-1">
+                                            <Badge status={isGift ? 'pending' : 'personal'}>
+                                                {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
+                                            </Badge>
+                                            <span className="text-xs text-text-secondary">
+                                                Purchased on {new Date(purchase.purchased_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
-            </div>
+                    </div>
 
-            {/* Organization Purchases Section */}
-            <div className="bg-surface rounded-card shadow-card p-6">
+                    {/* Organization Purchases Section */}
+                    <div className="bg-surface rounded-card shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="text-xl font-bold text-text-primary">My Group Purchases</h2>
@@ -419,13 +590,16 @@ function Packages() {
                         })}
                     </div>
                 )}
-            </div>
+                    </div>
+                </>
+            )}
 
             <PackagePurchaseModal
                 isOpen={modalOpen}
                 onClose={handleCloseModal}
                 packageId={selectedPackageId}
                 packageData={selectedPackage}
+                isSimulatorPackage={isSimulatorPackage}
                 onSuccess={handlePurchaseSuccess}
                 defaultType={modalType}
                 lockType={true}
