@@ -446,45 +446,47 @@ function ClientPortal() {
                         {/* Tabs */}
                         <div className="bg-surface rounded-card shadow-card mb-6">
                             <div className="border-b border-border">
-                                <nav className="flex -mb-px">
-                                    {[
-                                        { id: 'bookings', label: 'Bookings' },
-                                        { id: 'gifts', label: 'Gifts', pending: giftsPending?.length || 0 },
-                                        { id: 'transfers', label: 'Transfers', pending: transfersPending?.length || 0 },
-                                        { id: 'send-transfer', label: 'Send Transfer' },
-                                    ].map((tab) => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setActiveTab(tab.id)}
-                                            className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
-                                                activeTab === tab.id
-                                                    ? 'border-primary text-primary bg-primary/5'
-                                                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border hover:bg-background'
-                                            }`}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                {tab.label}
-                                                {tab.pending > 0 && (
-                                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-status-pending-text bg-status-pending-bg border border-status-pending-text/20 rounded-full px-2 py-0.5">
-                                                        <svg
-                                                            className="w-3 h-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M12 8v4l2.5 2.5M12 22a10 10 0 100-20 10 10 0 000 20z"
-                                                            />
-                                                        </svg>
-                                                        {tab.pending}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </button>
-                                    ))}
+                                <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
+                                    <div className="flex min-w-full md:min-w-0">
+                                        {[
+                                            { id: 'bookings', label: 'Bookings' },
+                                            { id: 'gifts', label: 'Gifts', pending: giftsPending?.length || 0 },
+                                            { id: 'transfers', label: 'Transfers', pending: transfersPending?.length || 0 },
+                                            { id: 'send-transfer', label: 'Send Transfer' },
+                                        ].map((tab) => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setActiveTab(tab.id)}
+                                                className={`px-3 sm:px-4 md:px-6 py-3 text-xs sm:text-sm font-medium border-b-2 transition whitespace-nowrap flex-shrink-0 ${
+                                                    activeTab === tab.id
+                                                        ? 'border-primary text-primary bg-primary/5'
+                                                        : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border hover:bg-background'
+                                                }`}
+                                            >
+                                                <span className="flex items-center gap-1 sm:gap-2">
+                                                    {tab.label}
+                                                    {tab.pending > 0 && (
+                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-status-pending-text bg-status-pending-bg border border-status-pending-text/20 rounded-full px-1.5 sm:px-2 py-0.5">
+                                                            <svg
+                                                                className="w-2.5 h-2.5 sm:w-3 sm:h-3"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                viewBox="0 0 24 24"
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    strokeWidth={2}
+                                                                    d="M12 8v4l2.5 2.5M12 22a10 10 0 100-20 10 10 0 000 20z"
+                                                                />
+                                                            </svg>
+                                                            {tab.pending}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </nav>
                             </div>
                         </div>

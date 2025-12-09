@@ -163,30 +163,30 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         {!coachId && (
                             <div className="flex flex-col gap-4 w-full md:w-auto">
                                 {/* Calendar Type Toggle */}
-                                <div className="flex items-center justify-between gap-4 bg-background rounded-2xl p-2 shadow-inner">
+                                <div className="flex items-center justify-between gap-2 sm:gap-4 bg-background rounded-2xl p-1.5 sm:p-2 shadow-inner">
                                     <button
                                         onClick={() => setCalendarType('simulator')}
-                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${
                                             calendarType === 'simulator'
                                                 ? 'bg-primary-light text-white shadow-md scale-[1.02]'
                                                 : 'text-text-secondary hover:bg-surface'
                                         }`}
                                         title="Normal Simulator Calendar"
                                     >
-                                        <span className="w-3 h-3 rounded-full bg-primary-light"></span>
-                                        <span className="hidden sm:inline">Simulators</span>
+                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary-light flex-shrink-0"></span>
+                                        <span className="text-xs sm:text-sm font-medium">Simulators</span>
                                     </button>
                                     <button
                                         onClick={() => setCalendarType('coaching')}
-                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${
                                             calendarType === 'coaching'
                                                 ? 'bg-primary text-white shadow-md scale-[1.02]'
                                                 : 'text-text-secondary hover:bg-surface'
                                         }`}
                                         title="Coaching Simulator Calendar"
                                     >
-                                        <span className="w-3 h-3 rounded-full bg-primary"></span>
-                                        <span className="hidden sm:inline">Coaching</span>
+                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary flex-shrink-0"></span>
+                                        <span className="text-xs sm:text-sm font-medium">Coaching</span>
                                     </button>
                                 </div>
                             </div>

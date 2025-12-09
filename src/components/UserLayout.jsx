@@ -55,8 +55,8 @@ function UserLayout() {
         <div className="min-h-screen bg-background">
             {/* Header */}
             <header className="bg-surface shadow-sm border-b border-border sticky top-0 z-50 w-full">
-                <div className="w-full px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-14">
+                <div className="max-w-full px-4 sm:px-6 lg:px-8 mx-auto">
+                    <div className="flex items-center justify-between h-14 w-full">
                         {/* Left side - Logo/Title */}
                         <div className="flex items-center space-x-2 md:space-x-4">
                             <div className="bg-white p-1 rounded-md">
