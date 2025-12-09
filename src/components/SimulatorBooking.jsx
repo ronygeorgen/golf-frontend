@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours } from '../store/slices/bookingSlice';
 import PopupMessage from './PopupMessage';
@@ -28,10 +28,83 @@ function SimulatorBooking() {
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [usePrepaidHours, setUsePrepaidHours] = useState(null); // null = not selected, true = use prepaid, false = pay
     
+    // Step management: 'form' -> 'slots' -> 'payment'
+    const [currentStep, setCurrentStep] = useState('form');
+    
+    // Store previous data for back navigation
+    const [previousDate, setPreviousDate] = useState('');
+    const [previousDuration, setPreviousDuration] = useState(60);
+    
+    // Calculate price based on duration and hourly_price
+    const calculatePrice = () => {
+        if (!availability.hourly_price) return null;
+        const hours = duration / 60;
+        return (availability.hourly_price * hours).toFixed(2);
+    };
+    
+    const calculatedPrice = calculatePrice();
+    
     useEffect(() => {
         dispatch(getSimulatorCredits());
         dispatch(getAvailableSimulatorHours({ use_organization: true }));
     }, [dispatch]);
+    
+    // Debug: Log totalAvailableHours when it changes
+    useEffect(() => {
+        console.log('📊 Total Available Hours State:', {
+            totalAvailableHours,
+            availableHoursLoading,
+            hasHours: totalAvailableHours > 0
+        });
+    }, [totalAvailableHours, availableHoursLoading]);
+    
+    // Clear slots when date or duration changes (only if we're on form step)
+    const prevDateRef = useRef(date);
+    const prevDurationRef = useRef(duration);
+    
+    useEffect(() => {
+        // Only clear if date or duration actually changed (not on initial mount)
+        const dateChanged = prevDateRef.current !== date;
+        const durationChanged = prevDurationRef.current !== duration;
+        
+        if ((dateChanged || durationChanged) && currentStep === 'form') {
+            // Only clear if we had previous values (not initial mount)
+            if (prevDateRef.current || prevDurationRef.current !== 60) {
+                dispatch(clearAvailability());
+                setSelectedSlot(null);
+                setUsePrepaidHours(null);
+                setCurrentStep('form');
+            }
+        }
+        
+        prevDateRef.current = date;
+        prevDurationRef.current = duration;
+    }, [date, duration, dispatch, currentStep]);
+    
+    // Move to slots step when slots are fetched
+    useEffect(() => {
+        if (availability.simulator && availability.simulator.length > 0 && currentStep === 'form') {
+            setCurrentStep('slots');
+        }
+        
+        // Debug: Log availability state to check hourly_price
+        if (availability.simulator && availability.simulator.length > 0) {
+            console.log('📊 Availability State:', {
+                slots_count: availability.simulator.length,
+                hourly_price: availability.hourly_price,
+                has_hourly_price: !!availability.hourly_price,
+                hourly_price_type: typeof availability.hourly_price
+            });
+        }
+    }, [availability.simulator, availability.hourly_price, currentStep]);
+    
+    // Refetch available hours when moving to payment step to ensure we have latest data
+    useEffect(() => {
+        if (currentStep === 'payment' && selectedSlot) {
+            console.log('🔄 Refetching available hours for payment step...');
+            dispatch(getAvailableSimulatorHours({ use_organization: true }));
+        }
+    }, [currentStep, selectedSlot, dispatch]);
 
     const checkAvailability = async () => {
         if (!date) {
@@ -42,6 +115,10 @@ function SimulatorBooking() {
             });
             return;
         }
+
+        // Store current values for back navigation
+        setPreviousDate(date);
+        setPreviousDuration(duration);
 
         // Clear selected slot and reset availability before checking
         setSelectedSlot(null);
@@ -55,6 +132,15 @@ function SimulatorBooking() {
         if (checkSimulatorAvailability.fulfilled.match(result)) {
             const payload = result.payload || {};
             const slots = payload.slots || [];
+            
+            // Debug: Log the API response to check hourly_price
+            console.log('📊 Availability API Response:', {
+                slots_count: slots.length,
+                hourly_price: payload.hourly_price,
+                has_hourly_price: !!payload.hourly_price,
+                payload_keys: Object.keys(payload)
+            });
+            
             // Show message from API if available (e.g., "No simulators available for this day")
             // Priority: message > error > specialEventMessage > default message
             if (payload.message) {
@@ -69,6 +155,7 @@ function SimulatorBooking() {
                 // If no slots and no messages, show a default message
                 showError('No available time slots found for the selected date. Please try a different date.');
             }
+            // Step will be updated by useEffect when slots are available
         } else if (checkSimulatorAvailability.rejected.match(result)) {
             // Handle rejected case (API error)
             const errorMessage = result.payload?.error || 
@@ -135,6 +222,7 @@ function SimulatorBooking() {
         const isCurrentlySelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
         if (isCurrentlySelected) {
             setSelectedSlot(null);
+            setCurrentStep('slots');
             return;
         }
         
@@ -142,12 +230,47 @@ function SimulatorBooking() {
         const startTime = new Date(slot.start_time);
         const endTime = new Date(startTime.getTime() + duration * 60000); // Add duration in milliseconds
         
+        // Calculate total payable amount
+        let totalPayableAmount = null;
+        if (availability.hourly_price) {
+            const hours = duration / 60;
+            totalPayableAmount = (availability.hourly_price * hours).toFixed(2);
+            console.log('💰 Total Payable Amount:', {
+                hourly_price: availability.hourly_price,
+                duration_minutes: duration,
+                duration_hours: hours.toFixed(2),
+                total_amount: `$${totalPayableAmount}`
+            });
+        } else {
+            console.log('💰 Total Payable Amount: Hourly price not available');
+        }
+        
         setSelectedSlot({
             ...slot,
             start_time: startTime.toISOString(),
             end_time: endTime.toISOString(),
             duration_minutes: duration
         });
+        
+        // Move to payment step
+        setCurrentStep('payment');
+    };
+    
+    const handleBack = () => {
+        if (currentStep === 'payment') {
+            // Go back to slots
+            setSelectedSlot(null);
+            setUsePrepaidHours(null);
+            setCurrentStep('slots');
+        } else if (currentStep === 'slots') {
+            // Go back to form, restore previous values if available
+            if (previousDate) setDate(previousDate);
+            if (previousDuration) setDuration(previousDuration);
+            dispatch(clearAvailability());
+            setSelectedSlot(null);
+            setUsePrepaidHours(null);
+            setCurrentStep('form');
+        }
     };
 
     const handleBooking = async () => {
@@ -269,6 +392,9 @@ function SimulatorBooking() {
             setSelectedSlot(null);
             setBookingSuccess(true);
             setUsePrepaidHours(null); // Reset selection
+            setCurrentStep('form'); // Reset to form step
+            setDate(''); // Clear date
+            setDuration(60); // Reset duration
             dispatch(getSimulatorCredits());
             dispatch(getAvailableSimulatorHours({ use_organization: true }));
             showSuccess('Booking confirmed successfully!');
@@ -301,7 +427,12 @@ function SimulatorBooking() {
                 <h3 className="text-2xl font-bold text-status-confirmed-text mb-2">Booking Confirmed!</h3>
                 <p className="text-text-secondary mb-6">Your simulator session has been booked successfully.</p>
                 <Button 
-                    onClick={() => setBookingSuccess(false)}
+                    onClick={() => {
+                        setBookingSuccess(false);
+                        setCurrentStep('form');
+                        setDate('');
+                        setDuration(60);
+                    }}
                     variant="primary"
                 >
                     Book Another Session
@@ -312,80 +443,88 @@ function SimulatorBooking() {
 
     return (
         <div className="space-y-6">
-            <div className="bg-surface rounded-card shadow-card p-6">
-                <h2 className="text-xl font-bold text-text-primary mb-2">Book Simulator Session</h2>
-                <p className="text-sm text-text-secondary mb-4">
-                    We'll automatically assign the optimal bay at confirmation. Simulator bookings can be cancelled up to 24 hours out without penalty—inside that window you'll need an admin override.
-                </p>
-                <div className="mb-4 p-4 bg-primary-light/10 border border-primary/20 rounded-card text-sm text-primary">
-                    <p className="font-semibold">Refund policy</p>
-                    <p>
-                        Cancelling at least 24 hours in advance converts your payment into a simulator credit so you can rebook later at no charge.
+            {/* Form Step */}
+            {currentStep === 'form' && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <h2 className="text-xl font-bold text-text-primary mb-2">Book Simulator Session</h2>
+                    <p className="text-sm text-text-secondary mb-4">
+                        We'll automatically assign the optimal bay at confirmation. Simulator bookings can be cancelled up to 24 hours out without penalty—inside that window you'll need an admin override.
                     </p>
-                </div>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Date
-                        </label>
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            min={new Date().toISOString().split('T')[0]}
-                        />
+                    <div className="mb-4 p-4 bg-primary-light/10 border border-primary/20 rounded-card text-sm text-primary">
+                        <p className="font-semibold">Refund policy</p>
+                        <p>
+                            Cancelling at least 24 hours in advance converts your payment into a simulator credit so you can rebook later at no charge.
+                        </p>
                     </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Duration
-                        </label>
-                        <select 
-                            value={duration} 
-                            onChange={(e) => {
-                                setDuration(parseInt(e.target.value));
-                                setSelectedSlot(null); // Reset selected slot when duration changes
-                            }}
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Date
+                            </label>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Duration
+                            </label>
+                            <select 
+                                value={duration} 
+                                onChange={(e) => {
+                                    setDuration(parseInt(e.target.value));
+                                    setSelectedSlot(null); // Reset selected slot when duration changes
+                                }}
+                            >
+                                <option value={60}>1 hour</option>
+                                <option value={120}>2 hours</option>
+                                <option value={180}>3 hours</option>
+                            </select>
+                        </div>
+                        
+                        <Button 
+                            onClick={checkAvailability} 
+                            disabled={loading}
+                            variant="primary"
+                            className="w-full py-3"
                         >
-                            <option value={30}>30 minutes</option>
-                            <option value={60}>1 hour</option>
-                            <option value={120}>2 hours</option>
-                            <option value={180}>3 hours</option>
-                        </select>
+                            {loading ? 'Checking Availability...' : 'Check Availability'}
+                        </Button>
                     </div>
-                    
-                    <Button 
-                        onClick={checkAvailability} 
-                        disabled={loading}
-                        variant="primary"
-                        className="w-full py-3"
-                    >
-                        {loading ? 'Checking Availability...' : 'Check Availability'}
-                    </Button>
-                </div>
-            </div>
-
-            {availability.specialEventMessage && (
-                <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-6">
-                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
                 </div>
             )}
-            {availability.simulator && availability.simulator.length > 0 && (
+
+            {/* Slots Step */}
+            {currentStep === 'slots' && availability.simulator && availability.simulator.length > 0 && (
                 <div className="bg-surface rounded-card shadow-card p-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                        <h3 className="text-xl font-bold text-text-primary">Available Time Slots</h3>
-                        <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
-                            <span className="font-medium">Book simulator sessions for</span>
-                            <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
-                                {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
-                            </span>
-                            <span className="text-text-secondary/50">|</span>
-                            <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
-                                {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
-                            </span>
-                        </div>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">Available Time Slots</h2>
+                        <Button 
+                            onClick={handleBack}
+                            variant="secondary"
+                            className="flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+                    <div className="mb-4 text-sm text-text-secondary flex flex-wrap items-center gap-2">
+                        <span className="font-medium">Book simulator sessions for</span>
+                        <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
+                            {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
+                        </span>
+                        <span className="text-text-secondary/50">|</span>
+                        <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
+                            {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {availability.simulator.map((slot, index) => {
                             // Check if this slot is selected (compare by start_time since that's unique)
                             const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
@@ -430,59 +569,80 @@ function SimulatorBooking() {
                             );
                         })}
                     </div>
+                </div>
+            )}
+
+            {/* Payment Step */}
+            {currentStep === 'payment' && selectedSlot && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">Payment Method</h2>
+                        <Button 
+                            onClick={handleBack}
+                            variant="secondary"
+                            className="flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
+                    </div>
                     
-                    {selectedSlot && (
-                        <>
-                            <div className="bg-status-personal-bg border border-status-personal-text/20 rounded-card p-4 mb-4">
-                                <div className="space-y-3">
-                                    <div>
-                                        <p className="text-status-personal-text font-semibold mb-2">
-                                            Payment Method
-                                        </p>
-                                        {totalAvailableHours > 0 ? (
-                                            <p className="text-sm text-status-personal-text/80 mb-3">
-                                                You have {totalAvailableHours.toFixed(2)} pre-paid simulator hour{totalAvailableHours !== 1 ? 's' : ''} available
-                                            </p>
-                                        ) : (
-                                            <p className="text-sm text-text-secondary mb-3">
-                                                No pre-paid hours available. You can pay for this session.
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        {totalAvailableHours > 0 && (
-                                            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
-                                                <input 
-                                                    type="radio" 
-                                                    name="paymentMethod"
-                                                    className="h-4 w-4 text-status-personal-text"
-                                                    checked={usePrepaidHours === true}
-                                                    onChange={() => setUsePrepaidHours(true)}
-                                                    disabled={availableHoursLoading}
-                                                />
-                                                <div className="flex-1">
-                                                    <div className="font-medium text-text-primary">Use Pre-paid Hours</div>
-                                                    <div className="text-xs text-text-secondary">Use {totalAvailableHours.toFixed(2)} available hours</div>
-                                                </div>
-                                            </label>
-                                        )}
-                                        <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
-                                            <input 
-                                                type="radio" 
-                                                name="paymentMethod"
-                                                className="h-4 w-4 text-primary"
-                                                checked={usePrepaidHours === false}
-                                                onChange={() => setUsePrepaidHours(false)}
-                                            />
-                                            <div className="flex-1">
-                                                <div className="font-medium text-text-primary">Pay for Session</div>
-                                                <div className="text-xs text-text-secondary">Pay at standard simulator rate</div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
+                    <div className="bg-status-personal-bg border border-status-personal-text/20 rounded-card p-4 mb-4">
+                        <div className="space-y-3">
+                            <div>
+                                <p className="text-status-personal-text font-semibold mb-2">
+                                    Payment Method
+                                </p>
+                                {availableHoursLoading ? (
+                                    <p className="text-sm text-text-secondary mb-3">
+                                        Loading available hours...
+                                    </p>
+                                ) : totalAvailableHours > 0 ? (
+                                    <p className="text-sm text-status-personal-text/80 mb-3">
+                                        You have {totalAvailableHours.toFixed(2)} pre-paid simulator hour{totalAvailableHours !== 1 ? 's' : ''} available
+                                    </p>
+                                ) : (
+                                    <p className="text-sm text-text-secondary mb-3">
+                                        No pre-paid hours available. You can pay for this session.
+                                    </p>
+                                )}
                             </div>
-                            <div className="bg-background rounded-card p-6">
+                            <div className="space-y-2">
+                                {totalAvailableHours > 0 && (
+                                    <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                        <input 
+                                            type="radio" 
+                                            name="paymentMethod"
+                                            className="h-4 w-4 text-status-personal-text"
+                                            checked={usePrepaidHours === true}
+                                            onChange={() => setUsePrepaidHours(true)}
+                                            disabled={availableHoursLoading}
+                                        />
+                                        <div className="flex-1">
+                                            <div className="font-medium text-text-primary">Use Pre-paid Hours</div>
+                                            <div className="text-xs text-text-secondary">Use {totalAvailableHours.toFixed(2)} available hours</div>
+                                        </div>
+                                    </label>
+                                )}
+                                <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                    <input 
+                                        type="radio" 
+                                        name="paymentMethod"
+                                        className="h-4 w-4 text-primary"
+                                        checked={usePrepaidHours === false}
+                                        onChange={() => setUsePrepaidHours(false)}
+                                    />
+                                    <div className="flex-1">
+                                        <div className="font-medium text-text-primary">Pay for Session</div>
+                                        <div className="text-xs text-text-secondary">Pay at standard simulator rate</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-background rounded-card p-6">
                                 <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
                             <div className="space-y-2 mb-4">
                                 <p className="text-text-primary">
@@ -505,7 +665,7 @@ function SimulatorBooking() {
                             )}
                             {usePrepaidHours === false && (
                                 <div className="text-sm text-text-secondary bg-background border border-border rounded-card p-3 mb-4">
-                                    This booking will be charged at the standard simulator rate.
+                                    <p className="font-semibold text-text-primary">We will redirect you to payment gateway.</p>
                                 </div>
                             )}
                             {usePrepaidHours === null && (
@@ -532,9 +692,14 @@ function SimulatorBooking() {
                                     'Confirm Booking'
                                 )}
                             </Button>
-                        </div>
-                        </>
-                    )}
+                    </div>
+                </div>
+            )}
+
+            {/* Special Event Message */}
+            {availability.specialEventMessage && currentStep !== 'payment' && (
+                <div className="bg-danger/10 border border-danger/30 rounded-card p-4">
+                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
                 </div>
             )}
             {toast && (

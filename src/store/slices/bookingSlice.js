@@ -211,6 +211,7 @@ export const checkSimulatorAvailability = createAsyncThunk(
                 specialEventMessage: response.data.special_event_message || null,
                 message: response.data.message || null, // Include API message
                 error: response.data.error || null, // Include API error if present
+                hourly_price: response.data.hourly_price || null, // Include hourly_price for price calculation
             };
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -291,6 +292,7 @@ const initialState = {
         simulator: [],
         coaching: [],
         specialEventMessage: null,
+        hourly_price: null, // Store hourly_price for price calculation
     },
     loading: false,
     error: null,
@@ -312,7 +314,14 @@ const bookingSlice = createSlice({
             state.error = null;
         },
         clearAvailability: (state) => {
-            state.availability = { simulator: [], coaching: [], specialEventMessage: null };
+            // Preserve hourly_price when clearing availability
+            const hourly_price = state.availability.hourly_price;
+            state.availability = { 
+                simulator: [], 
+                coaching: [], 
+                specialEventMessage: null,
+                hourly_price: hourly_price || null
+            };
         },
     },
     extraReducers: (builder) => {
@@ -493,6 +502,7 @@ const bookingSlice = createSlice({
                 state.loading = false;
                 state.availability.simulator = action.payload.slots || [];
                 state.availability.specialEventMessage = action.payload.specialEventMessage || null;
+                state.availability.hourly_price = action.payload.hourly_price || null;
             })
             .addCase(checkSimulatorAvailability.rejected, (state, action) => {
                 state.loading = false;
@@ -529,11 +539,23 @@ const bookingSlice = createSlice({
             })
             .addCase(getAvailableSimulatorHours.fulfilled, (state, action) => {
                 state.availableHoursLoading = false;
-                state.totalAvailableHours = action.payload?.total_available_hours || 0;
+                const hours = action.payload?.total_available_hours || 0;
+                state.totalAvailableHours = hours;
+                // Debug: Log the response
+                console.log('📊 getAvailableSimulatorHours API Response:', {
+                    payload: action.payload,
+                    total_available_hours: action.payload?.total_available_hours,
+                    hours_set: hours
+                });
             })
             .addCase(getAvailableSimulatorHours.rejected, (state, action) => {
                 state.availableHoursLoading = false;
                 state.error = action.payload;
+                // Debug: Log error
+                console.error('❌ getAvailableSimulatorHours API Error:', {
+                    error: action.payload,
+                    message: action.payload?.error || action.payload?.message || 'Unknown error'
+                });
             });
     },
 });
