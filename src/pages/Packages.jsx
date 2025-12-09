@@ -286,29 +286,50 @@ function Packages() {
 
                                     {/* Action Buttons */}
                                     <div className="space-y-2 mt-auto">
-                                        <Button
-                                            onClick={() => handleOpenModal(pkg.id, 'normal')}
-                                            variant="primary"
-                                            className="w-full py-2 text-sm"
-                                        >
-                                            Buy for Myself
-                                        </Button>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <Button
-                                                onClick={() => handleOpenModal(pkg.id, 'gift')}
-                                                variant="accent"
-                                                className="w-full py-2 text-sm"
-                                            >
-                                                Gift Package
-                                            </Button>
-                                            <Button
-                                                onClick={() => handleOpenModal(pkg.id, 'organization')}
-                                                variant="secondary"
-                                                className="w-full py-2 text-sm"
-                                            >
-                                                Group Purchase
-                                            </Button>
-                                        </div>
+                                        {pkg.session_count >= 10 ? (
+                                            <>
+                                                <Button
+                                                    onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                                    variant="primary"
+                                                    className="w-full py-2 text-sm"
+                                                >
+                                                    Buy for Myself
+                                                </Button>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <Button
+                                                        onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                        variant="accent"
+                                                        className="w-full py-2 text-sm"
+                                                    >
+                                                        Gift Package
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => handleOpenModal(pkg.id, 'organization')}
+                                                        variant="secondary"
+                                                        className="w-full py-2 text-sm"
+                                                    >
+                                                        Group Purchase
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button
+                                                    onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                                    variant="primary"
+                                                    className="w-full py-2 text-sm"
+                                                >
+                                                    Buy for Myself
+                                                </Button>
+                                                <Button
+                                                    onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                    variant="accent"
+                                                    className="w-full py-2 text-sm"
+                                                >
+                                                    Gift Package
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
