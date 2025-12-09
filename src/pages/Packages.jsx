@@ -59,6 +59,25 @@ function Packages() {
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
     }, [dispatch]);
+    
+    // Debug: Log simulator purchases when they change
+    useEffect(() => {
+        if (simulatorPurchases && simulatorPurchases.length > 0) {
+            console.log('📦 Simulator Purchases in Redux:', {
+                count: simulatorPurchases.length,
+                purchases: simulatorPurchases.map(p => ({
+                    id: p.id,
+                    purchase_name: p.purchase_name,
+                    package_title: p.package_details?.title,
+                    package_status: p.package_status,
+                    hours_remaining: p.hours_remaining,
+                    hours_total: p.hours_total,
+                    purchase_type: p.purchase_type,
+                    gift_status: p.gift_status
+                }))
+            });
+        }
+    }, [simulatorPurchases]);
 
 
     const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId) 
