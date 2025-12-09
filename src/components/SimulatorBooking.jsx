@@ -346,6 +346,9 @@ function SimulatorBooking() {
                 const url = new URL(response.redirect_url);
                 url.searchParams.set('phone', buyerPhone); // Current user's phone
                 url.searchParams.set('recipient_phone', response.temp_id); // recipient_phone contains temp_id
+                // Add count parameter (duration in hours)
+                const count = duration / 60; // Convert minutes to hours (60min=1, 120min=2, 180min=3)
+                url.searchParams.set('count', count.toString());
                 
                 openPopup({
                     type: 'success',
