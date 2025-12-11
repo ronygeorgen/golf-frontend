@@ -198,12 +198,13 @@ export const getBookingStats = createAsyncThunk(
 
 export const checkSimulatorAvailability = createAsyncThunk(
     'booking/checkSimulatorAvailability',
-    async ({ date, duration }, { rejectWithValue }) => {
+    async ({ date, duration, simulator_count = 1 }, { rejectWithValue }) => {
         try {
             const response = await apiClient.get(endpoints.bookings.checkSimulatorAvailability, {
                 params: {
                     date: date,
                     duration: duration,
+                    simulator_count: simulator_count,
                 },
             });
             return {
@@ -212,6 +213,8 @@ export const checkSimulatorAvailability = createAsyncThunk(
                 message: response.data.message || null, // Include API message
                 error: response.data.error || null, // Include API error if present
                 hourly_price: response.data.hourly_price || null, // Include hourly_price for price calculation
+                max_available_simulators: response.data.max_available_simulators || null,
+                simulator_count: response.data.simulator_count || 1,
             };
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);

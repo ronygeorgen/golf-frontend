@@ -23,6 +23,7 @@ function SimulatorBooking() {
     
     const [date, setDate] = useState('');
     const [duration, setDuration] = useState(60);
+    const [simulatorCount, setSimulatorCount] = useState(1);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [loading, setLoading] = useState(false);
     const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -34,12 +35,13 @@ function SimulatorBooking() {
     // Store previous data for back navigation
     const [previousDate, setPreviousDate] = useState('');
     const [previousDuration, setPreviousDuration] = useState(60);
+    const [maxAvailableSimulators, setMaxAvailableSimulators] = useState(5); // Default to 5, will be updated from API
     
-    // Calculate price based on duration and hourly_price
+    // Calculate price based on duration, hourly_price, and simulator_count
     const calculatePrice = () => {
         if (!availability.hourly_price) return null;
         const hours = duration / 60;
-        return (availability.hourly_price * hours).toFixed(2);
+        return (availability.hourly_price * hours * simulatorCount).toFixed(2);
     };
     
     const calculatedPrice = calculatePrice();
@@ -125,7 +127,8 @@ function SimulatorBooking() {
         dispatch(clearAvailability()); // Clear previous availability slots
 
         setLoading(true);
-        const result = await dispatch(checkSimulatorAvailability({ date, duration }));
+        const count = simulatorCount && simulatorCount >= 1 ? simulatorCount : 1;
+        const result = await dispatch(checkSimulatorAvailability({ date, duration, simulator_count: count }));
         setLoading(false);
         
         // Check if the API returned a message or error
@@ -133,11 +136,22 @@ function SimulatorBooking() {
             const payload = result.payload || {};
             const slots = payload.slots || [];
             
+            // Update max available simulators from API response
+            if (payload.max_available_simulators !== undefined) {
+                setMaxAvailableSimulators(payload.max_available_simulators);
+                // Adjust simulator_count if it exceeds max
+                if (simulatorCount > payload.max_available_simulators) {
+                    setSimulatorCount(payload.max_available_simulators);
+                }
+            }
+            
             // Debug: Log the API response to check hourly_price
             console.log('📊 Availability API Response:', {
                 slots_count: slots.length,
                 hourly_price: payload.hourly_price,
                 has_hourly_price: !!payload.hourly_price,
+                max_available_simulators: payload.max_available_simulators,
+                simulator_count: payload.simulator_count,
                 payload_keys: Object.keys(payload)
             });
             
@@ -308,6 +322,7 @@ function SimulatorBooking() {
             start_time: selectedSlot.start_time,
             end_time: selectedSlot.end_time,
             duration_minutes: duration,
+            simulator_count: simulatorCount && simulatorCount >= 1 ? simulatorCount : 1,
             // total_price will be calculated on backend based on duration
         };
         
@@ -346,8 +361,8 @@ function SimulatorBooking() {
                 const url = new URL(response.redirect_url);
                 url.searchParams.set('phone', buyerPhone); // Current user's phone
                 url.searchParams.set('recipient_phone', response.temp_id); // recipient_phone contains temp_id
-                // Add count parameter (duration in hours)
-                const count = duration / 60; // Convert minutes to hours (60min=1, 120min=2, 180min=3)
+                // Add count parameter (duration in hours * simulator_count)
+                const count = (duration / 60) * simulatorCount; // Convert minutes to hours and multiply by simulator count
                 url.searchParams.set('count', count.toString());
                 
                 openPopup({
@@ -489,6 +504,46 @@ function SimulatorBooking() {
                             </select>
                         </div>
                         
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Number of Simulators
+                            </label>
+                            <input
+                                type="text"
+                                value={simulatorCount}
+                                onChange={(e) => {
+                                    const inputValue = e.target.value;
+                                    // Allow empty input while typing
+                                    if (inputValue === '') {
+                                        setSimulatorCount('');
+                                        return;
+                                    }
+                                    // Only allow numeric input
+                                    const numericValue = inputValue.replace(/[^0-9]/g, '');
+                                    if (numericValue === '') {
+                                        setSimulatorCount('');
+                                        return;
+                                    }
+                                    const value = parseInt(numericValue);
+                                    if (!isNaN(value)) {
+                                        const clampedValue = Math.max(1, Math.min(value, maxAvailableSimulators));
+                                        setSimulatorCount(clampedValue);
+                                        setSelectedSlot(null); // Reset selected slot when simulator count changes
+                                    }
+                                }}
+                                onBlur={(e) => {
+                                    // Ensure a valid value on blur
+                                    if (simulatorCount === '' || simulatorCount < 1) {
+                                        setSimulatorCount(1);
+                                    }
+                                }}
+                                className="w-full"
+                            />
+                            <p className="text-xs text-text-secondary mt-1">
+                                Maximum {maxAvailableSimulators} simulator{maxAvailableSimulators !== 1 ? 's' : ''} available
+                            </p>
+                        </div>
+                        
                         <Button 
                             onClick={checkAvailability} 
                             disabled={loading}
@@ -526,6 +581,14 @@ function SimulatorBooking() {
                         <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
                             {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                         </span>
+                        {simulatorCount > 1 && (
+                            <>
+                                <span className="text-text-secondary/50">|</span>
+                                <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
+                                    {simulatorCount} simulator{simulatorCount !== 1 ? 's' : ''}
+                                </span>
+                            </>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {availability.simulator.map((slot, index) => {
@@ -660,10 +723,15 @@ function SimulatorBooking() {
                                 <p className="text-text-primary">
                                     <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
                                 </p>
+                                {simulatorCount > 1 && (
+                                    <p className="text-text-primary">
+                                        <span className="font-medium">Number of Simulators:</span> {simulatorCount}
+                                    </p>
+                                )}
                             </div>
                             {usePrepaidHours === true && totalAvailableHours > 0 && (
                                 <div className="text-sm text-status-confirmed-text bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-3 mb-4">
-                                    This booking will use {(duration / 60).toFixed(2)} hour{(duration / 60) !== 1 ? 's' : ''} from your pre-paid hours. No additional payment is required.
+                                    This booking will use {((duration / 60) * simulatorCount).toFixed(2)} hour{((duration / 60) * simulatorCount) !== 1 ? 's' : ''} from your pre-paid hours ({simulatorCount} simulator{simulatorCount !== 1 ? 's' : ''} × {(duration / 60).toFixed(2)} hour{(duration / 60) !== 1 ? 's' : ''} each). No additional payment is required.
                                 </div>
                             )}
                             {usePrepaidHours === false && (

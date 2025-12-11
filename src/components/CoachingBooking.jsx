@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkCoachingAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
@@ -6,6 +6,7 @@ import { getActiveCoachingPackages, getMyPackagePurchases, getOrganizationPackag
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
+import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
 
 function CoachingBooking() {
     const dispatch = useAppDispatch();
@@ -25,6 +26,18 @@ function CoachingBooking() {
     const [coaches, setCoaches] = useState([]);
     const [toast, setToast] = useState({ show: false, message: '' });
     const [packageType, setPackageType] = useState('personal'); // 'personal' or 'organization'
+    
+    // Step management: 'form' -> 'slots' -> 'summary'
+    const [currentStep, setCurrentStep] = useState('form');
+    
+    // Store previous data for back navigation
+    const [previousDate, setPreviousDate] = useState('');
+    const [previousPackage, setPreviousPackage] = useState(null);
+    const [previousCoach, setPreviousCoach] = useState(null);
+    
+    // Track if this is the first mount to avoid clearing availability on remount
+    const isFirstMount = useRef(true);
+    const previousPackageRef = useRef(null);
     
     const selectedPackageData = selectedPackage
         ? packages.find((pkg) => pkg.id === selectedPackage)
@@ -70,9 +83,23 @@ function CoachingBooking() {
         } else {
             setCoaches([]);
         }
-        setSelectedSlot(null);
-        dispatch(clearAvailability());
-    }, [selectedPackage, packages, dispatch]);
+        
+        // Only clear availability if package actually changed (not on first mount or remount)
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            previousPackageRef.current = selectedPackage;
+            // On first mount, restore step if availability exists
+            if (availability.coaching && availability.coaching.length > 0) {
+                setCurrentStep('slots');
+            }
+        } else if (previousPackageRef.current !== selectedPackage) {
+            // Package actually changed, clear availability
+            setSelectedSlot(null);
+            dispatch(clearAvailability());
+            setCurrentStep('form');
+            previousPackageRef.current = selectedPackage;
+        }
+    }, [selectedPackage, packages, dispatch, availability.coaching]);
 
     useEffect(() => {
         setDuration(packageSessionDuration);
@@ -82,7 +109,20 @@ function CoachingBooking() {
         // Reset slot and availability when package type changes
         setSelectedSlot(null);
         dispatch(clearAvailability());
+        setCurrentStep('form');
     }, [packageType, dispatch]);
+    
+    // Move to slots step when slots are fetched
+    useEffect(() => {
+        if (availability.coaching && availability.coaching.length > 0) {
+            if (currentStep === 'form') {
+                setCurrentStep('slots');
+            }
+        } else if (availability.coaching && availability.coaching.length === 0 && currentStep === 'slots') {
+            // If slots were cleared, go back to form
+            setCurrentStep('form');
+        }
+    }, [availability.coaching, currentStep]);
 
     const handlePurchasePackage = async () => {
         navigate('/packages');
@@ -116,6 +156,11 @@ function CoachingBooking() {
             return;
         }
 
+        // Store current values for back navigation
+        setPreviousDate(date);
+        setPreviousPackage(selectedPackage);
+        setPreviousCoach(selectedCoach);
+        
         // Clear selected slot and reset availability before checking
         setSelectedSlot(null);
         dispatch(clearAvailability()); // Clear previous availability slots
@@ -143,7 +188,9 @@ function CoachingBooking() {
                 setTimeout(() => {
                     setToast({ show: false, message: '' });
                 }, 5000);
+                setCurrentStep('form'); // Stay on form step if no slots
             }
+            // Step will be updated by useEffect when slots are available
         }
     };
 
@@ -171,6 +218,9 @@ function CoachingBooking() {
             end_time: endTime.toISOString(),
             duration_minutes: duration
         });
+        
+        // Move to summary step
+        setCurrentStep('summary');
     };
 
     const isSlotDisabled = (slot) => {
@@ -218,6 +268,22 @@ function CoachingBooking() {
         return `${maxSuggested} minutes`;
     };
 
+    const handleBack = () => {
+        if (currentStep === 'summary') {
+            // Go back to slots
+            setSelectedSlot(null);
+            setCurrentStep('slots');
+        } else if (currentStep === 'slots') {
+            // Go back to form, restore previous values if available
+            if (previousDate) setDate(previousDate);
+            if (previousPackage) setSelectedPackage(previousPackage);
+            if (previousCoach) setSelectedCoach(previousCoach);
+            dispatch(clearAvailability());
+            setSelectedSlot(null);
+            setCurrentStep('form');
+        }
+    };
+    
     const handleBooking = async () => {
         if (!selectedSlot) {
             openPopup({
@@ -264,6 +330,13 @@ function CoachingBooking() {
             if (packageType === 'organization') {
                 await dispatch(getOrganizationPackages());
             }
+            // Clear availability slots and selected slot after successful booking
+            dispatch(clearAvailability());
+            setSelectedSlot(null);
+            setCurrentStep('form'); // Reset to form step
+            setDate(''); // Clear date
+            setSelectedPackage(null); // Clear package
+            setSelectedCoach(null); // Clear coach
             setBookingSuccess(true);
         } else {
             const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
@@ -342,9 +415,15 @@ function CoachingBooking() {
                     </div>
                 </div>
             )}
-            <div className="bg-surface rounded-card shadow-card p-6">
-                <h2 className="text-xl font-bold text-text-primary mb-4">Book Coaching Session</h2>
-                <div className="space-y-4">
+            
+            {/* Step 1: Form Step */}
+            {currentStep === 'form' && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <h2 className="text-xl font-bold text-text-primary mb-4">Book Coaching Session</h2>
+                    {purchasesLoading || organizationPackagesLoading ? (
+                        <FormSkeleton fields={5} />
+                    ) : (
+                    <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-text-primary mb-2">
                             Date
@@ -355,25 +434,6 @@ function CoachingBooking() {
                             onChange={(e) => setDate(e.target.value)}
                             min={new Date().toISOString().split('T')[0]}
                         />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Session Duration
-                        </label>
-                        <input
-                            type="text"
-                            value={
-                                selectedPackageData
-                                    ? `${packageSessionDuration} minutes`
-                                    : 'Select a package to see session length'
-                            }
-                            disabled
-                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
-                        />
-                        <p className="text-xs text-text-secondary mt-1">
-                            Duration is locked to your package and consumes one session.
-                        </p>
                     </div>
 
                     <div>
@@ -396,6 +456,25 @@ function CoachingBooking() {
                                 </option>
                             ))}
                         </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-2">
+                            Your session duration will be
+                        </label>
+                        <input
+                            type="text"
+                            value={
+                                selectedPackageData
+                                    ? `${packageSessionDuration} minutes`
+                                    : 'Select a package to see session length'
+                            }
+                            disabled
+                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
+                        />
+                        <p className="text-xs text-text-secondary mt-1">
+                            Duration is locked to your package and consumes one session.
+                        </p>
                     </div>
 
                     {selectedPackage && (
@@ -512,47 +591,67 @@ function CoachingBooking() {
                     >
                         {loading || bookingLoading ? 'Checking Availability...' : 'Check Availability'}
                     </Button>
-                </div>
-            </div>
-
-            {availability.specialEventMessage && (
-                <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-6">
-                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
+                    </div>
+                    )}
                 </div>
             )}
-            {availability.coaching && availability.coaching.length > 0 && (
+
+            {/* Step 2: Slots Step */}
+            {currentStep === 'slots' && (
                 <div className="bg-surface rounded-card shadow-card p-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                        <h3 className="text-xl font-bold text-text-primary">Available Time Slots</h3>
-                        <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
-                            <span className="font-medium">Book coaching sessions for</span>
-                            <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
-                                {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
-                            </span>
-                            <span className="text-text-secondary/50">|</span>
-                            <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
-                                {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
-                            </span>
-                            {selectedCoach && (
-                                <>
-                                    <span className="text-text-secondary/50">|</span>
-                                    <span className="px-2 py-1 bg-status-personal-bg text-status-personal-text rounded-badge font-semibold">
-                                        {coaches.find(c => c.id === selectedCoach)?.first_name} {coaches.find(c => c.id === selectedCoach)?.last_name}
-                                    </span>
-                                </>
-                            )}
-                            {selectedPackage && (
-                                <>
-                                    <span className="text-text-secondary/50">|</span>
-                                    <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
-                                        {packages.find(p => p.id === selectedPackage)?.title}
-                                    </span>
-                                </>
-                            )}
-                        </div>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">Available Time Slots</h2>
+                        <Button 
+                            onClick={handleBack}
+                            variant="secondary"
+                            className="flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
-                        {availability.coaching.map((slot, index) => {
+                    {loading || bookingLoading ? (
+                        <BookingSlotsSkeleton count={8} />
+                    ) : availability.coaching && availability.coaching.length > 0 ? (
+                        <>
+                            {availability.specialEventMessage && (
+                                <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-4">
+                                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
+                                </div>
+                            )}
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+                                <h3 className="text-lg font-bold text-text-primary">Select a Time Slot</h3>
+                                <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
+                                    <span className="font-medium">Book coaching sessions for</span>
+                                    <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
+                                        {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
+                                    </span>
+                                    <span className="text-text-secondary/50">|</span>
+                                    <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
+                                        {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
+                                    </span>
+                                    {selectedCoach && (
+                                        <>
+                                            <span className="text-text-secondary/50">|</span>
+                                            <span className="px-2 py-1 bg-status-personal-bg text-status-personal-text rounded-badge font-semibold">
+                                                {coaches.find(c => c.id === selectedCoach)?.first_name} {coaches.find(c => c.id === selectedCoach)?.last_name}
+                                            </span>
+                                        </>
+                                    )}
+                                    {selectedPackage && (
+                                        <>
+                                            <span className="text-text-secondary/50">|</span>
+                                            <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
+                                                {packages.find(p => p.id === selectedPackage)?.title}
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+                                {availability.coaching.map((slot, index) => {
                             const disabled = isSlotDisabled(slot);
                             const suggestedDuration = disabled ? getSuggestedDuration(slot) : null;
                             // Check if this slot is selected (compare by start_time since that's unique)
@@ -610,11 +709,34 @@ function CoachingBooking() {
                                 </div>
                             );
                         })}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-center py-8 text-text-secondary">
+                            <p>No available time slots found. Please try a different date or package.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Step 3: Summary Step */}
+            {currentStep === 'summary' && selectedSlot && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">Booking Summary</h2>
+                        <Button 
+                            onClick={handleBack}
+                            variant="secondary"
+                            className="flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
                     </div>
-                    
-                    {selectedSlot && (
-                        <div className="bg-background rounded-card p-6">
-                            <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
+                    <div className="bg-background rounded-card p-6">
+                        <h4 className="text-lg font-bold text-text-primary mb-4">Confirm Your Booking</h4>
                             <div className="space-y-2 mb-4">
                                 <p className="text-text-primary">
                                     <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
@@ -664,10 +786,10 @@ function CoachingBooking() {
                                     'Confirm Booking'
                                 )}
                             </Button>
-                        </div>
-                    )}
+                    </div>
                 </div>
             )}
+            
             <PopupMessage
                 open={popup.open}
                 type={popup.type}
