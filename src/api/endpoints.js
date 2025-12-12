@@ -11,6 +11,8 @@ export const endpoints = {
         autoLogin: '/auth/auto-login/',
         requestOTP: '/auth/request-otp/',
         verifyOTP: '/auth/verify-otp/',
+        ghlLocations: '/auth/ghl-locations/',
+        updateDob: '/auth/update-dob/',
     },
     
     // Admin endpoints

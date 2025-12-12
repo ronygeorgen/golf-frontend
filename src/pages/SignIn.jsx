@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
+import DOBPopup from '../components/DOBPopup';
 
 function SignIn() {
     const dispatch = useAppDispatch();
@@ -12,6 +13,7 @@ function SignIn() {
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState('phone');
+    const [showDOBPopup, setShowDOBPopup] = useState(false);
     
     const navigate = useNavigate();
 
@@ -36,7 +38,16 @@ function SignIn() {
         dispatch(clearError());
         const result = await dispatch(verifyOTP({ phone, otp }));
         if (verifyOTP.fulfilled.match(result)) {
-            navigate('/booking');
+            // Clear the DOB popup flag on new login
+            sessionStorage.removeItem('dobPopupShown');
+            
+            // Check if DOB is needed
+            if (result.payload.needs_dob) {
+                setShowDOBPopup(true);
+                sessionStorage.setItem('dobPopupShown', 'true');
+            } else {
+                navigate('/portal');
+            }
         }
     };
 
@@ -136,6 +147,18 @@ function SignIn() {
                     </Link>
                 </p>
             </div>
+            
+            <DOBPopup 
+                isOpen={showDOBPopup}
+                onClose={() => {
+                    setShowDOBPopup(false);
+                    navigate('/portal');
+                }}
+                onSkip={() => {
+                    setShowDOBPopup(false);
+                    navigate('/portal');
+                }}
+            />
         </div>
     );
 }

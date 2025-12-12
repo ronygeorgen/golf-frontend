@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { logout } from '../store/slices/authSlice';
+import { logout, getProfile } from '../store/slices/authSlice';
 import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
+import DOBPopup from './DOBPopup';
 
 function UserLayout() {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ function UserLayout() {
     const { user } = useAppSelector((state) => state.auth);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
+    const [showDOBPopup, setShowDOBPopup] = useState(false);
     const dropdownRef = useRef(null);
     const packagesMenuRef = useRef(null);
 
@@ -35,6 +37,25 @@ function UserLayout() {
         };
     }, []);
 
+    // Check for missing DOB only once per session (not on every reload)
+    useEffect(() => {
+        // Check if we've already shown the popup in this session
+        const dobPopupShown = sessionStorage.getItem('dobPopupShown');
+        
+        if (user && !user.date_of_birth && location.pathname !== '/profile' && !dobPopupShown) {
+            // Small delay to ensure layout is rendered, and don't show on profile page
+            const timer = setTimeout(() => {
+                setShowDOBPopup(true);
+                sessionStorage.setItem('dobPopupShown', 'true');
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else if (user && user.date_of_birth) {
+            // Close popup if DOB is now set and clear the flag
+            setShowDOBPopup(false);
+            sessionStorage.removeItem('dobPopupShown');
+        }
+    }, [user, location.pathname]);
+
     const handleLogout = async () => {
         await dispatch(logout());
         navigate('/signin');
@@ -47,6 +68,7 @@ function UserLayout() {
         if (path === '/booking') return 'Book a Session';
         if (path === '/packages') return 'Packages & Gifts';
         if (path === '/special-events') return 'Special Events';
+        if (path === '/profile') return 'Profile';
         if (path === '/coaching-sessions' || path.startsWith('/coaching-sessions')) return 'My Coaching Sessions';
         return 'Dashboard';
     };
@@ -356,6 +378,16 @@ function UserLayout() {
                                             )}
                                             <button
                                                 onClick={() => {
+                                                    navigate('/profile');
+                                                    setDropdownOpen(false);
+                                                }}
+                                                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
+                                            >
+                                                <User className="w-4 h-4" />
+                                                <span>Profile</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
                                                     handleLogout();
                                                     setDropdownOpen(false);
                                                 }}
@@ -377,6 +409,21 @@ function UserLayout() {
             <main className="pt-0">
                 <Outlet />
             </main>
+            
+            <DOBPopup 
+                isOpen={showDOBPopup}
+                onClose={() => {
+                    setShowDOBPopup(false);
+                    // Refresh user data only if DOB was actually updated
+                    if (user && !user.date_of_birth) {
+                        dispatch(getProfile());
+                    }
+                }}
+                onSkip={() => {
+                    setShowDOBPopup(false);
+                    // Don't refresh on skip - user data hasn't changed
+                }}
+            />
         </div>
     );
 }

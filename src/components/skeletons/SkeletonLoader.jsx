@@ -8,7 +8,7 @@ export const Skeleton = ({ className = '', width, height, rounded = 'rounded' })
     
     return (
         <div 
-            className={`bg-gray-200 animate-pulse ${rounded} ${className}`}
+            className={`bg-gray-200 dark:bg-gray-700 animate-pulse ${rounded} ${className}`}
             style={style}
         />
     );
@@ -96,18 +96,44 @@ export const ListSkeleton = ({ items = 5 }) => {
 };
 
 // Form skeleton
-export const FormSkeleton = ({ fields = 4 }) => {
+export const FormSkeleton = ({ fields = 4, showGrid = false }) => {
+    if (showGrid && fields >= 2) {
+        // For profile form with grid layout (first 2 fields in grid)
+        return (
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Skeleton height="16px" width="30%" className="mb-2" />
+                        <Skeleton height="48px" width="100%" rounded="rounded-button" />
+                    </div>
+                    <div>
+                        <Skeleton height="16px" width="30%" className="mb-2" />
+                        <Skeleton height="48px" width="100%" rounded="rounded-button" />
+                    </div>
+                </div>
+                {Array.from({ length: fields - 2 }).map((_, i) => (
+                    <div key={i}>
+                        <Skeleton height="16px" width="30%" className="mb-2" />
+                        <Skeleton height="48px" width="100%" rounded="rounded-button" />
+                    </div>
+                ))}
+                <div className="flex gap-4 pt-4">
+                    <Skeleton height="44px" width="100%" rounded="rounded-button" />
+                </div>
+            </div>
+        );
+    }
+    
     return (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="space-y-4">
             {Array.from({ length: fields }).map((_, i) => (
-                <div key={i} className="mb-6">
+                <div key={i}>
                     <Skeleton height="16px" width="30%" className="mb-2" />
-                    <Skeleton height="40px" width="100%" />
+                    <Skeleton height="48px" width="100%" rounded="rounded-button" />
                 </div>
             ))}
-            <div className="flex gap-4">
-                <Skeleton height="44px" width="120px" />
-                <Skeleton height="44px" width="120px" />
+            <div className="flex gap-4 pt-4">
+                <Skeleton height="44px" width="100%" rounded="rounded-button" />
             </div>
         </div>
     );
@@ -192,6 +218,39 @@ export const PackagesSkeleton = () => {
                     ))}
                 </div>
             </div>
+        </div>
+    );
+};
+
+// Event card skeleton for special events page
+export const EventCardSkeleton = ({ count = 3 }) => {
+    return (
+        <div className="grid gap-6">
+            {Array.from({ length: count }).map((_, i) => (
+                <div key={i} className="bg-surface rounded-card shadow-card border border-border p-6">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                        <div className="flex-1">
+                            <div className="flex items-start justify-between mb-3">
+                                <Skeleton height="32px" width="60%" />
+                                <Skeleton height="24px" width="100px" rounded="rounded-full" />
+                            </div>
+                            <Skeleton height="16px" width="100%" className="mb-2" />
+                            <Skeleton height="16px" width="90%" className="mb-4" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <Skeleton height="20px" width="80%" />
+                                <Skeleton height="20px" width="80%" />
+                                <Skeleton height="20px" width="70%" />
+                                <Skeleton height="20px" width="75%" />
+                                <Skeleton height="20px" width="65%" />
+                                <Skeleton height="20px" width="70%" />
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-2 md:min-w-[180px]">
+                            <Skeleton height="40px" width="100%" rounded="rounded-button" />
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };

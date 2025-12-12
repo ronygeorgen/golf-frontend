@@ -9,6 +9,7 @@ import PopupMessage from '../components/PopupMessage';
 import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
+import { EventCardSkeleton } from '../components/skeletons/SkeletonLoader';
 import { Calendar, Clock, Users, CheckCircle, XCircle } from 'lucide-react';
 
 
@@ -89,11 +90,11 @@ function SpecialEvents() {
     if (loading) {
         return (
             <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
-                <div className="animate-pulse space-y-4">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="bg-surface rounded-card p-6 h-48"></div>
-                    ))}
+                <div className="mb-6">
+                    <div className="h-9 w-64 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mb-2"></div>
+                    <div className="h-5 w-96 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
                 </div>
+                <EventCardSkeleton count={3} />
             </div>
         );
     }

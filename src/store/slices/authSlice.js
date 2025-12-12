@@ -77,6 +77,36 @@ export const getProfile = createAsyncThunk(
     }
 );
 
+export const updateProfile = createAsyncThunk(
+    'auth/updateProfile',
+    async (profileData, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.put(endpoints.auth.profile, profileData);
+            if (response.data.user) {
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const updateDob = createAsyncThunk(
+    'auth/updateDob',
+    async (dateOfBirth, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.put(endpoints.auth.updateDob, { date_of_birth: dateOfBirth });
+            if (response.data.user) {
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const autoLogin = createAsyncThunk(
     'auth/autoLogin',
     async (email, { rejectWithValue }) => {
@@ -102,10 +132,12 @@ export const logout = createAsyncThunk(
             await apiClient.post(endpoints.auth.logout);
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            sessionStorage.removeItem('dobPopupShown'); // Clear DOB popup flag on logout
             return null;
         } catch (error) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            sessionStorage.removeItem('dobPopupShown'); // Clear DOB popup flag on logout
             return rejectWithValue(error.response?.data || error.message);
         }
     }
@@ -151,6 +183,8 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
+                // Clear DOB popup flag on new signup
+                sessionStorage.removeItem('dobPopupShown');
             })
             .addCase(signup.rejected, (state, action) => {
                 state.loading = false;
@@ -167,6 +201,8 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
+                // Clear DOB popup flag on login
+                sessionStorage.removeItem('dobPopupShown');
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
@@ -200,6 +236,8 @@ const authSlice = createSlice({
                 state.user = action.payload.user;
                 state.token = action.payload.token;
                 state.otpSent = false;
+                // Clear DOB popup flag on new login
+                sessionStorage.removeItem('dobPopupShown');
             })
             .addCase(verifyOTP.rejected, (state, action) => {
                 state.loading = false;
@@ -220,6 +258,42 @@ const authSlice = createSlice({
                 state.error = action.payload;
             });
 
+        // Update Profile
+        builder
+            .addCase(updateProfile.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(updateProfile.fulfilled, (state, action) => {
+                state.loading = false;
+                if (action.payload.user) {
+                    state.user = action.payload.user;
+                }
+            })
+            .addCase(updateProfile.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Update DOB
+        builder
+            .addCase(updateDob.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(updateDob.fulfilled, (state, action) => {
+                state.loading = false;
+                if (action.payload.user) {
+                    state.user = action.payload.user;
+                    // Clear the flag when DOB is successfully saved
+                    sessionStorage.removeItem('dobPopupShown');
+                }
+            })
+            .addCase(updateDob.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
         // Auto Login
         builder
             .addCase(autoLogin.pending, (state) => {
@@ -230,6 +304,8 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
+                // Clear DOB popup flag on auto-login
+                sessionStorage.removeItem('dobPopupShown');
             })
             .addCase(autoLogin.rejected, (state, action) => {
                 state.loading = false;

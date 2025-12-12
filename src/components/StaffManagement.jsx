@@ -23,7 +23,8 @@ function StaffManagement() {
         last_name: '',
         email: '',
         phone: '',
-        role: 'staff'
+        role: 'staff',
+        date_of_birth: ''
     });
     const [submitLoading, setSubmitLoading] = useState(false);
     const handlePopupConfirm = async () => {
@@ -44,7 +45,7 @@ function StaffManagement() {
             if (modalRef.current && !modalRef.current.contains(event.target)) {
                 setShowForm(false);
                 setEditingStaff(null);
-                setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
+                setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff', date_of_birth: '' });
             }
         };
 
@@ -82,7 +83,8 @@ function StaffManagement() {
             last_name: staffMember.last_name,
             email: staffMember.email,
             phone: staffMember.phone,
-            role: staffMember.role
+            role: staffMember.role,
+            date_of_birth: staffMember.date_of_birth || ''
         });
         setShowForm(true);
     };
@@ -120,7 +122,7 @@ function StaffManagement() {
                     <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(3px)' }} onClick={() => {
                         setShowForm(false);
                         setEditingStaff(null);
-                        setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
+                        setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff', date_of_birth: '' });
                     }}>
                         <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
@@ -186,6 +188,17 @@ function StaffManagement() {
                                             <option value="admin">Admin</option>
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.date_of_birth}
+                                            onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
+                                            max={new Date().toISOString().split('T')[0]}
+                                        />
+                                    </div>
                                     <div className="flex gap-4 pt-4">
                                         <Button 
                                             type="submit" 
@@ -204,7 +217,7 @@ function StaffManagement() {
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingStaff(null);
-                                                setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
+                                                setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff', date_of_birth: '' });
                                             }}
                                         >
                                             Cancel

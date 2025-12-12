@@ -43,6 +43,7 @@ function Toast({ message, type = 'info', onClose, duration = 5000 }) {
             }, duration);
             return () => clearTimeout(timer);
         }
+        // If duration is 0 or negative, toast persists (won't auto-close)
     }, [duration, onClose]);
 
     return (

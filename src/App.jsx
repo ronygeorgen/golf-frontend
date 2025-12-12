@@ -31,19 +31,25 @@ import StaffCoachingSessions from './pages/StaffCoachingSessions';
 import StaffCoachingSessionsAdmin from './pages/StaffCoachingSessionsAdmin';
 import StaffCoachingSessionsCalendar from './pages/StaffCoachingSessionsCalendar';
 import StaffCoachingSessionsCalendarAdmin from './pages/StaffCoachingSessionsCalendarAdmin';
+import Profile from './pages/Profile';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
     const { user, token, loading } = useAppSelector((state) => state.auth);
     
     // Fetch fresh user profile if token exists but user data might be stale
+    // Only check once on mount, not on every user update
     useEffect(() => {
         if (token && (!user || !user.hasOwnProperty('is_superuser'))) {
             dispatch(getProfile());
         }
-    }, [token, user, dispatch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token]); // Only depend on token, not user - to avoid infinite loop
     
-    if (loading) {
+    // Show loading only if we don't have a user yet (initial load)
+    // Don't show loading if user exists - let individual components handle their own loading states
+    // This prevents the global loader from showing during profile updates
+    if (loading && !user) {
         return <div className="min-h-screen flex items-center justify-center"><div className="text-gray-600">Loading...</div></div>;
     }
     
@@ -119,11 +125,12 @@ function AppContent() {
     }, [location.search, dispatch, navigate, token]);
     
     // Fetch fresh user profile on app load if user exists but data might be stale
-    useEffect(() => {
-        if (token && user && !user.hasOwnProperty('is_superuser')) {
-            dispatch(getProfile());
-        }
-    }, []); // Only run on mount
+    // This is handled by ProtectedRoute now, so we can remove this duplicate
+    // useEffect(() => {
+    //     if (token && user && !user.hasOwnProperty('is_superuser')) {
+    //         dispatch(getProfile());
+    //     }
+    // }, []); // Only run on mount
     
     return (
         <Routes>
@@ -150,6 +157,7 @@ function AppContent() {
                 <Route path="purchases/personal" element={<PersonalPurchases />} />
                 <Route path="purchases/organizations" element={<OrganizationPurchases />} />
                 <Route path="transfers/sessions" element={<TransferSessions />} />
+                <Route path="profile" element={<Profile />} />
             </Route>
 
             {/* Admin Routes with AdminLayout */}

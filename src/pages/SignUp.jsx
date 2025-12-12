@@ -5,6 +5,8 @@ import { signup, clearError } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import { X } from 'lucide-react';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function SignUp() {
     const dispatch = useAppDispatch();
@@ -17,12 +19,35 @@ function SignUp() {
         password_confirm: '',
         first_name: '',
         last_name: '',
-        role: 'client'
+        role: 'client',
+        ghl_location_id: '',
+        date_of_birth: ''
     });
     
     const [toast, setToast] = useState({ show: false, messages: [] });
+    const [locations, setLocations] = useState([]);
+    const [loadingLocations, setLoadingLocations] = useState(true);
     
     const navigate = useNavigate();
+
+    // Fetch GHL locations on component mount
+    useEffect(() => {
+        const fetchLocations = async () => {
+            try {
+                setLoadingLocations(true);
+                const response = await apiClient.get(endpoints.auth.ghlLocations);
+                if (response.data && response.data.locations) {
+                    setLocations(response.data.locations);
+                }
+            } catch (error) {
+                console.error('Failed to fetch GHL locations:', error);
+                // Don't show error to user, just continue without location dropdown
+            } finally {
+                setLoadingLocations(false);
+            }
+        };
+        fetchLocations();
+    }, []);
 
     // Helper function to parse error messages from API response
     const parseErrorMessages = (error) => {
@@ -76,7 +101,14 @@ function SignUp() {
         e.preventDefault();
         dispatch(clearError());
         setToast({ show: false, messages: [] });
-        const result = await dispatch(signup(formData));
+        
+        // Prepare data - convert empty string to null for date_of_birth
+        const submitData = {
+            ...formData,
+            date_of_birth: formData.date_of_birth || null
+        };
+        
+        const result = await dispatch(signup(submitData));
         if (signup.fulfilled.match(result)) {
             navigate('/booking');
         }
@@ -165,6 +197,39 @@ function SignUp() {
                             value={formData.password_confirm}
                             onChange={(e) => setFormData({...formData, password_confirm: e.target.value})}
                             required
+                        />
+                    </div>
+                    
+                    {locations.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Select Location <span className="text-text-secondary text-xs">(Optional)</span>
+                            </label>
+                            <select
+                                value={formData.ghl_location_id}
+                                onChange={(e) => setFormData({...formData, ghl_location_id: e.target.value})}
+                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                            >
+                                <option value="">Select a location (optional)</option>
+                                {locations.map((location) => (
+                                    <option key={location.location_id} value={location.location_id}>
+                                        {location.display_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-2">
+                            Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
+                        </label>
+                        <input
+                            type="date"
+                            value={formData.date_of_birth}
+                            onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
+                            max={new Date().toISOString().split('T')[0]}
+                            className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
                         />
                     </div>
                     
