@@ -63,18 +63,29 @@ function SpecialEvents() {
         });
     };
 
-    const handleCancelRegistration = async (eventId) => {
-        setRegistering({ ...registering, [eventId]: true });
-                        try {
-                            await axios.post(endpoints.specialEvents.cancelRegistration(eventId));
-                            showSuccess('Registration cancelled successfully');
-                            fetchEvents(); // Refresh to update registration status
-                        } catch (error) {
-                            console.error('Error cancelling registration:', error);
-                            showError(error.response?.data?.error || 'Failed to cancel registration');
-                        } finally {
-            setRegistering({ ...registering, [eventId]: false });
-        }
+    const handleCancelRegistration = (eventId) => {
+        openPopup({
+            type: 'warning',
+            title: 'Cancel Registration?',
+            message: 'Are you sure you want to cancel your registration for this event?',
+            showCancel: true,
+            confirmText: 'Yes, Cancel',
+            cancelText: 'Keep Registration',
+            onConfirm: async () => {
+                closePopup();
+                setRegistering({ ...registering, [eventId]: true });
+                try {
+                    await axios.post(endpoints.specialEvents.cancelRegistration(eventId));
+                    showSuccess('Registration cancelled successfully');
+                    fetchEvents(); // Refresh to update registration status
+                } catch (error) {
+                    console.error('Error cancelling registration:', error);
+                    showError(error.response?.data?.error || 'Failed to cancel registration');
+                } finally {
+                    setRegistering({ ...registering, [eventId]: false });
+                }
+            },
+        });
     };
 
     const formatDate = (dateString) => {

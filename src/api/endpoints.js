@@ -66,6 +66,7 @@ export const endpoints = {
         overrides: {
             coachingSessions: '/admin/overrides/coaching-sessions/',
             simulatorCredits: '/admin/overrides/simulator-credits/',
+            lockedBookings: '/admin/overrides/locked-bookings/',
         },
         users: {
             list: '/admin/users/',

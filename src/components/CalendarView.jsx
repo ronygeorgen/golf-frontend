@@ -14,7 +14,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const { calendarEvents: events, loading } = useAppSelector((state) => state.booking);
     const { popup, openPopup, closePopup } = usePopup();
     
-    const [view, setView] = useState('week');
+    const [view, setView] = useState('month'); // Default to month view
     const [date, setDate] = useState(new Date());
     const [calendarType, setCalendarType] = useState(coachId ? 'coaching' : 'simulator'); // 'simulator' or 'coaching'
     const handlePopupConfirm = async () => {
@@ -26,15 +26,34 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     };
 
     useEffect(() => {
-        const startOfWeek = moment(date).startOf('week').toDate();
-        const endOfWeek = moment(date).endOf('week').toDate();
+        // Calculate date range based on current view
+        let startDate, endDate;
+        
+        if (view === 'month') {
+            // For month view, get start and end of the month
+            startDate = moment(date).startOf('month').toDate();
+            endDate = moment(date).endOf('month').toDate();
+        } else if (view === 'week') {
+            // For week view, get start and end of the week
+            startDate = moment(date).startOf('week').toDate();
+            endDate = moment(date).endOf('week').toDate();
+        } else if (view === 'day') {
+            // For day view, get start and end of the day
+            startDate = moment(date).startOf('day').toDate();
+            endDate = moment(date).endOf('day').toDate();
+        } else {
+            // Default to week if view is unknown
+            startDate = moment(date).startOf('week').toDate();
+            endDate = moment(date).endOf('week').toDate();
+        }
+        
         dispatch(getCalendarBookings({ 
-            startDate: startOfWeek, 
-            endDate: endOfWeek,
+            startDate, 
+            endDate,
             bookingType: calendarType,
             coachId: coachId 
         }));
-    }, [dispatch, date, calendarType, coachId]);
+    }, [dispatch, date, calendarType, coachId, view]); // Add 'view' to dependencies
 
     const eventStyleGetter = (event) => {
         // Use design system colors

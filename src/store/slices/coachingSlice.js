@@ -68,10 +68,7 @@ export const createSimulatorPackagePurchase = createAsyncThunk(
             if (purchaseType === 'gift' && recipientPhone) {
                 payload.recipient_phone = recipientPhone;
             }
-            const locationId = localStorage.getItem('ghlLocationId');
-            if (locationId) {
-                payload.location_id = locationId;
-            }
+            // location_id is automatically added by axios interceptor
             const response = await apiClient.post(endpoints.coaching.simulatorPurchases, payload);
             return response.data;
         } catch (error) {
@@ -110,13 +107,18 @@ export const getMyPackagePurchases = createAsyncThunk(
 
 export const createTempPurchase = createAsyncThunk(
     'coaching/createTempPurchase',
-    async ({ packageId, buyerPhone, purchaseType = 'normal', recipients = [] }, { rejectWithValue }) => {
+    async ({ packageId, buyerPhone, purchaseType = 'normal', recipients = [], packageType }, { rejectWithValue }) => {
         try {
+            if (!packageType || !['coaching', 'simulator'].includes(packageType)) {
+                return rejectWithValue({ error: 'packageType is required and must be either "coaching" or "simulator"' });
+            }
+            
             const payload = {
                 package_id: packageId,
                 buyer_phone: buyerPhone,
                 purchase_type: purchaseType,
                 recipients: recipients,
+                package_type: packageType, // REQUIRED: 'coaching' or 'simulator'
             };
             const response = await apiClient.post(endpoints.coaching.tempPurchase, payload);
             return response.data;
@@ -144,10 +146,7 @@ export const createPackagePurchase = createAsyncThunk(
             if (purchaseType === 'organization' && memberPhones && memberPhones.length > 0) {
                 payload.member_phones = memberPhones;
             }
-            const locationId = localStorage.getItem('ghlLocationId');
-            if (locationId) {
-                payload.location_id = locationId;
-            }
+            // location_id is automatically added by axios interceptor
             const response = await apiClient.post(endpoints.coaching.purchases, payload);
             return response.data;
         } catch (error) {
@@ -436,8 +435,29 @@ const coachingSlice = createSlice({
             })
             .addCase(getActivePackages.fulfilled, (state, action) => {
                 state.loading = false;
-                state.activePackages = action.payload;
-                state.packages = action.payload; // Also update packages
+                // Preserve category from backend if it exists, otherwise determine it from package data
+                const packagesWithCategory = Array.isArray(action.payload) 
+                    ? action.payload.map(pkg => {
+                        // If backend already sent category, preserve it (check for truthy string values)
+                        if (pkg.category && (pkg.category === 'coaching' || pkg.category === 'combo' || pkg.category === 'simulator')) {
+                            return { ...pkg, category: pkg.category };
+                        }
+                        // Otherwise, determine category from package data
+                        // Combo packages have simulator_hours > 0
+                        const hasSimulatorHours = pkg.simulator_hours && parseFloat(pkg.simulator_hours) > 0;
+                        const determinedCategory = hasSimulatorHours ? 'combo' : 'coaching';
+                        console.log('📦 Package category determined:', { 
+                            id: pkg.id, 
+                            title: pkg.title, 
+                            backendCategory: pkg.category, 
+                            determinedCategory,
+                            simulator_hours: pkg.simulator_hours 
+                        });
+                        return { ...pkg, category: determinedCategory };
+                    })
+                    : action.payload;
+                state.activePackages = packagesWithCategory;
+                state.packages = packagesWithCategory; // Also update packages
             })
             .addCase(getActivePackages.rejected, (state, action) => {
                 state.loading = false;
@@ -661,7 +681,13 @@ const coachingSlice = createSlice({
             })
             .addCase(getSimulatorPackages.fulfilled, (state, action) => {
                 state.simulatorPackagesLoading = false;
-                state.simulatorPackages = action.payload;
+                // Preserve category from backend if it exists, otherwise set to 'simulator'
+                state.simulatorPackages = Array.isArray(action.payload)
+                    ? action.payload.map(pkg => ({ 
+                        ...pkg, 
+                        category: pkg.category || 'simulator' // Preserve backend category or default to 'simulator'
+                    }))
+                    : action.payload;
             })
             .addCase(getSimulatorPackages.rejected, (state, action) => {
                 state.simulatorPackagesLoading = false;
@@ -673,7 +699,13 @@ const coachingSlice = createSlice({
             })
             .addCase(getActiveSimulatorPackages.fulfilled, (state, action) => {
                 state.simulatorPackagesLoading = false;
-                state.simulatorPackages = action.payload;
+                // Preserve category from backend if it exists, otherwise set to 'simulator'
+                state.simulatorPackages = Array.isArray(action.payload)
+                    ? action.payload.map(pkg => ({ 
+                        ...pkg, 
+                        category: pkg.category || 'simulator' // Preserve backend category or default to 'simulator'
+                    }))
+                    : action.payload;
             })
             .addCase(getActiveSimulatorPackages.rejected, (state, action) => {
                 state.simulatorPackagesLoading = false;

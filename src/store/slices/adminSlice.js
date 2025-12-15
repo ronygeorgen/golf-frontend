@@ -315,6 +315,18 @@ export const adminCancelBooking = createAsyncThunk(
     }
 );
 
+export const getLockedBookings = createAsyncThunk(
+    'admin/getLockedBookings',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.admin.overrides.lockedBookings);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const grantCoachingSessions = createAsyncThunk(
     'admin/grantCoachingSessions',
     async (payload, { rejectWithValue }) => {
@@ -435,6 +447,11 @@ const initialState = {
             loading: false,
             error: null,
             success: null,
+        },
+        lockedBookings: {
+            list: [],
+            loading: false,
+            error: null,
         },
     },
 };
@@ -696,9 +713,22 @@ const adminSlice = createSlice({
             .addCase(adminCancelBooking.fulfilled, (state, action) => {
                 const booking = action.payload?.booking || action.payload;
                 if (booking?.id) {
+                    // Update booking in bookings list
                     const index = state.bookings.list.findIndex(b => b.id === booking.id);
                     if (index !== -1) {
                         state.bookings.list[index] = booking;
+                    }
+                    // Remove cancelled booking from locked bookings list
+                    state.overrides.lockedBookings.list = state.overrides.lockedBookings.list.filter(
+                        b => b.id !== booking.id
+                    );
+                } else {
+                    // Fallback: try to get bookingId from meta
+                    const bookingId = action.meta?.arg?.bookingId;
+                    if (bookingId) {
+                        state.overrides.lockedBookings.list = state.overrides.lockedBookings.list.filter(
+                            b => b.id !== bookingId
+                        );
                     }
                 }
             });
@@ -729,6 +759,18 @@ const adminSlice = createSlice({
             .addCase(grantSimulatorCredits.rejected, (state, action) => {
                 state.overrides.simulator.loading = false;
                 state.overrides.simulator.error = action.payload || 'Unable to grant simulator credits.';
+            })
+            .addCase(getLockedBookings.pending, (state) => {
+                state.overrides.lockedBookings.loading = true;
+                state.overrides.lockedBookings.error = null;
+            })
+            .addCase(getLockedBookings.fulfilled, (state, action) => {
+                state.overrides.lockedBookings.loading = false;
+                state.overrides.lockedBookings.list = action.payload?.bookings || [];
+            })
+            .addCase(getLockedBookings.rejected, (state, action) => {
+                state.overrides.lockedBookings.loading = false;
+                state.overrides.lockedBookings.error = action.payload || 'Unable to fetch locked bookings.';
             });
         
         // User management

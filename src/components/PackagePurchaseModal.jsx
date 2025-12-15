@@ -148,11 +148,52 @@ function PackagePurchaseModal({
             }
             
             // Create temp purchase
+            // Determine package type from backend category field
+            // Category can be: 'simulator', 'coaching', or 'combo'
+            // For redirect URL: 'simulator' → 'simulator', 'coaching' or 'combo' → 'coaching'
+            // Priority: ALWAYS use packageData.category if available (most reliable source)
+            let packageCategory;
+            if (packageData?.category && typeof packageData.category === 'string') {
+                // Use category from backend (most reliable)
+                packageCategory = packageData.category;
+            } else {
+                // Fallback: determine from package data or isSimulatorPackage prop
+                // Check if it has simulator_hours to determine if it's a combo package
+                const hasSimulatorHours = packageData?.simulator_hours && parseFloat(packageData.simulator_hours) > 0;
+                if (hasSimulatorHours) {
+                    packageCategory = 'combo';
+                } else if (isSimulatorPackage) {
+                    packageCategory = 'simulator';
+                } else {
+                    packageCategory = 'coaching';
+                }
+            }
+            // Map category to package_type for URL: combo packages should use 'coaching' as package_type
+            const packageTypeForUrl = packageCategory === 'simulator' ? 'simulator' : 'coaching';
+            
+            // Debug logging to trace the issue
+            console.log('🔍 Package Purchase Debug:', {
+                packageId,
+                packageData: packageData ? {
+                    id: packageData.id,
+                    title: packageData.title,
+                    category: packageData.category,
+                    simulator_hours: packageData.simulator_hours,
+                    hasSimulatorHours: packageData.simulator_hours && parseFloat(packageData.simulator_hours) > 0
+                } : null,
+                isSimulatorPackage,
+                packageCategory,
+                packageTypeForUrl,
+                'packageData?.category exists': !!packageData?.category,
+                'packageData?.category value': packageData?.category
+            });
+            
             const tempResult = await dispatch(createTempPurchase({
                 packageId,
                 buyerPhone,
                 purchaseType,
                 recipients,
+                packageType: packageTypeForUrl,
             }));
             
             if (createTempPurchase.fulfilled.match(tempResult)) {
@@ -166,6 +207,8 @@ function PackagePurchaseModal({
                 url.searchParams.set('package_id', packageId.toString());
                 url.searchParams.set('purchase_type', purchaseType);
                 url.searchParams.set('recipient_phone', tempId); // recipient_phone contains temp_id
+                // Use packageTypeForUrl: 'simulator' for simulator packages, 'coaching' for coaching/combo packages
+                url.searchParams.set('package_type', packageTypeForUrl);
                 
                 // Reset form state
                 setRecipientPhone('');

@@ -17,6 +17,31 @@ apiClient.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Token ${token}`;
         }
+        
+        // Add location_id to all requests (GET, POST, PUT, DELETE, PATCH)
+        const locationId = localStorage.getItem('locationId');
+        if (locationId) {
+            // For GET requests, add as query parameter
+            if (config.method === 'get' || config.method === 'GET') {
+                config.params = config.params || {};
+                config.params.location_id = locationId;
+            } else {
+                // For POST, PUT, DELETE, PATCH, add to request body
+                // But if data is a list or FormData, add as query parameter instead
+                if (Array.isArray(config.data) || config.data instanceof FormData) {
+                    // If data is a list or FormData, add location_id as query parameter
+                    config.params = config.params || {};
+                    config.params.location_id = locationId;
+                } else if (typeof config.data === 'object' && config.data !== null) {
+                    // If data is an object (dict), add location_id to the body
+                    config.data.location_id = locationId;
+                } else {
+                    // If data is null/undefined, create an object with location_id
+                    config.data = { location_id: locationId };
+                }
+            }
+        }
+        
         return config;
     },
     (error) => {

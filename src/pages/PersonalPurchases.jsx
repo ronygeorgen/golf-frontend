@@ -1,22 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getMyPackagePurchases } from '../store/slices/coachingSlice';
+import { getMyPackagePurchases, getMySimulatorPurchases } from '../store/slices/coachingSlice';
 import { Skeleton } from '../components/skeletons/SkeletonLoader';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 
 function PersonalPurchases() {
     const dispatch = useAppDispatch();
-    const { purchases, purchasesPagination, purchasesLoading } = useAppSelector((state) => state.coaching);
+    const { 
+        purchases, 
+        simulatorPurchases,
+        purchasesPagination, 
+        purchasesLoading,
+        simulatorPurchasesLoading 
+    } = useAppSelector((state) => state.coaching);
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
         dispatch(getMyPackagePurchases({ page: currentPage }));
+        dispatch(getMySimulatorPurchases({ page: 1 })); // Fetch all simulator purchases
     }, [dispatch, currentPage]);
 
-    const totalPages = purchasesPagination.totalPages || 1;
-    const totalCount = purchasesPagination.count || 0;
-    const pageSize = purchasesPagination.pageSize || 10;
+    // Combine all purchases (coaching + simulator) - sorted by latest purchase first
+    const allPurchases = React.useMemo(() => {
+        // Combine purchases from both types
+        const combined = [
+            ...purchases.map(p => ({ ...p, purchaseType: 'coaching' })),
+            ...(simulatorPurchases || []).map(p => ({ ...p, purchaseType: 'simulator' }))
+        ];
+        
+        // Sort by purchased_at date/time (most recent first)
+        return combined.sort((a, b) => {
+            const dateA = new Date(a.purchased_at);
+            const dateB = new Date(b.purchased_at);
+            return dateB - dateA; // Descending order (newest first)
+        });
+    }, [purchases, simulatorPurchases]);
+
+    const totalCount = allPurchases.length;
+    const isLoading = purchasesLoading || simulatorPurchasesLoading;
 
     return (
         <div className="p-4 md:p-6 lg:p-8">
@@ -29,14 +51,17 @@ function PersonalPurchases() {
                         </p>
                     </div>
                     <button
-                        onClick={() => dispatch(getMyPackagePurchases({ page: currentPage }))}
+                        onClick={() => {
+                            dispatch(getMyPackagePurchases({ page: currentPage }));
+                            dispatch(getMySimulatorPurchases({ page: 1 }));
+                        }}
                         className="text-sm text-primary hover:text-primary-light font-semibold transition-colors"
                     >
                         Refresh
                     </button>
                 </div>
 
-                {purchasesLoading ? (
+                {isLoading ? (
                     <div className="grid gap-4">
                         {Array.from({ length: 5 }).map((_, idx) => (
                             <div key={idx} className="rounded-card p-4 bg-surface shadow-card space-y-3">
@@ -50,7 +75,7 @@ function PersonalPurchases() {
                             </div>
                         ))}
                     </div>
-                ) : purchases.length === 0 ? (
+                ) : allPurchases.length === 0 ? (
                     <div className="text-center text-text-secondary py-12">
                         <p className="text-lg mb-2">You haven&apos;t purchased any packages yet.</p>
                         <p className="text-sm">Start by purchasing a package from the Packages page.</p>
@@ -58,24 +83,37 @@ function PersonalPurchases() {
                 ) : (
                     <>
                         <div className="grid gap-4 mb-6">
-                            {purchases.map((purchase) => {
+                            {allPurchases.map((purchase) => {
                                 const isGift = purchase.purchase_type === 'gift';
                                 const owner = purchase.original_owner_details;
+                                const isSimulator = purchase.purchaseType === 'simulator';
+                                
                                 return (
-                                    <div key={purchase.id} className="rounded-card p-4 bg-background border border-border shadow-card">
+                                    <div 
+                                        key={isSimulator ? `sim-${purchase.id}` : purchase.id} 
+                                        className={`rounded-card p-4 bg-background border border-border shadow-card ${isSimulator ? 'border-l-4 border-accent' : ''}`}
+                                    >
                                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                             <div className="flex-1">
                                                 <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
                                                 <p className="text-sm text-text-secondary">
-                                                    Package: {purchase.package_details?.title}
+                                                    Package: {purchase.package_details?.title || (isSimulator ? 'Simulator Package' : 'Package')}
                                                 </p>
-                                                <p className="text-sm text-text-secondary">
-                                                    Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
-                                                </p>
-                                                {purchase.simulator_hours_total > 0 && (
+                                                {isSimulator ? (
                                                     <p className="text-sm text-text-secondary">
-                                                        Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                        Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
                                                     </p>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-sm text-text-secondary">
+                                                            Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
+                                                        </p>
+                                                        {purchase.simulator_hours_total > 0 && (
+                                                            <p className="text-sm text-text-secondary">
+                                                                Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                            </p>
+                                                        )}
+                                                    </>
                                                 )}
                                                 {isGift && owner && (
                                                     <p className="text-sm text-accent mt-1">
@@ -97,35 +135,12 @@ function PersonalPurchases() {
                             })}
                         </div>
 
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-border">
-                                <p className="text-sm text-text-secondary">
-                                    Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalCount)} of {totalCount} purchases
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                                        disabled={currentPage === 1 || purchasesLoading}
-                                        variant="secondary"
-                                        className="px-3 py-1"
-                                    >
-                                        Previous
-                                    </Button>
-                                    <span className="text-sm font-medium text-text-primary">
-                                        Page {currentPage} of {totalPages}
-                                    </span>
-                                    <Button
-                                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                                        disabled={currentPage >= totalPages || purchasesLoading}
-                                        variant="primary"
-                                        className="px-3 py-1"
-                                    >
-                                        Next
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+                        {/* Show total count */}
+                        <div className="flex items-center justify-center pt-4 border-t border-border">
+                            <p className="text-sm text-text-secondary">
+                                Total: {totalCount} purchase{totalCount !== 1 ? 's' : ''}
+                            </p>
+                        </div>
                     </>
                 )}
             </div>

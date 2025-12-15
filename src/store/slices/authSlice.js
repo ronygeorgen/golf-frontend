@@ -144,14 +144,24 @@ export const logout = createAsyncThunk(
 );
 
 // Initial state
-const initialState = {
-    user: JSON.parse(localStorage.getItem('user')) || null,
-    token: localStorage.getItem('token') || null,
-    loading: false,
-    error: null,
-    otpSent: false,
-    otpMessage: null,
+const getInitialState = () => {
+    const user = JSON.parse(localStorage.getItem('user')) || null;
+    const locationId = user?.ghl_location_id || localStorage.getItem('locationId') || null;
+    if (locationId && !localStorage.getItem('locationId')) {
+        localStorage.setItem('locationId', locationId);
+    }
+    return {
+        user: user,
+        token: localStorage.getItem('token') || null,
+        locationId: locationId,
+        loading: false,
+        error: null,
+        otpSent: false,
+        otpMessage: null,
+    };
 };
+
+const initialState = getInitialState();
 
 // Auth slice
 const authSlice = createSlice({
@@ -183,6 +193,11 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
+                // Store location_id from user data
+                if (action.payload.user?.ghl_location_id) {
+                    state.locationId = action.payload.user.ghl_location_id;
+                    localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                }
                 // Clear DOB popup flag on new signup
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -201,6 +216,11 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
+                // Store location_id from user data
+                if (action.payload.user?.ghl_location_id) {
+                    state.locationId = action.payload.user.ghl_location_id;
+                    localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                }
                 // Clear DOB popup flag on login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -236,6 +256,11 @@ const authSlice = createSlice({
                 state.user = action.payload.user;
                 state.token = action.payload.token;
                 state.otpSent = false;
+                // Store location_id from user data
+                if (action.payload.user?.ghl_location_id) {
+                    state.locationId = action.payload.user.ghl_location_id;
+                    localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                }
                 // Clear DOB popup flag on new login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -252,6 +277,11 @@ const authSlice = createSlice({
             .addCase(getProfile.fulfilled, (state, action) => {
                 state.loading = false;
                 state.user = action.payload;
+                // Update location_id from user data
+                if (action.payload?.ghl_location_id) {
+                    state.locationId = action.payload.ghl_location_id;
+                    localStorage.setItem('locationId', action.payload.ghl_location_id);
+                }
             })
             .addCase(getProfile.rejected, (state, action) => {
                 state.loading = false;
@@ -268,6 +298,11 @@ const authSlice = createSlice({
                 state.loading = false;
                 if (action.payload.user) {
                     state.user = action.payload.user;
+                    // Update location_id from user data
+                    if (action.payload.user?.ghl_location_id) {
+                        state.locationId = action.payload.user.ghl_location_id;
+                        localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                    }
                 }
             })
             .addCase(updateProfile.rejected, (state, action) => {
@@ -304,6 +339,11 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
+                // Store location_id from user data
+                if (action.payload.user?.ghl_location_id) {
+                    state.locationId = action.payload.user.ghl_location_id;
+                    localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                }
                 // Clear DOB popup flag on auto-login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -317,9 +357,11 @@ const authSlice = createSlice({
             .addCase(logout.fulfilled, (state) => {
                 state.user = null;
                 state.token = null;
+                state.locationId = null;
                 state.error = null;
                 state.otpSent = false;
                 state.otpMessage = null;
+                localStorage.removeItem('locationId');
             });
     },
 });

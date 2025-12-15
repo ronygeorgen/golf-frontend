@@ -34,7 +34,8 @@ function Packages() {
         organizationPurchasesPagination,
         loading, 
         simulatorPackagesLoading,
-        purchasesLoading, 
+        purchasesLoading,
+        simulatorPurchasesLoading,
         organizationPurchasesLoading 
     } = useAppSelector((state) => state.coaching);
 
@@ -44,21 +45,52 @@ function Packages() {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState('normal');
     const [selectedPackageId, setSelectedPackageId] = useState(null);
+    const [selectedPackageCategory, setSelectedPackageCategory] = useState(null); // Track which category was clicked
     const [memberManagementOpen, setMemberManagementOpen] = useState(false);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
     const [usageDetailsOpen, setUsageDetailsOpen] = useState(false);
     const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState(null);
     const previewLimit = 5;
 
+    // Initial load - fetch all data on mount
     useEffect(() => {
+        console.log('🔄 Initial mount - fetching all data');
+        // Always fetch packages
         dispatch(getActiveCoachingPackages());
         dispatch(getActiveSimulatorPackages());
+        
+        // Always fetch purchases (both types) on mount - CRITICAL: both must be called
+        console.log('📞 Initial mount - Calling getMyPackagePurchases');
         dispatch(getMyPackagePurchases({ page: 1 }));
-        dispatch(getMySimulatorPurchases({ page: 1 }));
+        console.log('📞 Initial mount - Calling getMySimulatorPurchases');
+        dispatch(getMySimulatorPurchases({ page: 1 })); // Ensure this is always called
         dispatch(getMyOrganizationPurchases({ page: 1 }));
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
     }, [dispatch]);
+    
+    // Refetch data when view mode changes - watch searchParams directly to ensure it triggers on URL changes
+    useEffect(() => {
+        const currentView = searchParams.get('view') === 'purchases' ? 'manage-purchases' : 'view-packages';
+        console.log('🔄 View mode changed:', currentView, 'URL view param:', searchParams.get('view'));
+        
+        if (currentView === 'manage-purchases') {
+            // When switching to purchases view, refresh purchase-related data
+            // IMPORTANT: Always call both purchase APIs to get latest data
+            console.log('📞 ViewMode effect (manage-purchases) - Calling getMyPackagePurchases');
+            dispatch(getMyPackagePurchases({ page: 1 }));
+            console.log('📞 ViewMode effect (manage-purchases) - Calling getMySimulatorPurchases');
+            dispatch(getMySimulatorPurchases({ page: 1 })); // Ensure simulator purchases are fetched
+            dispatch(getMyOrganizationPurchases({ page: 1 }));
+            dispatch(getGiftsPending());
+            dispatch(getTransfersPending());
+        } else if (currentView === 'view-packages') {
+            // When switching to packages view, refresh package listings
+            console.log('📞 ViewMode effect (view-packages) - Calling getActiveCoachingPackages and getActiveSimulatorPackages');
+            dispatch(getActiveCoachingPackages());
+            dispatch(getActiveSimulatorPackages());
+        }
+    }, [searchParams, dispatch]); // Watch searchParams directly instead of viewMode
     
     // Debug: Log simulator purchases when they change
     useEffect(() => {
@@ -73,32 +105,93 @@ function Packages() {
                     hours_remaining: p.hours_remaining,
                     hours_total: p.hours_total,
                     purchase_type: p.purchase_type,
-                    gift_status: p.gift_status
+                    gift_status: p.gift_status,
+                    purchased_at: p.purchased_at
                 }))
             });
         }
     }, [simulatorPurchases]);
 
+    // Additional safeguard: Refresh purchases when component becomes visible and we're on purchases view
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden && viewMode === 'manage-purchases') {
+                console.log('🔄 Page became visible - Refreshing purchase data');
+                dispatch(getMyPackagePurchases({ page: 1 }));
+                dispatch(getMySimulatorPurchases({ page: 1 }));
+            }
+        };
 
-    const selectedPackage = packages.find((pkg) => pkg.id === selectedPackageId) 
-        || (simulatorPackages || []).find((pkg) => pkg.id === selectedPackageId);
-    const isSimulatorPackage = (simulatorPackages || []).some((pkg) => pkg.id === selectedPackageId);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [viewMode, dispatch]);
 
-    const handleOpenModal = (pkgId, type) => {
+
+    // Find package - use selectedPackageCategory to determine which array to check first
+    // This prevents conflicts when the same ID exists in both arrays
+    const simulatorPackage = (simulatorPackages || []).find((pkg) => pkg.id === selectedPackageId);
+    const coachingPackage = packages.find((pkg) => pkg.id === selectedPackageId);
+    
+    // Determine which package to use based on the category that was clicked
+    let selectedPackage;
+    if (selectedPackageCategory === 'simulator') {
+        // User clicked a simulator package, use that even if coaching package exists with same ID
+        selectedPackage = simulatorPackage || coachingPackage;
+    } else if (selectedPackageCategory === 'coaching' || selectedPackageCategory === 'combo') {
+        // User clicked a coaching/combo package, use that even if simulator package exists with same ID
+        selectedPackage = coachingPackage || simulatorPackage;
+    } else {
+        // Fallback: prioritize simulatorPackages if ID exists in both (original behavior)
+        selectedPackage = simulatorPackage || coachingPackage;
+    }
+    
+    // Determine package type: simulator packages are ONLY in simulatorPackages array
+    // Coaching packages (including combo) are in packages array
+    // Use the selected package's category if available, otherwise check which array it came from
+    const isSimulatorPackage = selectedPackage?.category === 'simulator' || 
+                                (selectedPackage === simulatorPackage && !coachingPackage);
+    
+    // Debug: Log selected package details when it changes
+    useEffect(() => {
+        if (selectedPackage && selectedPackageId) {
+            console.log('📦 Selected Package Debug:', {
+                packageId: selectedPackageId,
+                title: selectedPackage.title,
+                category: selectedPackage.category,
+                selectedPackageCategory, // The category that was clicked
+                isSimulatorPackage,
+                simulator_hours: selectedPackage.simulator_hours,
+                'from simulatorPackages': !!simulatorPackage,
+                'from packages': !!coachingPackage,
+                'simulatorPackage exists': !!simulatorPackage,
+                'coachingPackage exists': !!coachingPackage
+            });
+        }
+    }, [selectedPackageId, selectedPackage, selectedPackageCategory, isSimulatorPackage, simulatorPackage, coachingPackage]);
+
+    const handleOpenModal = (pkgId, type, packageCategory = null) => {
         setSelectedPackageId(pkgId);
         setModalType(type);
+        setSelectedPackageCategory(packageCategory); // Store the category of the clicked package
         setModalOpen(true);
     };
 
     const handleCloseModal = () => {
         setModalOpen(false);
         setSelectedPackageId(null);
+        setSelectedPackageCategory(null);
     };
 
     const handlePurchaseSuccess = () => {
-        dispatch(getMyPackagePurchases());
-        dispatch(getMyOrganizationPurchases());
+        // Refresh all purchase-related data after a successful purchase
+        console.log('🔄 Purchase success - Refreshing all purchase data');
+        dispatch(getMyPackagePurchases({ page: 1 }));
+        dispatch(getMySimulatorPurchases({ page: 1 }));
+        dispatch(getMyOrganizationPurchases({ page: 1 }));
         dispatch(getGiftsPending());
+        dispatch(getTransfersPending());
     };
 
     const handleManageMembers = (purchase) => {
@@ -272,24 +365,22 @@ function Packages() {
 
                                 {/* Content Section */}
                                 <div className="p-4 flex-1 flex flex-col">
-                                    {/* Your Sessions Info */}
-                                    {ownedSessions > 0 && (
-                                        <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-2.5 mb-3">
-                                            <p className="text-xs text-status-confirmed-text font-semibold">
-                                                You will get <span className="text-base font-bold">{ownedSessions}</span> coaching session{ownedSessions !== 1 ? 's' : ''}
-                                                {pkg.simulator_hours > 0 && (
-                                                    <> and <span className="text-base font-bold">{pkg.simulator_hours}</span> simulator hour{pkg.simulator_hours !== 1 ? 's' : ''}</>
-                                                )}
-                                            </p>
-                                        </div>
-                                    )}
+                                    {/* Package Info */}
+                                    <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-2.5 mb-3">
+                                        <p className="text-xs text-status-confirmed-text font-semibold">
+                                            You will get <span className="text-base font-bold">{pkg.session_count}</span> coaching session{pkg.session_count !== 1 ? 's' : ''}
+                                            {pkg.simulator_hours > 0 && (
+                                                <> and <span className="text-base font-bold">{pkg.simulator_hours}</span> simulator hour{pkg.simulator_hours !== 1 ? 's' : ''}</>
+                                            )}
+                                        </p>
+                                    </div>
 
                                     {/* Action Buttons */}
                                     <div className="space-y-2 mt-auto">
                                         {pkg.session_count >= 10 ? (
                                             <>
                                                 <Button
-                                                    onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                                    onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
                                                     variant="primary"
                                                     className="w-full py-2 text-sm"
                                                 >
@@ -297,14 +388,14 @@ function Packages() {
                                                 </Button>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <Button
-                                                        onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                        onClick={() => handleOpenModal(pkg.id, 'gift', pkg.category)}
                                                         variant="accent"
                                                         className="w-full py-2 text-sm"
                                                     >
                                                         Gift Package
                                                     </Button>
                                                     <Button
-                                                        onClick={() => handleOpenModal(pkg.id, 'organization')}
+                                                        onClick={() => handleOpenModal(pkg.id, 'organization', pkg.category)}
                                                         variant="secondary"
                                                         className="w-full py-2 text-sm"
                                                     >
@@ -315,14 +406,14 @@ function Packages() {
                                         ) : (
                                             <div className="grid grid-cols-2 gap-2">
                                                 <Button
-                                                    onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                                    onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
                                                     variant="primary"
                                                     className="w-full py-2 text-sm"
                                                 >
                                                     Buy for Myself
                                                 </Button>
                                                 <Button
-                                                    onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                    onClick={() => handleOpenModal(pkg.id, 'gift', pkg.category)}
                                                     variant="accent"
                                                     className="w-full py-2 text-sm"
                                                 >
@@ -377,14 +468,14 @@ function Packages() {
                                         {/* Action Buttons */}
                                         <div className="grid grid-cols-2 gap-2 mt-auto">
                                             <Button
-                                                onClick={() => handleOpenModal(pkg.id, 'normal')}
+                                                onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
                                                 variant="primary"
                                                 className="w-full py-2 text-sm"
                                             >
                                                 Buy for Myself
                                             </Button>
                                             <Button
-                                                onClick={() => handleOpenModal(pkg.id, 'gift')}
+                                                onClick={() => handleOpenModal(pkg.id, 'gift', pkg.category)}
                                                 variant="accent"
                                                 className="w-full py-2 text-sm"
                                             >
@@ -418,25 +509,33 @@ function Packages() {
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold text-text-primary">My Package Purchases</h2>
                     <div className="flex items-center gap-3">
-                        {purchases.length > previewLimit && (
-                            <button
-                                onClick={() => navigate('/purchases/personal')}
-                                className="group text-sm text-primary hover:text-primary-light transition-colors font-medium cursor-pointer"
-                            >
-                                <span className="border-b border-current group-hover:border-primary-light transition-colors">
-                                    View All ({purchasesPagination.count || purchases.length})
-                                </span>
-                            </button>
-                        )}
+                        {(() => {
+                            const totalPurchases = purchases.length + simulatorPurchases.length;
+                            const totalCount = (purchasesPagination.count || purchases.length) + (simulatorPurchases.length || 0);
+                            return totalPurchases > previewLimit && (
+                                <button
+                                    onClick={() => navigate('/purchases/personal')}
+                                    className="group text-sm text-primary hover:text-primary-light transition-colors font-medium cursor-pointer"
+                                >
+                                    <span className="border-b border-current group-hover:border-primary-light transition-colors">
+                                        View All ({totalCount})
+                                    </span>
+                                </button>
+                            );
+                        })()}
                         <button
-                            onClick={() => dispatch(getMyPackagePurchases({ page: 1 }))}
+                            onClick={() => {
+                                console.log('🔄 Refresh button clicked - Refreshing purchase data');
+                                dispatch(getMyPackagePurchases({ page: 1 }));
+                                dispatch(getMySimulatorPurchases({ page: 1 }));
+                            }}
                             className="text-sm text-primary hover:text-primary-light font-semibold transition-colors"
                         >
                             Refresh
                         </button>
                     </div>
                 </div>
-                {purchasesLoading ? (
+                {(purchasesLoading || simulatorPurchasesLoading) ? (
                     <div className="grid gap-4">
                         {Array.from({ length: Math.min(3, previewLimit) }).map((_, idx) => (
                             <div key={idx} className="rounded-card p-4 bg-surface shadow-card space-y-3">
@@ -454,81 +553,75 @@ function Packages() {
                     <div className="text-center text-text-secondary py-6">You haven&apos;t purchased any packages yet.</div>
                 ) : (
                     <div className="grid gap-4">
-                        {/* Coaching Package Purchases */}
-                        {purchases
-                            .slice(0, previewLimit)
-                            .map((purchase) => {
-                            const isGift = purchase.purchase_type === 'gift';
-                            const owner = purchase.original_owner_details;
-                            return (
-                                <div key={purchase.id} className="rounded-card p-4 bg-surface shadow-card">
-                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
-                                            <p className="text-sm text-text-secondary">
-                                                Package: {purchase.package_details?.title}
-                                            </p>
-                                            <p className="text-sm text-text-secondary">
-                                                Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
-                                            </p>
-                                            {purchase.simulator_hours_total > 0 && (
-                                                <p className="text-sm text-text-secondary">
-                                                    Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
-                                                </p>
-                                            )}
-                                            {isGift && owner && (
-                                                <p className="text-sm text-accent mt-1">
-                                                    Gifted by {owner.first_name} {owner.last_name}
-                                                </p>
-                                            )}
+                        {/* Combined purchases (coaching + simulator) - sorted by latest purchase first */}
+                        {(() => {
+                            // Combine all purchases and mark their type
+                            const allPurchases = [
+                                ...purchases.map(p => ({ ...p, purchaseType: 'coaching' })),
+                                ...simulatorPurchases.map(p => ({ ...p, purchaseType: 'simulator' }))
+                            ];
+                            
+                            // Sort by purchased_at date/time (most recent first)
+                            const sortedPurchases = allPurchases.sort((a, b) => {
+                                const dateA = new Date(a.purchased_at);
+                                const dateB = new Date(b.purchased_at);
+                                return dateB - dateA; // Descending order (newest first)
+                            });
+                            
+                            // Take only the preview limit
+                            return sortedPurchases
+                                .slice(0, previewLimit)
+                                .map((purchase) => {
+                                    const isGift = purchase.purchase_type === 'gift';
+                                    const owner = purchase.original_owner_details;
+                                    const isSimulator = purchase.purchaseType === 'simulator';
+                                    
+                                    return (
+                                        <div 
+                                            key={isSimulator ? `sim-${purchase.id}` : purchase.id} 
+                                            className={`rounded-card p-4 bg-surface shadow-card ${isSimulator ? 'border-l-4 border-accent' : ''}`}
+                                        >
+                                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                                <div>
+                                                    <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
+                                                    <p className="text-sm text-text-secondary">
+                                                        Package: {purchase.package_details?.title || (isSimulator ? 'Simulator Package' : 'Package')}
+                                                    </p>
+                                                    {isSimulator ? (
+                                                        <p className="text-sm text-text-secondary">
+                                                            Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
+                                                        </p>
+                                                    ) : (
+                                                        <>
+                                                            <p className="text-sm text-text-secondary">
+                                                                Sessions Remaining: <span className="font-semibold">{purchase.sessions_remaining}</span> / {purchase.sessions_total}
+                                                            </p>
+                                                            {purchase.simulator_hours_total > 0 && (
+                                                                <p className="text-sm text-text-secondary">
+                                                                    Simulator Hours Remaining: <span className="font-semibold">{purchase.simulator_hours_remaining}</span> / {purchase.simulator_hours_total} hrs
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                    {isGift && owner && (
+                                                        <p className="text-sm text-accent mt-1">
+                                                            Gifted by {owner.first_name} {owner.last_name}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col items-end text-right space-y-1">
+                                                    <Badge status={isGift ? 'pending' : 'personal'}>
+                                                        {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
+                                                    </Badge>
+                                                    <span className="text-xs text-text-secondary">
+                                                        Purchased on {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-end text-right space-y-1">
-                                            <Badge status={isGift ? 'pending' : 'personal'}>
-                                                {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
-                                            </Badge>
-                                            <span className="text-xs text-text-secondary">
-                                                Purchased on {new Date(purchase.purchased_at).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {/* Simulator Package Purchases */}
-                        {simulatorPurchases
-                            .slice(0, previewLimit)
-                            .map((purchase) => {
-                            const isGift = purchase.purchase_type === 'gift';
-                            const owner = purchase.original_owner_details;
-                            return (
-                                <div key={`sim-${purchase.id}`} className="rounded-card p-4 bg-surface shadow-card border-l-4 border-accent">
-                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-text-primary">{purchase.purchase_name}</h3>
-                                            <p className="text-sm text-text-secondary">
-                                                Package: {purchase.package_details?.title || 'Simulator Package'}
-                                            </p>
-                                            <p className="text-sm text-text-secondary">
-                                                Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
-                                            </p>
-                                            {isGift && owner && (
-                                                <p className="text-sm text-accent mt-1">
-                                                    Gifted by {owner.first_name} {owner.last_name}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col items-end text-right space-y-1">
-                                            <Badge status={isGift ? 'pending' : 'personal'}>
-                                                {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
-                                            </Badge>
-                                            <span className="text-xs text-text-secondary">
-                                                Purchased on {new Date(purchase.purchased_at).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                    );
+                                });
+                        })()}
                     </div>
                 )}
                     </div>
