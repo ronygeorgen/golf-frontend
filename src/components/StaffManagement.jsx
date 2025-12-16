@@ -8,13 +8,18 @@ import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { Edit, Trash2, Calendar, Users } from 'lucide-react';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function StaffManagement() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { list: staff, loading } = useAppSelector((state) => state.admin.staff);
+    const { user } = useAppSelector((state) => state.auth);
     const modalRef = useRef(null);
+    
+    const isSuperadmin = user?.role === 'superadmin';
     
     const [showForm, setShowForm] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
@@ -23,10 +28,14 @@ function StaffManagement() {
         last_name: '',
         email: '',
         phone: '',
-        role: 'staff',
-        date_of_birth: ''
+        role: isSuperadmin ? 'admin' : 'staff',
+        date_of_birth: '',
+        ghl_location_id: ''
     });
+    const [ghlLocations, setGhlLocations] = useState([]);
+    const [loadingLocations, setLoadingLocations] = useState(false);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -38,6 +47,26 @@ function StaffManagement() {
     useEffect(() => {
         dispatch(getStaff());
     }, [dispatch]);
+
+    // Fetch GHL locations if superadmin
+    useEffect(() => {
+        const fetchGhlLocations = async () => {
+            if (isSuperadmin) {
+                try {
+                    setLoadingLocations(true);
+                    const response = await apiClient.get(endpoints.ghl.admin.locations);
+                    if (response.data && response.data.locations) {
+                        setGhlLocations(response.data.locations);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch GHL locations:', error);
+                } finally {
+                    setLoadingLocations(false);
+                }
+            }
+        };
+        fetchGhlLocations();
+    }, [isSuperadmin]);
 
     // Close modal when clicking outside
     useEffect(() => {
@@ -62,14 +91,41 @@ function StaffManagement() {
         e.preventDefault();
         setSubmitLoading(true);
         try {
+            // For superadmin creating admin, ensure location_id is provided
+            if (isSuperadmin && !editingStaff && !formData.ghl_location_id) {
+                openPopup({
+                    type: 'error',
+                    title: 'Location Required',
+                    message: 'Please select a location for the admin.',
+                    confirmText: 'OK',
+                    showCancel: false,
+                });
+                setSubmitLoading(false);
+                return;
+            }
+
+            const submitData = { ...formData };
+            // Remove location_id from formData if not superadmin (regular admin uses their own location)
+            if (!isSuperadmin) {
+                delete submitData.ghl_location_id;
+            }
+
             if (editingStaff) {
-                await dispatch(updateStaff({ id: editingStaff.id, staffData: formData }));
+                await dispatch(updateStaff({ id: editingStaff.id, staffData: submitData }));
             } else {
-                await dispatch(createStaff(formData));
+                await dispatch(createStaff(submitData));
             }
             setShowForm(false);
             setEditingStaff(null);
-            setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff' });
+            setFormData({ 
+                first_name: '', 
+                last_name: '', 
+                email: '', 
+                phone: '', 
+                role: isSuperadmin ? 'admin' : 'staff',
+                date_of_birth: '',
+                ghl_location_id: ''
+            });
             // No need to refetch - Redux already updates the state optimistically
         } finally {
             setSubmitLoading(false);
@@ -83,8 +139,9 @@ function StaffManagement() {
             last_name: staffMember.last_name,
             email: staffMember.email,
             phone: staffMember.phone,
-            role: staffMember.role,
-            date_of_birth: staffMember.date_of_birth || ''
+            role: isSuperadmin ? staffMember.role : 'staff', // Regular admin can only edit as staff
+            date_of_birth: staffMember.date_of_birth || '',
+            ghl_location_id: staffMember.ghl_location_id || ''
         });
         setShowForm(true);
     };
@@ -98,7 +155,17 @@ function StaffManagement() {
             cancelText: 'Cancel',
             showCancel: true,
             onConfirm: async () => {
-                await dispatch(deleteStaff(staffId));
+                setDeletingId(staffId);
+                try {
+                    const result = await dispatch(deleteStaff(staffId));
+                    if (deleteStaff.fulfilled.match(result)) {
+                        closePopup();
+                    }
+                } catch (error) {
+                    console.error('Error deleting staff:', error);
+                } finally {
+                    setDeletingId(null);
+                }
             },
         });
     };
@@ -109,10 +176,21 @@ function StaffManagement() {
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <Button 
-                            onClick={() => setShowForm(true)}
+                            onClick={() => {
+                                setFormData({
+                                    first_name: '',
+                                    last_name: '',
+                                    email: '',
+                                    phone: '',
+                                    role: isSuperadmin ? 'admin' : 'staff',
+                                    date_of_birth: '',
+                                    ghl_location_id: ''
+                                });
+                                setShowForm(true);
+                            }}
                             variant="primary"
                         >
-                            Add Staff Member
+                            {isSuperadmin ? 'Add Admin' : 'Add Staff Member'}
                         </Button>
                     </div>
                 </div>
@@ -127,7 +205,7 @@ function StaffManagement() {
                         <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
                                 <h2 className="text-2xl font-bold text-text-primary mb-6">
-                                    {editingStaff ? 'Edit Staff' : 'Add Staff'}
+                                    {editingStaff ? (isSuperadmin ? 'Edit Admin' : 'Edit Staff') : (isSuperadmin ? 'Add Admin' : 'Add Staff')}
                                 </h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -176,18 +254,45 @@ function StaffManagement() {
                                             required
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-2">
-                                            Role
-                                        </label>
-                                        <select
-                                            value={formData.role}
-                                            onChange={(e) => setFormData({...formData, role: e.target.value})}
-                                        >
-                                            <option value="staff">Staff</option>
-                                            <option value="admin">Admin</option>
-                                        </select>
-                                    </div>
+                                    {!isSuperadmin && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Role
+                                            </label>
+                                            <select
+                                                value={formData.role}
+                                                onChange={(e) => setFormData({...formData, role: e.target.value})}
+                                            >
+                                                <option value="staff">Staff</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    {isSuperadmin && !editingStaff && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Location <span className="text-danger">*</span>
+                                            </label>
+                                            {loadingLocations ? (
+                                                <div className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary text-center">
+                                                    Loading locations...
+                                                </div>
+                                            ) : (
+                                                <select
+                                                    value={formData.ghl_location_id}
+                                                    onChange={(e) => setFormData({...formData, ghl_location_id: e.target.value})}
+                                                    className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                                    required
+                                                >
+                                                    <option value="">Select a location</option>
+                                                    {ghlLocations.map((location) => (
+                                                        <option key={location.location_id} value={location.location_id}>
+                                                            {location.company_name || location.location_id}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
                                             Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
@@ -208,7 +313,7 @@ function StaffManagement() {
                                         >
                                             {submitLoading
                                                 ? (editingStaff ? 'Updating...' : 'Creating...')
-                                                : `${editingStaff ? 'Update' : 'Create'} Staff`}
+                                                : `${editingStaff ? 'Update' : 'Create'} ${isSuperadmin ? 'Admin' : 'Staff'}`}
                                         </Button>
                                         <Button 
                                             type="button" 
@@ -217,7 +322,15 @@ function StaffManagement() {
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingStaff(null);
-                                                setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff', date_of_birth: '' });
+                                                setFormData({ 
+                                                    first_name: '', 
+                                                    last_name: '', 
+                                                    email: '', 
+                                                    phone: '', 
+                                                    role: isSuperadmin ? 'admin' : 'staff',
+                                                    date_of_birth: '',
+                                                    ghl_location_id: ''
+                                                });
                                             }}
                                         >
                                             Cancel
@@ -298,11 +411,16 @@ function StaffManagement() {
                                                         </div>
                                                         <div className="relative group">
                                                             <button 
-                                                                className="p-2 text-danger hover:text-danger-light hover:bg-danger/10 rounded-button transition-colors"
+                                                                className="p-2 text-danger hover:text-danger-light hover:bg-danger/10 rounded-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 onClick={() => handleDelete(staffMember.id)}
+                                                                disabled={deletingId === staffMember.id}
                                                                 aria-label="Delete staff member"
                                                             >
-                                                                <Trash2 className="w-4 h-4" />
+                                                                {deletingId === staffMember.id ? (
+                                                                    <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin"></div>
+                                                                ) : (
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                )}
                                                             </button>
                                                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                                                                 <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">

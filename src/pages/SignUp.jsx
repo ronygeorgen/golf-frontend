@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { signup, clearError } from '../store/slices/authSlice';
+import { signup, verifyOTP, requestOTP, clearError, clearOTP } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import { X } from 'lucide-react';
@@ -10,13 +10,11 @@ import { endpoints } from '../api/endpoints';
 
 function SignUp() {
     const dispatch = useAppDispatch();
-    const { loading, error } = useAppSelector((state) => state.auth);
+    const { loading, error, otpSent, otpMessage } = useAppSelector((state) => state.auth);
     
     const [formData, setFormData] = useState({
         email: '',
         phone: '',
-        password: '',
-        password_confirm: '',
         first_name: '',
         last_name: '',
         role: 'client',
@@ -24,6 +22,8 @@ function SignUp() {
         date_of_birth: ''
     });
     
+    const [otp, setOtp] = useState('');
+    const [step, setStep] = useState('signup'); // 'signup' or 'otp'
     const [toast, setToast] = useState({ show: false, messages: [] });
     const [locations, setLocations] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
@@ -83,6 +83,13 @@ function SignUp() {
     };
 
     useEffect(() => {
+        // Clear OTP state on mount
+        dispatch(clearError());
+        dispatch(clearOTP());
+        setStep('signup');
+    }, [dispatch]);
+
+    useEffect(() => {
         if (error) {
             const errorMessages = parseErrorMessages(error);
             // Show all error messages as toast
@@ -97,10 +104,19 @@ function SignUp() {
         }
     }, [error]);
 
-    const handleSubmit = async (e) => {
+    const handleSignupSubmit = async (e) => {
         e.preventDefault();
         dispatch(clearError());
         setToast({ show: false, messages: [] });
+        
+        // Validate that location is selected (mandatory)
+        if (!formData.ghl_location_id) {
+            setToast({ 
+                show: true, 
+                messages: ['Please select a location'] 
+            });
+            return;
+        }
         
         // Prepare data - convert empty string to null for date_of_birth
         const submitData = {
@@ -110,6 +126,17 @@ function SignUp() {
         
         const result = await dispatch(signup(submitData));
         if (signup.fulfilled.match(result)) {
+            // After successful signup, show OTP input
+            setStep('otp');
+        }
+    };
+
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        dispatch(clearError());
+        const result = await dispatch(verifyOTP({ phone: formData.phone, otp }));
+        if (verifyOTP.fulfilled.match(result)) {
+            // After OTP verification, redirect to booking page
             navigate('/booking');
         }
     };
@@ -128,7 +155,8 @@ function SignUp() {
                     Sign Up
                 </h2>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                {step === 'signup' && (
+                <form onSubmit={handleSignupSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-text-primary mb-2">
@@ -178,47 +206,28 @@ function SignUp() {
                     
                     <div>
                         <label className="block text-sm font-medium text-text-primary mb-2">
-                            Password
+                            Select Location <span className="text-danger">*</span>
                         </label>
-                        <input
-                            type="password"
-                            value={formData.password}
-                            onChange={(e) => setFormData({...formData, password: e.target.value})}
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Confirm Password
-                        </label>
-                        <input
-                            type="password"
-                            value={formData.password_confirm}
-                            onChange={(e) => setFormData({...formData, password_confirm: e.target.value})}
-                            required
-                        />
-                    </div>
-                    
-                    {locations.length > 0 && (
-                        <div>
-                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                Select Location <span className="text-text-secondary text-xs">(Optional)</span>
-                            </label>
+                        {loadingLocations ? (
+                            <div className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary text-center">
+                                Loading locations...
+                            </div>
+                        ) : (
                             <select
                                 value={formData.ghl_location_id}
                                 onChange={(e) => setFormData({...formData, ghl_location_id: e.target.value})}
                                 className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                required
                             >
-                                <option value="">Select a location (optional)</option>
+                                <option value="">Select a location</option>
                                 {locations.map((location) => (
                                     <option key={location.location_id} value={location.location_id}>
                                         {location.display_name}
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                    )}
+                        )}
+                    </div>
                     
                     <div>
                         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -242,6 +251,56 @@ function SignUp() {
                         {loading ? 'Creating Account...' : 'Sign Up'}
                     </Button>
                 </form>
+                )}
+
+                {step === 'otp' && (
+                    <form onSubmit={handleOtpSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Enter OTP
+                            </label>
+                            <p className="text-sm text-text-secondary mb-3">
+                                We've sent a verification code to {formData.phone}
+                            </p>
+                            <input
+                                type="text"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                placeholder="Enter 6-digit OTP"
+                                maxLength={6}
+                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary text-center text-2xl tracking-widest bg-background text-text-primary"
+                                required
+                            />
+                        </div>
+                        <Button 
+                            type="submit" 
+                            disabled={loading}
+                            variant="primary"
+                            className="w-full py-3"
+                        >
+                            {loading ? 'Verifying...' : 'Verify OTP'}
+                        </Button>
+                        <p className="text-sm text-center text-text-secondary">
+                            Didn't receive OTP?{' '}
+                            <button 
+                                type="button" 
+                                className="text-primary hover:text-primary-light font-medium transition-colors"
+                                onClick={() => {
+                                    dispatch(clearError());
+                                    dispatch(requestOTP(formData.phone));
+                                }}
+                            >
+                                Resend
+                            </button>
+                        </p>
+                    </form>
+                )}
+
+                {otpMessage && (
+                    <div className="mt-4 p-3 bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card">
+                        <p className="text-sm text-status-confirmed-text text-center">{otpMessage}</p>
+                    </div>
+                )}
                 
                 {/* Toast Notification */}
                 {toast.show && toast.messages.length > 0 && (

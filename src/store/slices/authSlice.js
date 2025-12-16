@@ -8,10 +8,7 @@ export const signup = createAsyncThunk(
     async (userData, { rejectWithValue }) => {
         try {
             const response = await apiClient.post(endpoints.auth.signup, userData);
-            if (response.data.token) {
-                localStorage.setItem('token', response.data.token);
-                localStorage.setItem('user', JSON.stringify(response.data.user));
-            }
+            // Signup no longer returns token - OTP verification is required
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -191,15 +188,10 @@ const authSlice = createSlice({
             })
             .addCase(signup.fulfilled, (state, action) => {
                 state.loading = false;
-                state.user = action.payload.user;
-                state.token = action.payload.token;
-                // Store location_id from user data
-                if (action.payload.user?.ghl_location_id) {
-                    state.locationId = action.payload.user.ghl_location_id;
-                    localStorage.setItem('locationId', action.payload.user.ghl_location_id);
-                }
-                // Clear DOB popup flag on new signup
-                sessionStorage.removeItem('dobPopupShown');
+                // Signup no longer returns token/user - OTP verification is required
+                // Token will be set after OTP verification in verifyOTP.fulfilled
+                state.otpSent = true;
+                state.otpMessage = action.payload.message || 'OTP sent successfully';
             })
             .addCase(signup.rejected, (state, action) => {
                 state.loading = false;

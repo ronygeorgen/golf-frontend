@@ -146,6 +146,11 @@ export const endpoints = {
 
     ghl: {
         onboard: '/ghlpage/onboard/',
+        admin: {
+            locations: '/ghlpage/admin/locations/',
+            updateCompanyName: (locationId) => `/ghlpage/admin/locations/${locationId}/company-name/`,
+            setCompanyName: '/ghlpage/admin/locations/set-company-name/',
+        },
     },
     
     // Special Events endpoints

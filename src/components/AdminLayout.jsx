@@ -19,7 +19,8 @@ import {
     Settings,
     UserCog,
     Clock,
-    CalendarOff
+    CalendarOff,
+    MapPin
 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
@@ -61,6 +62,9 @@ function AdminLayout() {
         };
     }, []);
 
+    const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
+    const isSuperadmin = user?.role === 'superadmin';
+
     // Navigation structure with grouped items
     const navigationItems = {
         dashboard: { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -75,6 +79,7 @@ function AdminLayout() {
                 { path: '/admin/simulator-packages', label: 'Manage Simulator Only Packages', icon: Clock },
                 { path: '/admin/special-events', label: 'Manage Special Events', icon: CalendarDays },
                 { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },
+                ...(isSuperadmin ? [{ path: '/admin/ghl-locations', label: 'Manage GHL Locations', icon: MapPin }] : []),
             ]
         },
         bookings: {
@@ -105,11 +110,11 @@ function AdminLayout() {
         navigate('/signin');
     };
 
-    // const handleGHLOnboard = () => {
-    //     const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
-    //     const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
-    //     window.open(onboardURL, '_blank', 'noopener,noreferrer');
-    // };
+    const handleGHLOnboard = () => {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+        const onboardURL = `${baseURL}${endpoints.ghl.onboard}`;
+        window.open(onboardURL, '_blank', 'noopener,noreferrer');
+    };
 
     const getPageTitle = () => {
         const path = location.pathname;
@@ -125,11 +130,10 @@ function AdminLayout() {
         // Check standalone items
         if (isActive(navigationItems.dashboard.path)) return 'Dashboard';
         if (isActive(navigationItems.overrides.path)) return 'Admin Overrides';
+        if (isActive('/admin/ghl-locations')) return 'GHL Location Management';
         
         return 'Admin Dashboard';
     };
-
-    const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
 
     const handleNavClick = (path) => {
         navigate(path);
@@ -411,16 +415,18 @@ function AdminLayout() {
                                                     <Home className="w-4 h-4" />
                                                     <span>Switch to User Side</span>
                                                 </button>
-                                                {/* <button
-                                                    onClick={() => {
-                                                        handleGHLOnboard();
-                                                        setDropdownOpen(false);
-                                                    }}
-                                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
-                                                >
-                                                    <Link2 className="w-4 h-4" />
-                                                    <span>Onboard GHL</span>
-                                                </button> */}
+                                                {isSuperadmin && (
+                                                    <button
+                                                        onClick={() => {
+                                                            handleGHLOnboard();
+                                                            setDropdownOpen(false);
+                                                        }}
+                                                        className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
+                                                    >
+                                                        <Link2 className="w-4 h-4" />
+                                                        <span>Onboard GHL</span>
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         handleLogout();
