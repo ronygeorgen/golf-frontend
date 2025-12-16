@@ -167,17 +167,18 @@ export const getCalendarBookings = createAsyncThunk(
 
 export const getCoachingSessionsByCoach = createAsyncThunk(
     'booking/getCoachingSessionsByCoach',
-    async ({ coachId, page = 1 } = {}, { rejectWithValue }) => {
+    async ({ coachId, page = 1, filter = 'upcoming' } = {}, { rejectWithValue }) => {
         try {
             const params = new URLSearchParams();
             if (coachId) params.append('coach_id', coachId);
             if (page) params.append('page', page);
+            if (filter) params.append('filter', filter);
             const queryString = params.toString();
             const url = queryString
                 ? `${endpoints.bookings.coachingSessionsByCoach}?${queryString}`
                 : endpoints.bookings.coachingSessionsByCoach;
             const response = await apiClient.get(url);
-            return response.data;
+            return { data: response.data, filter };
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
         }
@@ -282,11 +283,18 @@ const initialState = {
     bookings: [],
     selectedBooking: null,
     upcomingBookings: [],
+    completedBookings: [],
     upcomingPagination: {
         count: 0,
         page: 1,
         totalPages: 1,
         pageSize: 5, // 5 items per page for upcoming bookings
+    },
+    completedPagination: {
+        count: 0,
+        page: 1,
+        totalPages: 1,
+        pageSize: 5, // 5 items per page for completed bookings
     },
     todayBookings: [],
     calendarEvents: [],
@@ -471,19 +479,32 @@ const bookingSlice = createSlice({
             })
             .addCase(getCoachingSessionsByCoach.fulfilled, (state, action) => {
                 state.loading = false;
-                const results = Array.isArray(action.payload)
-                    ? action.payload
-                    : action.payload?.results || [];
-                state.upcomingBookings = results;
-                const count = action.payload?.count ?? results.length ?? 0;
+                const filter = action.payload?.filter || action.meta?.arg?.filter || 'upcoming';
+                const payload = action.payload?.data || action.payload;
+                const results = Array.isArray(payload)
+                    ? payload
+                    : payload?.results || [];
+                const count = payload?.count ?? results.length ?? 0;
                 const pageSize = 5;
                 const currentPage = action.meta?.arg?.page || 1;
-                state.upcomingPagination = {
-                    count,
-                    pageSize,
-                    page: currentPage,
-                    totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
-                };
+                
+                if (filter === 'completed') {
+                    state.completedBookings = results;
+                    state.completedPagination = {
+                        count,
+                        pageSize,
+                        page: currentPage,
+                        totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
+                    };
+                } else {
+                    state.upcomingBookings = results;
+                    state.upcomingPagination = {
+                        count,
+                        pageSize,
+                        page: currentPage,
+                        totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
+                    };
+                }
             })
             .addCase(getCoachingSessionsByCoach.rejected, (state, action) => {
                 state.loading = false;

@@ -255,17 +255,17 @@ function StaffManagement() {
                                         />
                                     </div>
                                     {!isSuperadmin && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                                Role
-                                            </label>
-                                            <select
-                                                value={formData.role}
-                                                onChange={(e) => setFormData({...formData, role: e.target.value})}
-                                            >
-                                                <option value="staff">Staff</option>
-                                            </select>
-                                        </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Role
+                                        </label>
+                                        <select
+                                            value={formData.role}
+                                            onChange={(e) => setFormData({...formData, role: e.target.value})}
+                                        >
+                                            <option value="staff">Staff</option>
+                                        </select>
+                                    </div>
                                     )}
                                     {isSuperadmin && !editingStaff && (
                                         <div>
@@ -419,7 +419,7 @@ function StaffManagement() {
                                                                 {deletingId === staffMember.id ? (
                                                                     <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin"></div>
                                                                 ) : (
-                                                                    <Trash2 className="w-4 h-4" />
+                                                                <Trash2 className="w-4 h-4" />
                                                                 )}
                                                             </button>
                                                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">

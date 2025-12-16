@@ -10,26 +10,39 @@ function StaffCoachingSessions() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
-    const { upcomingBookings, loading, upcomingPagination } = useAppSelector((state) => state.booking);
+    const { upcomingBookings, completedBookings, loading, upcomingPagination, completedPagination } = useAppSelector((state) => state.booking);
     const [page, setPage] = useState(1);
+    const [filter, setFilter] = useState('upcoming'); // 'upcoming' or 'completed'
 
-    const totalPages = upcomingPagination?.totalPages || 1;
-    const pageSize = upcomingPagination?.pageSize || 5;
-    const totalCount = upcomingPagination?.count ?? upcomingBookings.length;
+    const isUpcoming = filter === 'upcoming';
+    const currentBookings = isUpcoming ? upcomingBookings : completedBookings;
+    const currentPagination = isUpcoming ? upcomingPagination : completedPagination;
+    const totalPages = currentPagination?.totalPages || 1;
+    const pageSize = currentPagination?.pageSize || 5;
+    const totalCount = currentPagination?.count ?? currentBookings.length;
 
     useEffect(() => {
         // Fetch coaching sessions where current user is the coach
-        dispatch(getCoachingSessionsByCoach({ page }));
-    }, [dispatch, page]);
+        dispatch(getCoachingSessionsByCoach({ page, filter }));
+    }, [dispatch, page, filter]);
 
     useEffect(() => {
-        if (page > totalPages) {
+        if (page > totalPages && totalPages > 0) {
             setPage(totalPages);
         }
     }, [totalPages]);
 
+    useEffect(() => {
+        // Reset to page 1 when filter changes
+        setPage(1);
+    }, [filter]);
+
     const handleViewCalendar = () => {
         navigate('/coaching-sessions/calendar');
+    };
+
+    const handleSubmitFeedback = () => {
+        window.open('https://api.leadconnectorhq.com/widget/form/BC73Onhy5eT0yKDPHKln?notrack=true', '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -42,7 +55,7 @@ function StaffCoachingSessions() {
                                 My Coaching Sessions
                             </h1>
                             <p className="text-text-secondary mt-2">
-                                View upcoming coaching sessions where clients have booked you as their coach
+                                View your coaching sessions where clients have booked you as their coach
                             </p>
                         </div>
                         <Button
@@ -55,12 +68,32 @@ function StaffCoachingSessions() {
                 </div>
 
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
-                    <h2 className="text-xl font-bold text-text-primary mb-4">Upcoming Coaching Sessions</h2>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">
+                            {isUpcoming ? 'Upcoming' : 'Completed'} Coaching Sessions
+                        </h2>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={() => setFilter('upcoming')}
+                                variant={isUpcoming ? 'primary' : 'secondary'}
+                                className="px-4 py-2"
+                            >
+                                Upcoming
+                            </Button>
+                            <Button
+                                onClick={() => setFilter('completed')}
+                                variant={!isUpcoming ? 'primary' : 'secondary'}
+                                className="px-4 py-2"
+                            >
+                                Completed
+                            </Button>
+                        </div>
+                    </div>
                     {loading ? (
                         <BookingCardSkeleton count={3} />
-                    ) : upcomingBookings.length > 0 ? (
+                    ) : currentBookings.length > 0 ? (
                         <div className="space-y-4">
-                            {upcomingBookings.map(booking => (
+                            {currentBookings.map(booking => (
                                 <div key={booking.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition duration-200 bg-surface">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
@@ -102,7 +135,7 @@ function StaffCoachingSessions() {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end gap-2 w-40">
+                                        <div className="flex flex-col items-end gap-2">
                                             <Badge status={
                                                 booking.status === 'confirmed' ? 'confirmed' :
                                                 booking.status === 'pending' ? 'pending' :
@@ -111,6 +144,15 @@ function StaffCoachingSessions() {
                                             }>
                                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                             </Badge>
+                                            {!isUpcoming && (booking.status === 'completed' || new Date(booking.start_time) < new Date()) && (
+                                                <Button
+                                                    onClick={handleSubmitFeedback}
+                                                    variant="primary"
+                                                    className="mt-2 text-xs px-3 py-1 whitespace-nowrap"
+                                                >
+                                                    Submit Feedback
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -118,7 +160,7 @@ function StaffCoachingSessions() {
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-text-secondary">No upcoming coaching sessions</p>
+                            <p className="text-text-secondary">No {isUpcoming ? 'upcoming' : 'completed'} coaching sessions</p>
                         </div>
                     )}
                     {!loading && (
