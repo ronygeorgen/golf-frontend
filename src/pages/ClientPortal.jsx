@@ -727,7 +727,7 @@ function ClientPortal() {
                                 <PackagesSkeleton />
                             ) : simulatorPackagesList.length > 0 ? (
                                 <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary">
-                                    <p className="font-semibold text-text-primary mb-2">Simulator-Only Packages</p>
+                                    <p className="font-semibold text-text-primary mb-2">Simulator Hours</p>
                                     <div className="space-y-2">
                                         {simulatorPackagesList.map((pkg) => (
                                             <div key={pkg.packageId} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
@@ -744,7 +744,7 @@ function ClientPortal() {
                                 <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary space-y-4">
                                     {personalPackagesList.length > 0 && (
                                         <div>
-                                            <p className="font-semibold text-text-primary mb-2">Personal / Gifted / Transferred Packages</p>
+                                            <p className="font-semibold text-text-primary mb-2">Coaching Sessions</p>
                                             <div className="space-y-2">
                                                 {personalPackagesList.map((pkg) => (
                                                     <div key={pkg.packageId} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
