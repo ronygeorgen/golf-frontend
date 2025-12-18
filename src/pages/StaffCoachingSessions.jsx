@@ -41,8 +41,10 @@ function StaffCoachingSessions() {
         navigate('/coaching-sessions/calendar');
     };
 
-    const handleSubmitFeedback = () => {
-        window.open('https://api.leadconnectorhq.com/widget/form/BC73Onhy5eT0yKDPHKln?notrack=true', '_blank', 'noopener,noreferrer');
+    const handleSubmitFeedback = (clientEmail) => {
+        const baseUrl = 'https://api.leadconnectorhq.com/widget/form/BC73Onhy5eT0yKDPHKln';
+        const url = clientEmail ? `${baseUrl}?email=${encodeURIComponent(clientEmail)}` : baseUrl;
+        window.open(url, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -146,7 +148,7 @@ function StaffCoachingSessions() {
                                             </Badge>
                                             {!isUpcoming && (booking.status === 'completed' || new Date(booking.start_time) < new Date()) && (
                                                 <Button
-                                                    onClick={handleSubmitFeedback}
+                                                    onClick={() => handleSubmitFeedback(booking.client_details?.email)}
                                                     variant="primary"
                                                     className="mt-2 text-xs px-3 py-1 whitespace-nowrap"
                                                 >

@@ -26,6 +26,7 @@ function SimulatorBooking() {
     const [simulatorCount, setSimulatorCount] = useState(1);
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [fetchingMaxSimulators, setFetchingMaxSimulators] = useState(false); // Loading state for fetching max simulators
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [usePrepaidHours, setUsePrepaidHours] = useState(null); // null = not selected, true = use prepaid, false = pay
     
@@ -35,7 +36,7 @@ function SimulatorBooking() {
     // Store previous data for back navigation
     const [previousDate, setPreviousDate] = useState('');
     const [previousDuration, setPreviousDuration] = useState(60);
-    const [maxAvailableSimulators, setMaxAvailableSimulators] = useState(5); // Default to 5, will be updated from API
+    const [maxAvailableSimulators, setMaxAvailableSimulators] = useState(null); // Will be updated from API after availability check
     
     // Calculate price based on duration, hourly_price, and simulator_count
     const calculatePrice = () => {
@@ -60,6 +61,60 @@ function SimulatorBooking() {
         });
     }, [totalAvailableHours, availableHoursLoading]);
     
+    // Fetch max available simulators when date is selected
+    const prevDateForMaxSimRef = useRef('');
+    useEffect(() => {
+        if (date && currentStep === 'form') {
+            // Reset maxAvailableSimulators when date changes to fetch fresh data
+            if (prevDateForMaxSimRef.current !== date && prevDateForMaxSimRef.current !== '') {
+                setMaxAvailableSimulators(null);
+            }
+            
+            // Fetch max available simulators with default values (duration=60, simulator_count=1)
+            // Only fetch if we don't already have the value for this date
+            if (maxAvailableSimulators === null) {
+                const fetchMaxSimulators = async () => {
+                    setFetchingMaxSimulators(true);
+                    try {
+                        const result = await dispatch(checkSimulatorAvailability({ 
+                            date, 
+                            duration: 60, 
+                            simulator_count: 1 
+                        }));
+                        
+                        if (checkSimulatorAvailability.fulfilled.match(result)) {
+                            const payload = result.payload || {};
+                            if (payload.max_available_simulators !== undefined) {
+                                setMaxAvailableSimulators(payload.max_available_simulators);
+                                // Adjust simulator_count if it exceeds max
+                                if (simulatorCount > payload.max_available_simulators) {
+                                    setSimulatorCount(payload.max_available_simulators);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // Silently fail - we'll get the value when user clicks "Check Availability"
+                        console.log('Failed to fetch max simulators on date select:', error);
+                    } finally {
+                        setFetchingMaxSimulators(false);
+                    }
+                };
+                
+                // Add a small delay to avoid calling on every keystroke if user is typing
+                const timeoutId = setTimeout(() => {
+                    fetchMaxSimulators();
+                }, 300);
+                
+                prevDateForMaxSimRef.current = date;
+                
+                return () => {
+                    clearTimeout(timeoutId);
+                    setFetchingMaxSimulators(false);
+                };
+            }
+        }
+    }, [date, currentStep, dispatch, simulatorCount, maxAvailableSimulators]);
+
     // Clear slots when date or duration changes (only if we're on form step)
     const prevDateRef = useRef(date);
     const prevDurationRef = useRef(duration);
@@ -83,10 +138,14 @@ function SimulatorBooking() {
         prevDurationRef.current = duration;
     }, [date, duration, dispatch, currentStep]);
     
-    // Move to slots step when slots are fetched
+    // Track if availability check was explicitly triggered by user (not auto-fetch for max simulators)
+    const explicitAvailabilityCheckRef = useRef(false);
+    
+    // Move to slots step when slots are fetched (only if explicitly checked by user)
     useEffect(() => {
-        if (availability.simulator && availability.simulator.length > 0 && currentStep === 'form') {
+        if (availability.simulator && availability.simulator.length > 0 && currentStep === 'form' && explicitAvailabilityCheckRef.current) {
             setCurrentStep('slots');
+            explicitAvailabilityCheckRef.current = false; // Reset flag
         }
         
         // Debug: Log availability state to check hourly_price
@@ -125,6 +184,9 @@ function SimulatorBooking() {
         // Clear selected slot and reset availability before checking
         setSelectedSlot(null);
         dispatch(clearAvailability()); // Clear previous availability slots
+
+        // Mark that this is an explicit availability check by user
+        explicitAvailabilityCheckRef.current = true;
 
         setLoading(true);
         const count = simulatorCount && simulatorCount >= 1 ? simulatorCount : 1;
@@ -362,7 +424,9 @@ function SimulatorBooking() {
                 url.searchParams.set('phone', buyerPhone); // Current user's phone
                 url.searchParams.set('recipient_phone', response.temp_id); // recipient_phone contains temp_id
                 // Add count parameter (duration in hours * simulator_count)
-                const count = (duration / 60) * simulatorCount; // Convert minutes to hours and multiply by simulator count
+                // Ensure simulatorCount is valid (at least 1) before calculating
+                const validSimulatorCount = simulatorCount && simulatorCount >= 1 ? simulatorCount : 1;
+                const count = (duration / 60) * validSimulatorCount; // Convert minutes to hours and multiply by simulator count
                 url.searchParams.set('count', count.toString());
                 
                 openPopup({
@@ -526,7 +590,10 @@ function SimulatorBooking() {
                                     }
                                     const value = parseInt(numericValue);
                                     if (!isNaN(value)) {
-                                        const clampedValue = Math.max(1, Math.min(value, maxAvailableSimulators));
+                                        // Only clamp if maxAvailableSimulators has been set from backend
+                                        const clampedValue = maxAvailableSimulators !== null 
+                                            ? Math.max(1, Math.min(value, maxAvailableSimulators))
+                                            : Math.max(1, value);
                                         setSimulatorCount(clampedValue);
                                         setSelectedSlot(null); // Reset selected slot when simulator count changes
                                     }
@@ -537,16 +604,59 @@ function SimulatorBooking() {
                                         setSimulatorCount(1);
                                     }
                                 }}
+                                disabled={fetchingMaxSimulators}
                                 className="w-full"
                             />
-                            <p className="text-xs text-text-secondary mt-1">
-                                Maximum {maxAvailableSimulators} simulator{maxAvailableSimulators !== 1 ? 's' : ''} available
-                            </p>
+                            {fetchingMaxSimulators && (
+                                <div className="flex items-center gap-2 mt-2">
+                                    <svg className="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <p className="text-xs text-text-secondary flex items-center">
+                                        Checking available simulators
+                                        <span className="inline-flex ml-1" style={{ width: '20px' }}>
+                                            <span 
+                                                className="inline-block"
+                                                style={{ 
+                                                    animation: 'dotPulse 1.4s ease-in-out infinite',
+                                                    animationDelay: '0ms'
+                                                }}
+                                            >.</span>
+                                            <span 
+                                                className="inline-block"
+                                                style={{ 
+                                                    animation: 'dotPulse 1.4s ease-in-out infinite',
+                                                    animationDelay: '200ms'
+                                                }}
+                                            >.</span>
+                                            <span 
+                                                className="inline-block"
+                                                style={{ 
+                                                    animation: 'dotPulse 1.4s ease-in-out infinite',
+                                                    animationDelay: '400ms'
+                                                }}
+                                            >.</span>
+                                        </span>
+                                    </p>
+                                    <style>{`
+                                        @keyframes dotPulse {
+                                            0%, 100% { opacity: 0.3; }
+                                            50% { opacity: 1; }
+                                        }
+                                    `}</style>
+                                </div>
+                            )}
+                            {!fetchingMaxSimulators && maxAvailableSimulators !== null && (
+                                <p className="text-xs text-text-secondary mt-1">
+                                    Maximum {maxAvailableSimulators} simulator{maxAvailableSimulators !== 1 ? 's' : ''} available
+                                </p>
+                            )}
                         </div>
                         
                         <Button 
                             onClick={checkAvailability} 
-                            disabled={loading}
+                            disabled={loading || fetchingMaxSimulators}
                             variant="primary"
                             className="w-full py-3"
                         >

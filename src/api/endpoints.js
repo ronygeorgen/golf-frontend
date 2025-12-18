@@ -13,6 +13,7 @@ export const endpoints = {
         verifyOTP: '/auth/verify-otp/',
         ghlLocations: '/auth/ghl-locations/',
         updateDob: '/auth/update-dob/',
+        memberList: '/auth/member-list/',
     },
     
     // Admin endpoints

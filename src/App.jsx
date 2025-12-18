@@ -33,6 +33,7 @@ import StaffCoachingSessionsAdmin from './pages/StaffCoachingSessionsAdmin';
 import StaffCoachingSessionsCalendar from './pages/StaffCoachingSessionsCalendar';
 import StaffCoachingSessionsCalendarAdmin from './pages/StaffCoachingSessionsCalendarAdmin';
 import Profile from './pages/Profile';
+import MemberList from './pages/MemberList';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -193,6 +194,7 @@ function AppContent() {
                 <Route path="purchases/organizations" element={<OrganizationPurchases />} />
                 <Route path="transfers/sessions" element={<TransferSessions />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="member-list" element={<MemberList />} />
             </Route>
 
             {/* Admin Routes with AdminLayout */}

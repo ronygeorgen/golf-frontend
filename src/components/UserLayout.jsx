@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout, getProfile } from '../store/slices/authSlice';
-import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package } from 'lucide-react';
+import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package, UserCheck } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 import DOBPopup from './DOBPopup';
 
@@ -13,9 +13,11 @@ function UserLayout() {
     const { user } = useAppSelector((state) => state.auth);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
+    const [coachingSessionsMenuOpen, setCoachingSessionsMenuOpen] = useState(false);
     const [showDOBPopup, setShowDOBPopup] = useState(false);
     const dropdownRef = useRef(null);
     const packagesMenuRef = useRef(null);
+    const coachingSessionsMenuRef = useRef(null);
 
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
     const isStaff = user?.role === 'staff';
@@ -28,6 +30,9 @@ function UserLayout() {
             }
             if (packagesMenuRef.current && !packagesMenuRef.current.contains(event.target)) {
                 setPackagesMenuOpen(false);
+            }
+            if (coachingSessionsMenuRef.current && !coachingSessionsMenuRef.current.contains(event.target)) {
+                setCoachingSessionsMenuOpen(false);
             }
         };
 
@@ -70,6 +75,7 @@ function UserLayout() {
         if (path === '/special-events') return 'Special Events';
         if (path === '/profile') return 'Profile';
         if (path === '/coaching-sessions' || path.startsWith('/coaching-sessions')) return 'My Coaching Sessions';
+        if (path === '/member-list') return 'Member List';
         return 'Dashboard';
     };
 
@@ -98,20 +104,56 @@ function UserLayout() {
                         <div className="flex items-center space-x-4">
                             {/* Navigation Links */}
                             <nav className="hidden md:flex items-center space-x-2">
+                                {/* My Coaching Sessions Dropdown - Staff Only */}
                                 {isStaff && (
-                                    <button
-                                        onClick={() => navigate('/coaching-sessions')}
-                                        className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
-                                                ? 'bg-primary-light text-white'
-                                                : 'text-text-secondary hover:bg-background'
-                                        }`}
-                                    >
-                                        <div className="flex items-center space-x-1">
+                                    <div className="relative" ref={coachingSessionsMenuRef}>
+                                        <button
+                                            onClick={() => setCoachingSessionsMenuOpen(!coachingSessionsMenuOpen)}
+                                            className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${
+                                                location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions') || location.pathname === '/member-list'
+                                                    ? 'bg-primary-light text-white'
+                                                    : 'text-text-secondary hover:bg-background'
+                                            }`}
+                                        >
                                             <Users className="w-4 h-4" />
-                                            <span>My Coaching Sessions</span>
-                                        </div>
-                                    </button>
+                                            <span>Management Page</span>
+                                            <ChevronDown className={`w-3 h-3 transition-transform ${coachingSessionsMenuOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {/* My Coaching Sessions Dropdown Menu */}
+                                        {coachingSessionsMenuOpen && (
+                                            <div className="absolute top-full left-0 mt-1 min-w-56 w-auto bg-surface rounded-card shadow-card border border-border py-2 z-[60] whitespace-nowrap">
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/coaching-sessions');
+                                                        setCoachingSessionsMenuOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
+                                                            ? 'bg-primary-light/10 text-primary font-semibold'
+                                                            : 'text-text-primary hover:bg-background'
+                                                    }`}
+                                                >
+                                                    <Users className="w-4 h-4" />
+                                                    <span>My Coaching Sessions</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/member-list');
+                                                        setCoachingSessionsMenuOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                        location.pathname === '/member-list'
+                                                            ? 'bg-primary-light/10 text-primary font-semibold'
+                                                            : 'text-text-primary hover:bg-background'
+                                                    }`}
+                                                >
+                                                    <UserCheck className="w-4 h-4" />
+                                                    <span>Member List</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                                 <button
                                     onClick={() => navigate('/portal')}
@@ -259,20 +301,36 @@ function UserLayout() {
                                             {/* Mobile Navigation Links - Only visible on mobile */}
                                             <div className="md:hidden border-b border-border pb-2 mb-2">
                                                 {isStaff && (
-                                                    <button
-                                                        onClick={() => {
-                                                            navigate('/coaching-sessions');
-                                                            setDropdownOpen(false);
-                                                        }}
-                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
-                                                                ? 'bg-primary-light text-white font-medium'
-                                                                : 'text-text-primary hover:bg-background'
-                                                        }`}
-                                                    >
-                                                        <Users className="w-4 h-4" />
-                                                        <span>My Coaching Sessions</span>
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                navigate('/coaching-sessions');
+                                                                setDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                                location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
+                                                                    ? 'bg-primary-light text-white font-medium'
+                                                                    : 'text-text-primary hover:bg-background'
+                                                            }`}
+                                                        >
+                                                            <Users className="w-4 h-4" />
+                                                            <span>My Coaching Sessions</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                navigate('/member-list');
+                                                                setDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                                location.pathname === '/member-list'
+                                                                    ? 'bg-primary-light text-white font-medium'
+                                                                    : 'text-text-primary hover:bg-background'
+                                                            }`}
+                                                        >
+                                                            <UserCheck className="w-4 h-4" />
+                                                            <span>Member List</span>
+                                                        </button>
+                                                    </>
                                                 )}
                                                 <button
                                                     onClick={() => {
@@ -347,6 +405,22 @@ function UserLayout() {
                                                         <span>Manage Purchased Packages</span>
                                                     </button>
                                                 </div>
+                                                {isStaff && (
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/member-list');
+                                                            setDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                            location.pathname === '/member-list'
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                    >
+                                                        <UserCheck className="w-4 h-4" />
+                                                        <span>Member List</span>
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         navigate('/special-events');
