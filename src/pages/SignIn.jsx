@@ -46,7 +46,7 @@ function SignIn() {
                 setShowDOBPopup(true);
                 sessionStorage.setItem('dobPopupShown', 'true');
             } else {
-                navigate('/portal');
+                navigate('/'); // Navigate to root, LandingRedirect will handle role-based redirect
             }
         }
     };
@@ -152,11 +152,11 @@ function SignIn() {
                 isOpen={showDOBPopup}
                 onClose={() => {
                     setShowDOBPopup(false);
-                    navigate('/portal');
+                    navigate('/'); // Navigate to root, LandingRedirect will handle role-based redirect
                 }}
                 onSkip={() => {
                     setShowDOBPopup(false);
-                    navigate('/portal');
+                    navigate('/'); // Navigate to root, LandingRedirect will handle role-based redirect
                 }}
             />
         </div>

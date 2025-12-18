@@ -41,7 +41,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     // Fetch fresh user profile if token exists but user data might be stale
     // Only check once on mount, not on every user update
     useEffect(() => {
-        if (token && (!user || !user.hasOwnProperty('is_superuser'))) {
+        if (token && (!user || !user.hasOwnProperty('is_superuser') || !user.role)) {
             dispatch(getProfile());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,6 +81,40 @@ function ProtectedRoute({ children, allowedRoles }) {
     }
     
     return children;
+}
+
+// Landing page redirect component - redirects staff to coaching-sessions, others to portal
+function LandingRedirect() {
+    const { user, loading } = useAppSelector((state) => state.auth);
+    const navigate = useNavigate();
+    
+    useEffect(() => {
+        console.log('LandingRedirect - useEffect triggered', { 
+            loading, 
+            hasUser: !!user, 
+            userRole: user?.role,
+            userObject: user 
+        });
+        
+        // Wait for loading to complete and user to be available with role
+        if (!loading && user && user.role) {
+            const isStaff = user.role === 'staff';
+            const redirectPath = isStaff ? "/coaching-sessions" : "/portal";
+            console.log('LandingRedirect - User role:', user.role, 'isStaff:', isStaff, 'Redirecting to:', redirectPath);
+            navigate(redirectPath, { replace: true });
+        } else if (!loading && user && !user.role) {
+            console.warn('LandingRedirect - User exists but no role property found!', user);
+        }
+    }, [user, loading, navigate]);
+    
+    // Show loading while waiting for user data or redirect
+    if (loading || !user || !user.role) {
+        return <div className="min-h-screen flex items-center justify-center"><div className="text-gray-600">Loading...</div></div>;
+    }
+    
+    // Fallback - should not reach here if useEffect works
+    const isStaff = user.role === 'staff';
+    return <Navigate to={isStaff ? "/coaching-sessions" : "/portal"} replace />;
 }
 
 function AppContent() {
@@ -147,7 +181,7 @@ function AppContent() {
                     </ProtectedRoute>
                 }
             >
-                <Route index element={<Navigate to="/portal" replace />} />
+                <Route index element={<LandingRedirect />} />
                 <Route path="portal" element={<ClientPortal />} />
                 <Route path="booking" element={<Booking />} />
                 <Route path="calendar" element={<CalendarView isUserView={true} />} />

@@ -98,6 +98,21 @@ function UserLayout() {
                         <div className="flex items-center space-x-4">
                             {/* Navigation Links */}
                             <nav className="hidden md:flex items-center space-x-2">
+                                {isStaff && (
+                                    <button
+                                        onClick={() => navigate('/coaching-sessions')}
+                                        className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
+                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
+                                                ? 'bg-primary-light text-white'
+                                                : 'text-text-secondary hover:bg-background'
+                                        }`}
+                                    >
+                                        <div className="flex items-center space-x-1">
+                                            <Users className="w-4 h-4" />
+                                            <span>My Coaching Sessions</span>
+                                        </div>
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => navigate('/portal')}
                                     className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
@@ -193,21 +208,6 @@ function UserLayout() {
                                 >
                                     Special Events
                                 </button>
-                                {isStaff && (
-                                    <button
-                                        onClick={() => navigate('/coaching-sessions')}
-                                        className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
-                                                ? 'bg-primary-light text-white'
-                                                : 'text-text-secondary hover:bg-background'
-                                        }`}
-                                    >
-                                        <div className="flex items-center space-x-1">
-                                            <Users className="w-4 h-4" />
-                                            <span>My Coaching Sessions</span>
-                                        </div>
-                                    </button>
-                                )}
                             </nav>
 
                             {/* User Dropdown */}
@@ -258,6 +258,22 @@ function UserLayout() {
                                         <div className="py-1">
                                             {/* Mobile Navigation Links - Only visible on mobile */}
                                             <div className="md:hidden border-b border-border pb-2 mb-2">
+                                                {isStaff && (
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/coaching-sessions');
+                                                            setDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                    >
+                                                        <Users className="w-4 h-4" />
+                                                        <span>My Coaching Sessions</span>
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         navigate('/portal');
@@ -345,22 +361,6 @@ function UserLayout() {
                                                     <Calendar className="w-4 h-4" />
                                                     <span>Special Events</span>
                                                 </button>
-                                                {isStaff && (
-                                                    <button
-                                                        onClick={() => {
-                                                            navigate('/coaching-sessions');
-                                                            setDropdownOpen(false);
-                                                        }}
-                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                            location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions')
-                                                                ? 'bg-primary-light text-white font-medium'
-                                                                : 'text-text-primary hover:bg-background'
-                                                        }`}
-                                                    >
-                                                        <Users className="w-4 h-4" />
-                                                        <span>My Coaching Sessions</span>
-                                                    </button>
-                                                )}
                                             </div>
 
                                             {/* Admin Options */}
