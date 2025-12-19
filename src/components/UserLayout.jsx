@@ -221,7 +221,7 @@ function UserLayout() {
                                                 }`}
                                             >
                                                 <Package className="w-4 h-4" />
-                                                <span>View Packages</span>
+                                                <span>Purchase Packages</span>
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -388,7 +388,7 @@ function UserLayout() {
                                                         }`}
                                                     >
                                                         <Package className="w-4 h-4" />
-                                                        <span>View Packages</span>
+                                                        <span>Purchase Packages</span>
                                                     </button>
                                                     <button
                                                         onClick={() => {
