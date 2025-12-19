@@ -116,7 +116,7 @@ function UserLayout() {
                                             }`}
                                         >
                                             <Users className="w-4 h-4" />
-                                            <span>Management Page</span>
+                                            <span>Manage</span>
                                             <ChevronDown className={`w-3 h-3 transition-transform ${coachingSessionsMenuOpen ? 'rotate-180' : ''}`} />
                                         </button>
 
