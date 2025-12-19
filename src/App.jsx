@@ -32,6 +32,7 @@ import StaffCoachingSessions from './pages/StaffCoachingSessions';
 import StaffCoachingSessionsAdmin from './pages/StaffCoachingSessionsAdmin';
 import StaffCoachingSessionsCalendar from './pages/StaffCoachingSessionsCalendar';
 import StaffCoachingSessionsCalendarAdmin from './pages/StaffCoachingSessionsCalendarAdmin';
+import StaffReferrals from './pages/StaffReferrals';
 import Profile from './pages/Profile';
 import MemberList from './pages/MemberList';
 
@@ -212,6 +213,7 @@ function AppContent() {
                 <Route path="staff/:id/availability" element={<StaffAvailability />} />
                 <Route path="staff/:id/coaching-sessions" element={<StaffCoachingSessionsAdmin />} />
                 <Route path="staff/:id/coaching-sessions/calendar" element={<StaffCoachingSessionsCalendarAdmin />} />
+                <Route path="staff/:id/referrals" element={<StaffReferrals />} />
                 <Route path="simulators" element={<SimulatorManagement />} />
                 <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
                 <Route path="packages" element={<PackageManagement />} />

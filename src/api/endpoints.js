@@ -27,6 +27,7 @@ export const endpoints = {
             detail: (id) => `/admin/staff/${id}/`,
             availability: (id) => `/admin/staff/${id}/availability/`,
             dayAvailability: (id) => `/admin/staff/${id}/day-availability/`,
+            referrals: (id) => `/admin/staff/${id}/referrals/`,
         },
         simulators: {
             list: '/admin/simulators/',

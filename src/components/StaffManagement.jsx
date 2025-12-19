@@ -7,7 +7,7 @@ import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
-import { Edit, Trash2, Calendar, Users } from 'lucide-react';
+import { Edit, Trash2, Calendar, Users, UserCheck } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
@@ -435,13 +435,13 @@ function StaffManagement() {
                                                             <button 
                                                                 className="p-2 text-status-personal-text hover:text-status-personal-text/80 hover:bg-status-personal-bg/20 rounded-button transition-colors"
                                                                 onClick={() => navigate(`/admin/staff/${staffMember.id}/availability`)}
-                                                                aria-label="View availability"
+                                                                aria-label="Add and view availability"
                                                             >
                                                                 <Calendar className="w-4 h-4" />
                                                             </button>
                                                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                                                                 <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
-                                                                    Availability
+                                                                    Add and view availability
                                                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                                                                         <div className="border-4 border-transparent border-t-gray-900"></div>
                                                                     </div>
@@ -452,13 +452,30 @@ function StaffManagement() {
                                                             <button 
                                                                 className="p-2 text-status-confirmed-text hover:text-status-confirmed-text/80 hover:bg-status-confirmed-bg/20 rounded-button transition-colors"
                                                                 onClick={() => navigate(`/admin/staff/${staffMember.id}/coaching-sessions`)}
-                                                                aria-label="View coaching sessions"
+                                                                aria-label={`View ${staffMember.first_name}'s coaching sessions`}
                                                             >
                                                                 <Users className="w-4 h-4" />
                                                             </button>
                                                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                                                                 <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
-                                                                    Coaching Sessions
+                                                                    View {staffMember.first_name}'s coaching sessions
+                                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <button 
+                                                                className="p-2 text-primary hover:text-primary-light hover:bg-primary-light/10 rounded-button transition-colors"
+                                                                onClick={() => navigate(`/admin/staff/${staffMember.id}/referrals`)}
+                                                                aria-label="View staff referrals"
+                                                            >
+                                                                <UserCheck className="w-4 h-4" />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                                                <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                                                    View staff referrals
                                                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                                                                         <div className="border-4 border-transparent border-t-gray-900"></div>
                                                                     </div>
