@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { getStaff } from '../store/slices/adminSlice';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { TableSkeleton } from '../components/skeletons/SkeletonLoader';
@@ -7,12 +9,16 @@ import Button from '../components/ui/Button';
 import { Eye, Package as PackageIcon, X, ArrowLeft } from 'lucide-react';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
+import DateRangePicker from '../components/DateRangePicker';
 
 function StaffReferrals() {
-    const { id } = useParams();
+    const { id: initialId } = useParams();
     const navigate = useNavigate();
+    const dispatch = useAppDispatch();
     const { toast, showSuccess, showError, hideToast } = useToast();
+    const { list: staffList, loading: staffListLoading } = useAppSelector((state) => state.admin.staff);
     
+    const [selectedStaffId, setSelectedStaffId] = useState(initialId || '');
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState(null);
@@ -27,43 +33,88 @@ function StaffReferrals() {
         page_size: 10
     });
     const [totalReferrals, setTotalReferrals] = useState(0);
+    const [totalSales, setTotalSales] = useState('0.00');
     const [staffName, setStaffName] = useState('');
+    const [dateRange, setDateRange] = useState({
+        from_date: '',
+        to_date: ''
+    });
+    const dateFilterTimeoutRef = useRef(null);
+
+    // Fetch staff list on mount
+    useEffect(() => {
+        dispatch(getStaff());
+    }, [dispatch]);
+
+    // Update selected staff ID when URL param changes
+    useEffect(() => {
+        if (initialId) {
+            setSelectedStaffId(initialId);
+        }
+    }, [initialId]);
 
     const fetchReferrals = async (pageNum = 1) => {
+        if (!selectedStaffId) return;
+        
         try {
             setLoading(true);
-            const response = await apiClient.get(endpoints.admin.staff.referrals(id), {
-                params: {
-                    page: pageNum
-                }
+            // Clear previous data immediately to show loading state
+            setMembers([]);
+            setTotalReferrals(0);
+            setTotalSales('0.00');
+            
+            const params = {
+                page: pageNum
+            };
+            
+            // Add date filters if provided - convert to UTC
+            if (dateRange.from_date) {
+                // Treat the selected date as UTC at start of day (00:00:00 UTC)
+                // Format: YYYY-MM-DD -> YYYY-MM-DDTHH:mm:ss.sssZ
+                params.from_date = `${dateRange.from_date}T00:00:00.000Z`;
+            }
+            if (dateRange.to_date) {
+                // Treat the selected date as UTC at end of day (23:59:59.999 UTC)
+                // Format: YYYY-MM-DD -> YYYY-MM-DDTHH:mm:ss.sssZ
+                params.to_date = `${dateRange.to_date}T23:59:59.999Z`;
+            }
+            
+            const response = await apiClient.get(endpoints.admin.staff.referrals(selectedStaffId), {
+                params
             });
             
             const data = response.data;
-            setMembers(data.members || data.results || []);
-            setTotalReferrals(data.total_referrals || data.count || 0);
+            // Always update state, even if empty - ensure we use the actual response data
+            const membersList = Array.isArray(data.members) ? data.members : (Array.isArray(data.results) ? data.results : []);
+            setMembers(membersList);
+            setTotalReferrals(data.total_referrals !== undefined ? data.total_referrals : (data.count !== undefined ? data.count : 0));
+            setTotalSales(data.total_sales !== undefined ? data.total_sales : '0.00');
             setPagination({
-                count: data.count || 0,
-                total_pages: data.total_pages || 1,
-                current_page: data.current_page || pageNum,
-                page_size: data.page_size || 10
+                count: data.count !== undefined ? data.count : 0,
+                total_pages: data.total_pages !== undefined ? data.total_pages : 1,
+                current_page: data.current_page !== undefined ? data.current_page : pageNum,
+                page_size: data.page_size !== undefined ? data.page_size : 10
             });
             
-            // Try to get staff name from first member if available
-            if (data.members && data.members.length > 0) {
-                // We'll need to fetch staff details separately
-                fetchStaffDetails();
-            }
+            // Fetch staff details
+            fetchStaffDetails();
         } catch (error) {
             console.error('Error fetching referrals:', error);
             showError('Failed to load staff referrals');
+            // Clear state on error
+            setMembers([]);
+            setTotalReferrals(0);
+            setTotalSales('0.00');
         } finally {
             setLoading(false);
         }
     };
 
     const fetchStaffDetails = async () => {
+        if (!selectedStaffId) return;
+        
         try {
-            const response = await apiClient.get(endpoints.admin.staff.detail(id));
+            const response = await apiClient.get(endpoints.admin.staff.detail(selectedStaffId));
             if (response.data) {
                 setStaffName(`${response.data.first_name} ${response.data.last_name}`);
             }
@@ -72,14 +123,60 @@ function StaffReferrals() {
         }
     };
 
-    // Fetch referrals when component mounts or page changes
+    // Fetch referrals when staff changes
     useEffect(() => {
-        if (id) {
-            fetchReferrals(page);
-            fetchStaffDetails();
+        if (selectedStaffId) {
+            setPage(1);
+            fetchReferrals(1);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, id]);
+    }, [selectedStaffId]);
+
+    // Fetch when both dates are selected (no debounce needed since user completes selection)
+    useEffect(() => {
+        if (!selectedStaffId) return;
+        
+        // Only fetch if both dates are provided
+        if (dateRange.from_date && dateRange.to_date) {
+            // Clear existing timeout
+            if (dateFilterTimeoutRef.current) {
+                clearTimeout(dateFilterTimeoutRef.current);
+            }
+            
+            // Clear state immediately to show loading
+            setLoading(true);
+            setMembers([]);
+            setTotalReferrals(0);
+            setTotalSales('0.00');
+            
+            // Fetch immediately when both dates are selected
+            setPage(1);
+            fetchReferrals(1);
+        } else if (!dateRange.from_date && !dateRange.to_date) {
+            // If both dates are cleared, fetch without date filter
+            setPage(1);
+            fetchReferrals(1);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateRange.from_date, dateRange.to_date]);
+
+    // Fetch referrals when page changes
+    useEffect(() => {
+        if (selectedStaffId) {
+            fetchReferrals(page);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page]);
+
+    const handleStaffChange = (staffId) => {
+        setSelectedStaffId(staffId);
+        navigate(`/admin/staff/${staffId}/referrals`);
+    };
+
+    const clearDateFilter = () => {
+        setDateRange({ from_date: '', to_date: '' });
+        setPage(1);
+    };
 
     const handleViewMember = (member) => {
         setSelectedMember(member);
@@ -115,37 +212,86 @@ function StaffReferrals() {
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </Button>
-                        <div>
+                        <div className="flex-1">
                             <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
                                 Staff Referrals
                             </h1>
-                            {staffName && (
-                                <p className="text-text-secondary mt-1">
-                                    {staffName}
+                        </div>
+                    </div>
+                    
+                    {/* Staff Selector */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-text-primary mb-2">
+                            Select Staff Member
+                        </label>
+                        <select
+                            value={selectedStaffId}
+                            onChange={(e) => handleStaffChange(e.target.value)}
+                            className="w-full md:w-auto px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:ring-2 focus:ring-primary focus:border-primary"
+                            disabled={staffListLoading}
+                        >
+                            <option value="">Select a staff member</option>
+                            {staffList.map((staff) => (
+                                <option key={staff.id} value={staff.id}>
+                                    {staff.first_name} {staff.last_name} ({staff.email})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Date Range Filter */}
+                    {selectedStaffId && (
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Filter by Date Range
+                            </label>
+                            <DateRangePicker
+                                value={dateRange}
+                                onChange={(newRange) => {
+                                    setDateRange(newRange);
+                                }}
+                                onClear={clearDateFilter}
+                            />
+                        </div>
+                    )}
+
+                    {/* Stats Cards */}
+                    {selectedStaffId && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div className="bg-primary-light/10 border border-primary-light/20 rounded-card p-4">
+                                <p className="text-sm text-text-secondary mb-1">Total Referrals</p>
+                                <p className="text-2xl font-bold text-primary">{totalReferrals}</p>
+                                <p className="text-xs text-text-secondary mt-1">
+                                    Number of clients referred by this staff member
                                 </p>
-                            )}
+                            </div>
+                            <div className="bg-green-50 border border-green-200 rounded-card p-4">
+                                <p className="text-sm text-text-secondary mb-1">Total Sales</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                    ${parseFloat(totalSales).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-xs text-text-secondary mt-1">
+                                    Total sales amount from referred packages
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                    <div className="mt-4">
-                        <div className="bg-primary-light/10 border border-primary-light/20 rounded-card p-4">
-                            <p className="text-lg font-semibold text-text-primary">
-                                Total Referrals: <span className="text-primary">{totalReferrals}</span>
-                            </p>
-                            <p className="text-sm text-text-secondary mt-1">
-                                Number of clients referred by this staff member
-                            </p>
-                        </div>
-                    </div>
+                    )}
                 </div>
 
-                <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
-                    {loading ? (
-                        <TableSkeleton />
-                    ) : members.length === 0 ? (
-                        <div className="text-center py-8">
-                            <p className="text-text-secondary">No referrals found</p>
-                        </div>
-                    ) : (
+                {selectedStaffId ? (
+                    <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                        {loading ? (
+                            <TableSkeleton />
+                        ) : members.length === 0 ? (
+                            <div className="text-center py-8">
+                                <p className="text-text-secondary">No referrals found</p>
+                                {(dateRange.from_date || dateRange.to_date) && (
+                                    <p className="text-sm text-text-secondary mt-2">
+                                        Try adjusting your date filter
+                                    </p>
+                                )}
+                            </div>
+                        ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -230,8 +376,15 @@ function StaffReferrals() {
                                 </Button>
                             </div>
                         </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                        <div className="text-center py-12">
+                            <p className="text-text-secondary text-lg">Please select a staff member to view referrals</p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Member Details Modal */}
