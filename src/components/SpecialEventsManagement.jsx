@@ -38,6 +38,7 @@ function SpecialEventsManagement() {
         description: '',
         event_type: 'one_time',
         date: '',
+        recurring_end_date: '',
         start_time: '09:00',
         end_time: '17:00',
         max_capacity: 10,
@@ -95,6 +96,8 @@ function SpecialEventsManagement() {
             start_time: localTimeToUTC(formData.start_time),
             end_time: localTimeToUTC(formData.end_time),
             price: formData.price ? parseFloat(formData.price) : null,
+            // Only include recurring_end_date for recurring events
+            recurring_end_date: formData.event_type !== 'one_time' && formData.recurring_end_date ? formData.recurring_end_date : null,
         };
 
         setSubmitLoading(true);
@@ -124,6 +127,7 @@ function SpecialEventsManagement() {
             description: event.description || '',
             event_type: event.event_type || 'one_time',
             date: event.date || '',
+            recurring_end_date: event.recurring_end_date || '',
             start_time: utcTimeToLocal(event.start_time) || '09:00',
             end_time: utcTimeToLocal(event.end_time) || '17:00',
             max_capacity: event.max_capacity || 10,
@@ -326,7 +330,15 @@ function SpecialEventsManagement() {
                                     <select
                                         required
                                         value={formData.event_type}
-                                        onChange={(e) => setFormData({ ...formData, event_type: e.target.value })}
+                                        onChange={(e) => {
+                                            const newEventType = e.target.value;
+                                            // Clear recurring_end_date when switching to one_time
+                                            setFormData({ 
+                                                ...formData, 
+                                                event_type: newEventType,
+                                                recurring_end_date: newEventType === 'one_time' ? '' : formData.recurring_end_date
+                                            });
+                                        }}
                                         className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                     >
                                         {EVENT_TYPES.map(type => (
@@ -337,7 +349,7 @@ function SpecialEventsManagement() {
 
                                 <div>
                                     <label className="block text-sm font-medium text-text-primary mb-1">
-                                        Date *
+                                        {formData.event_type === 'one_time' ? 'Date *' : 'Start Date *'}
                                     </label>
                                     <input
                                         type="date"
@@ -347,6 +359,26 @@ function SpecialEventsManagement() {
                                         className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                     />
                                 </div>
+
+                                {/* Recurring End Date - only show for recurring events */}
+                                {formData.event_type !== 'one_time' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            Recurring End Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.recurring_end_date}
+                                            onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
+                                            min={formData.date || undefined}
+                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                            placeholder="Optional - leave empty for no end date"
+                                        />
+                                        <p className="text-xs text-text-secondary mt-1">
+                                            Optional. Recurring occurrences will stop on this date. Leave empty for no end date.
+                                        </p>
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
