@@ -26,7 +26,7 @@ function SimulatorPackageManagement() {
         hours: '',
         redirect_url: '',
         is_active: true,
-        expiry_date: '',
+        validity_days: '',
         time_restrictions: []
     };
     const [formData, setFormData] = useState(emptyForm);
@@ -80,7 +80,7 @@ function SimulatorPackageManagement() {
             ...formData,
             price: parseFloat(formData.price),
             hours: parseFloat(formData.hours),
-            expiry_date: formData.expiry_date || null,
+            validity_days: formData.validity_days ? parseInt(formData.validity_days) : null,
             time_restrictions: formData.time_restrictions || []
         };
 
@@ -156,7 +156,7 @@ function SimulatorPackageManagement() {
             hours: pkg.hours !== null && pkg.hours !== undefined ? parseFloat(pkg.hours) : '',
             redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active !== undefined ? pkg.is_active : true,
-            expiry_date: pkg.expiry_date || '',
+            validity_days: pkg.validity_days || '',
             time_restrictions: time_restrictions
         });
         setShowForm(true);
@@ -436,15 +436,18 @@ function SimulatorPackageManagement() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-1">
-                                            Expiry Date (Optional)
+                                            Validity Period (Days) (Optional)
                                         </label>
                                         <input
-                                            type="date"
-                                            value={formData.expiry_date}
-                                            onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={formData.validity_days}
+                                            onChange={(e) => setFormData({...formData, validity_days: e.target.value})}
+                                            placeholder="e.g., 30"
                                             className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                         />
-                                        <p className="text-xs text-text-secondary mt-1">After this date, clients cannot use the package</p>
+                                        <p className="text-xs text-text-secondary mt-1">Number of days from purchase date that this package is valid. Package expires after this period.</p>
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-2">

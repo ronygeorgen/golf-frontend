@@ -104,14 +104,34 @@ function PersonalPurchases() {
                                                         <p className="text-sm text-text-secondary">
                                                             Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
                                                         </p>
-                                                        {purchase.expiry_date && (
-                                                            <p className={`text-sm mt-1 ${new Date(purchase.expiry_date) < new Date() ? 'text-danger' : 'text-text-secondary'}`}>
-                                                                Expires: <span className="font-semibold">{new Date(purchase.expiry_date).toLocaleDateString()}</span>
-                                                                {new Date(purchase.expiry_date) < new Date() && (
-                                                                    <span className="ml-2 text-danger font-semibold">(Expired)</span>
-                                                                )}
-                                                            </p>
-                                                        )}
+                                                        {purchase.expiry_date && (() => {
+                                                            const expiryDate = new Date(purchase.expiry_date);
+                                                            const today = new Date();
+                                                            today.setHours(0, 0, 0, 0);
+                                                            expiryDate.setHours(0, 0, 0, 0);
+                                                            const daysRemaining = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                                                            const isExpired = daysRemaining < 0;
+                                                            
+                                                            return (
+                                                                <p className={`text-sm mt-1 ${isExpired ? 'text-danger' : daysRemaining <= 7 ? 'text-accent' : 'text-text-secondary'}`}>
+                                                                    {isExpired ? (
+                                                                        <>
+                                                                            <span className="text-danger font-semibold">Expired</span>
+                                                                            <span className="ml-2 text-text-secondary">
+                                                                                ({Math.abs(daysRemaining)} day{Math.abs(daysRemaining) !== 1 ? 's' : ''} ago)
+                                                                            </span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining</span>
+                                                                            <span className="ml-2 text-text-secondary">
+                                                                                (Expires: {expiryDate.toLocaleDateString()})
+                                                                            </span>
+                                                                        </>
+                                                                    )}
+                                                                </p>
+                                                            );
+                                                        })()}
                                                     </>
                                                 ) : (
                                                     <>

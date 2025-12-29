@@ -493,14 +493,14 @@ function Packages() {
                                             </div>
                                         )}
 
-                                        {/* Expiry Date */}
-                                        {pkg.expiry_date && (
+                                        {/* Validity Period */}
+                                        {pkg.validity_days && (
                                             <div className="mb-3 p-2 bg-background rounded-button border border-border">
                                                 <div className="flex items-center gap-2 text-xs">
                                                     <Calendar className="w-3.5 h-3.5 text-text-secondary" />
-                                                    <span className="text-text-secondary">Expires: </span>
+                                                    <span className="text-text-secondary">Valid for: </span>
                                                     <span className="font-semibold text-text-primary">
-                                                        {new Date(pkg.expiry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        {pkg.validity_days} day{pkg.validity_days !== 1 ? 's' : ''} from purchase
                                                     </span>
                                                 </div>
                                             </div>
@@ -633,14 +633,34 @@ function Packages() {
                                                             <p className="text-sm text-text-secondary">
                                                                 Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
                                                             </p>
-                                                            {purchase.expiry_date && (
-                                                                <p className={`text-sm mt-1 ${new Date(purchase.expiry_date) < new Date() ? 'text-danger' : 'text-text-secondary'}`}>
-                                                                    Expires: <span className="font-semibold">{new Date(purchase.expiry_date).toLocaleDateString()}</span>
-                                                                    {new Date(purchase.expiry_date) < new Date() && (
-                                                                        <span className="ml-2 text-danger font-semibold">(Expired)</span>
-                                                                    )}
-                                                                </p>
-                                                            )}
+                                                            {purchase.expiry_date && (() => {
+                                                                const expiryDate = new Date(purchase.expiry_date);
+                                                                const today = new Date();
+                                                                today.setHours(0, 0, 0, 0);
+                                                                expiryDate.setHours(0, 0, 0, 0);
+                                                                const daysRemaining = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                                                                const isExpired = daysRemaining < 0;
+                                                                
+                                                                return (
+                                                                    <p className={`text-sm mt-1 ${isExpired ? 'text-danger' : daysRemaining <= 7 ? 'text-accent' : 'text-text-secondary'}`}>
+                                                                        {isExpired ? (
+                                                                            <>
+                                                                                <span className="text-danger font-semibold">Expired</span>
+                                                                                <span className="ml-2 text-text-secondary">
+                                                                                    ({Math.abs(daysRemaining)} day{Math.abs(daysRemaining) !== 1 ? 's' : ''} ago)
+                                                                                </span>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining</span>
+                                                                                <span className="ml-2 text-text-secondary">
+                                                                                    (Expires: {expiryDate.toLocaleDateString()})
+                                                                                </span>
+                                                                            </>
+                                                                        )}
+                                                                    </p>
+                                                                );
+                                                            })()}
                                                         </>
                                                     ) : (
                                                         <>
@@ -823,17 +843,13 @@ function Packages() {
                             </button>
                         </div>
 
-                        {selectedPackageForRestrictions.expiry_date && (
+                        {selectedPackageForRestrictions.validity_days && (
                             <div className="mb-4 p-3 bg-background rounded-button border border-border">
                                 <div className="flex items-center gap-2 text-sm">
                                     <Calendar className="w-4 h-4 text-text-secondary" />
-                                    <span className="text-text-secondary">Expires: </span>
+                                    <span className="text-text-secondary">Valid for: </span>
                                     <span className="font-semibold text-text-primary">
-                                        {new Date(selectedPackageForRestrictions.expiry_date).toLocaleDateString('en-US', { 
-                                            month: 'long', 
-                                            day: 'numeric', 
-                                            year: 'numeric' 
-                                        })}
+                                        {selectedPackageForRestrictions.validity_days} day{selectedPackageForRestrictions.validity_days !== 1 ? 's' : ''} from purchase date
                                     </span>
                                 </div>
                             </div>
