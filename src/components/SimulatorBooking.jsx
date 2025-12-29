@@ -481,16 +481,25 @@ function SimulatorBooking() {
             dispatch(getAvailableSimulatorHours({ use_organization: true }));
             showSuccess('Booking confirmed successfully!');
         } else if (createBooking.rejected.match(result)) {
-            const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
-            if (typeof errorMessage === 'object') {
-                // Handle validation errors object
-                const errorText = Object.entries(errorMessage)
-                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-                    .join(', ');
-                showError(`Booking failed: ${errorText}`);
-            } else {
-                showError(`Booking failed: ${errorMessage}`);
+            // Handle different error response formats
+            let errorMessage = 'Unknown error';
+            
+            // Check if payload is an array (DRF ValidationError format)
+            if (Array.isArray(result.payload)) {
+                errorMessage = result.payload.join(' ');
             }
+            // Check if payload has nested error structure
+            else if (result.payload) {
+                errorMessage = result.payload.error || result.payload.detail || result.payload.message || 
+                             (Array.isArray(result.payload) ? result.payload.join(' ') : 
+                             (typeof result.payload === 'object' ? 
+                                Object.entries(result.payload)
+                                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                                    .join(', ') : 
+                                String(result.payload)));
+            }
+            
+            showError(errorMessage);
         } else {
             // Handle case where result is neither fulfilled nor rejected
             console.error('Unexpected booking result state:', result);

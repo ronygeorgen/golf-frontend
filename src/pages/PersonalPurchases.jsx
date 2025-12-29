@@ -100,9 +100,19 @@ function PersonalPurchases() {
                                                     Package: {purchase.package_details?.title || (isSimulator ? 'Simulator Package' : 'Package')}
                                                 </p>
                                                 {isSimulator ? (
-                                                    <p className="text-sm text-text-secondary">
-                                                        Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
-                                                    </p>
+                                                    <>
+                                                        <p className="text-sm text-text-secondary">
+                                                            Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
+                                                        </p>
+                                                        {purchase.expiry_date && (
+                                                            <p className={`text-sm mt-1 ${new Date(purchase.expiry_date) < new Date() ? 'text-danger' : 'text-text-secondary'}`}>
+                                                                Expires: <span className="font-semibold">{new Date(purchase.expiry_date).toLocaleDateString()}</span>
+                                                                {new Date(purchase.expiry_date) < new Date() && (
+                                                                    <span className="ml-2 text-danger font-semibold">(Expired)</span>
+                                                                )}
+                                                            </p>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <p className="text-sm text-text-secondary">

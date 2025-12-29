@@ -19,6 +19,7 @@ import TransferClaim from '../components/TransferClaim';
 import { Skeleton } from '../components/skeletons/SkeletonLoader';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import { ChevronDown, Clock, Calendar, CalendarDays } from 'lucide-react';
 
 function Packages() {
     const dispatch = useAppDispatch();
@@ -50,6 +51,8 @@ function Packages() {
     const [selectedPurchase, setSelectedPurchase] = useState(null);
     const [usageDetailsOpen, setUsageDetailsOpen] = useState(false);
     const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState(null);
+    const [restrictionsModalOpen, setRestrictionsModalOpen] = useState(false);
+    const [selectedPackageForRestrictions, setSelectedPackageForRestrictions] = useState(null);
     const previewLimit = 5;
 
     // Initial load - fetch all data on mount
@@ -465,6 +468,44 @@ function Packages() {
                                             </p>
                                         </div>
 
+                                        {/* Time Restrictions Section */}
+                                        {pkg.time_restrictions && pkg.time_restrictions.length > 0 && (
+                                            <div className="mb-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="w-4 h-4 text-primary" />
+                                                        <span className="text-xs font-semibold text-text-primary">Time Restrictions</span>
+                                                        <Badge variant="accent" className="text-xs py-0 px-1.5">
+                                                            {pkg.time_restrictions.length}
+                                                        </Badge>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedPackageForRestrictions(pkg);
+                                                            setRestrictionsModalOpen(true);
+                                                        }}
+                                                        className="text-xs text-primary hover:text-primary-light transition-colors flex items-center gap-1 font-medium"
+                                                    >
+                                                        <span>View More</span>
+                                                        <ChevronDown className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Expiry Date */}
+                                        {pkg.expiry_date && (
+                                            <div className="mb-3 p-2 bg-background rounded-button border border-border">
+                                                <div className="flex items-center gap-2 text-xs">
+                                                    <Calendar className="w-3.5 h-3.5 text-text-secondary" />
+                                                    <span className="text-text-secondary">Expires: </span>
+                                                    <span className="font-semibold text-text-primary">
+                                                        {new Date(pkg.expiry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Action Buttons */}
                                         <div className="grid grid-cols-2 gap-2 mt-auto">
                                             <Button
@@ -588,9 +629,19 @@ function Packages() {
                                                         Package: {purchase.package_details?.title || (isSimulator ? 'Simulator Package' : 'Package')}
                                                     </p>
                                                     {isSimulator ? (
-                                                        <p className="text-sm text-text-secondary">
-                                                            Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
-                                                        </p>
+                                                        <>
+                                                            <p className="text-sm text-text-secondary">
+                                                                Simulator Hours Remaining: <span className="font-semibold">{purchase.hours_remaining}</span> / {purchase.hours_total} hrs
+                                                            </p>
+                                                            {purchase.expiry_date && (
+                                                                <p className={`text-sm mt-1 ${new Date(purchase.expiry_date) < new Date() ? 'text-danger' : 'text-text-secondary'}`}>
+                                                                    Expires: <span className="font-semibold">{new Date(purchase.expiry_date).toLocaleDateString()}</span>
+                                                                    {new Date(purchase.expiry_date) < new Date() && (
+                                                                        <span className="ml-2 text-danger font-semibold">(Expired)</span>
+                                                                    )}
+                                                                </p>
+                                                            )}
+                                                        </>
                                                     ) : (
                                                         <>
                                                             <p className="text-sm text-text-secondary">
@@ -749,6 +800,122 @@ function Packages() {
                 isOpen={usageDetailsOpen}
                 onClose={handleCloseUsageDetails}
             />
+
+            {/* Time Restrictions Modal */}
+            {restrictionsModalOpen && selectedPackageForRestrictions && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setRestrictionsModalOpen(false)}>
+                    <div className="bg-surface rounded-card shadow-card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                                    <Clock className="w-5 h-5" />
+                                    Time Restrictions
+                                </h2>
+                                <p className="text-sm text-text-secondary mt-1">{selectedPackageForRestrictions.title}</p>
+                            </div>
+                            <button
+                                onClick={() => setRestrictionsModalOpen(false)}
+                                className="text-text-secondary hover:text-text-primary transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {selectedPackageForRestrictions.expiry_date && (
+                            <div className="mb-4 p-3 bg-background rounded-button border border-border">
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Calendar className="w-4 h-4 text-text-secondary" />
+                                    <span className="text-text-secondary">Expires: </span>
+                                    <span className="font-semibold text-text-primary">
+                                        {new Date(selectedPackageForRestrictions.expiry_date).toLocaleDateString('en-US', { 
+                                            month: 'long', 
+                                            day: 'numeric', 
+                                            year: 'numeric' 
+                                        })}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-3">
+                            {selectedPackageForRestrictions.time_restrictions.map((restriction, idx) => {
+                                const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                                const dayName = restriction.is_recurring 
+                                    ? (restriction.day_of_week !== null ? dayNames[restriction.day_of_week] : 'Unknown')
+                                    : null;
+                                const dateStr = restriction.is_recurring 
+                                    ? null 
+                                    : (restriction.date ? new Date(restriction.date).toLocaleDateString('en-US', { 
+                                        month: 'long', 
+                                        day: 'numeric', 
+                                        year: 'numeric' 
+                                    }) : null);
+                                
+                                const formatTime = (timeStr) => {
+                                    if (!timeStr) return '';
+                                    const timeParts = timeStr.split(':');
+                                    const hours = parseInt(timeParts[0], 10);
+                                    const minutes = timeParts[1] || '00';
+                                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                                    const displayHour = hours % 12 || 12;
+                                    return `${displayHour}:${minutes} ${ampm}`;
+                                };
+
+                                return (
+                                    <div key={idx} className="p-4 bg-background rounded-button border border-border">
+                                        <div className="flex items-start gap-3">
+                                            {restriction.is_recurring ? (
+                                                <CalendarDays className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                                            ) : (
+                                                <Calendar className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                                            )}
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <h3 className="text-base font-semibold text-text-primary">
+                                                        {restriction.is_recurring ? dayName : dateStr}
+                                                    </h3>
+                                                    {restriction.is_recurring && (
+                                                        <Badge variant="accent" className="text-xs">Recurring</Badge>
+                                                    )}
+                                                    {!restriction.is_recurring && (
+                                                        <Badge variant="primary" className="text-xs">One-time</Badge>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1.5 text-sm">
+                                                    <div className="flex items-center gap-2 text-text-secondary">
+                                                        <Clock className="w-4 h-4" />
+                                                        <span>
+                                                            {formatTime(restriction.start_time)} - {formatTime(restriction.end_time)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-text-secondary">
+                                                        <span className="font-medium">Usage Limit: </span>
+                                                        <span className="font-semibold text-text-primary">{restriction.limit_hours} hour{restriction.limit_hours !== 1 ? 's' : ''}</span>
+                                                    </div>
+                                                    <p className="text-xs text-text-secondary mt-2 pt-2 border-t border-border/50">
+                                                        This package can be used for up to {restriction.limit_hours} hour{restriction.limit_hours !== 1 ? 's' : ''} on {restriction.is_recurring ? dayName : dateStr} between {formatTime(restriction.start_time)} and {formatTime(restriction.end_time)}.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <Button
+                                variant="secondary"
+                                onClick={() => setRestrictionsModalOpen(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

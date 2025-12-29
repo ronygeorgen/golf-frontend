@@ -8,7 +8,7 @@ import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
-import { Edit, Power, PowerOff, Trash2, X, FileText, Plus } from 'lucide-react';
+import { Edit, Power, PowerOff, Trash2, X, FileText, Plus, Calendar, Clock, CalendarDays } from 'lucide-react';
 
 function SimulatorPackageManagement() {
     const { popup, openPopup, closePopup } = usePopup();
@@ -25,7 +25,9 @@ function SimulatorPackageManagement() {
         price: '',
         hours: '',
         redirect_url: '',
-        is_active: true
+        is_active: true,
+        expiry_date: '',
+        time_restrictions: []
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -78,6 +80,8 @@ function SimulatorPackageManagement() {
             ...formData,
             price: parseFloat(formData.price),
             hours: parseFloat(formData.hours),
+            expiry_date: formData.expiry_date || null,
+            time_restrictions: formData.time_restrictions || []
         };
 
         setSubmitLoading(true);
@@ -100,15 +104,60 @@ function SimulatorPackageManagement() {
         }
     };
 
+    const addTimeRestriction = () => {
+        setFormData({
+            ...formData,
+            time_restrictions: [
+                ...formData.time_restrictions,
+                {
+                    is_recurring: true,
+                    day_of_week: null,
+                    date: '',
+                    start_time: '',
+                    end_time: '',
+                    limit_hours: 1.0
+                }
+            ]
+        });
+    };
+
+    const updateTimeRestriction = (index, field, value) => {
+        const updated = [...formData.time_restrictions];
+        updated[index] = { ...updated[index], [field]: value };
+        // Clear conflicting fields
+        if (field === 'is_recurring') {
+            if (value) {
+                updated[index].date = '';
+            } else {
+                updated[index].day_of_week = null;
+            }
+        }
+        setFormData({ ...formData, time_restrictions: updated });
+    };
+
+    const removeTimeRestriction = (index) => {
+        const updated = formData.time_restrictions.filter((_, i) => i !== index);
+        setFormData({ ...formData, time_restrictions: updated });
+    };
+
     const handleEdit = (pkg) => {
         setEditingPackage(pkg);
+        // Convert time restrictions to use limit_hours (handle old limit_count field)
+        const time_restrictions = (pkg.time_restrictions || []).map(restriction => ({
+            ...restriction,
+            limit_hours: restriction.limit_hours !== undefined ? parseFloat(restriction.limit_hours) : 
+                        (restriction.limit_count !== undefined ? parseFloat(restriction.limit_count) : 1.0)
+        }));
+        
         setFormData({
             title: pkg.title || '',
             description: pkg.description || '',
             price: pkg.price !== null && pkg.price !== undefined ? parseFloat(pkg.price) : '',
             hours: pkg.hours !== null && pkg.hours !== undefined ? parseFloat(pkg.hours) : '',
             redirect_url: pkg.redirect_url || '',
-            is_active: pkg.is_active !== undefined ? pkg.is_active : true
+            is_active: pkg.is_active !== undefined ? pkg.is_active : true,
+            expiry_date: pkg.expiry_date || '',
+            time_restrictions: time_restrictions
         });
         setShowForm(true);
     };
@@ -384,6 +433,143 @@ function SimulatorPackageManagement() {
                                             placeholder="https://example.com/redirect"
                                             className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            Expiry Date (Optional)
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.expiry_date}
+                                            onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
+                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        />
+                                        <p className="text-xs text-text-secondary mt-1">After this date, clients cannot use the package</p>
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-text-primary">
+                                                Time Restrictions (Optional)
+                                            </label>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                onClick={addTimeRestriction}
+                                                className="text-xs"
+                                            >
+                                                <Plus className="w-3 h-3 mr-1" />
+                                                Add Restriction
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-text-secondary mb-3">Set specific days/times when this package can be used</p>
+                                        {formData.time_restrictions.map((restriction, index) => (
+                                            <div key={index} className="mb-4 p-4 border border-border rounded-button bg-background">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className="text-sm font-medium text-text-primary">Restriction {index + 1}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeTimeRestriction(index)}
+                                                        className="text-danger hover:text-danger-light transition-colors"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={restriction.is_recurring}
+                                                            onChange={(e) => updateTimeRestriction(index, 'is_recurring', e.target.checked)}
+                                                            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                                                        />
+                                                        <label className="ml-2 text-sm font-medium text-text-primary">
+                                                            Recurring (Day of Week)
+                                                        </label>
+                                                    </div>
+                                                    {restriction.is_recurring ? (
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                                Day of Week *
+                                                            </label>
+                                                            <select
+                                                                value={restriction.day_of_week ?? ''}
+                                                                onChange={(e) => updateTimeRestriction(index, 'day_of_week', e.target.value ? parseInt(e.target.value) : null)}
+                                                                required
+                                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                                            >
+                                                                <option value="">Select day</option>
+                                                                <option value="0">Monday</option>
+                                                                <option value="1">Tuesday</option>
+                                                                <option value="2">Wednesday</option>
+                                                                <option value="3">Thursday</option>
+                                                                <option value="4">Friday</option>
+                                                                <option value="5">Saturday</option>
+                                                                <option value="6">Sunday</option>
+                                                            </select>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                                Specific Date *
+                                                            </label>
+                                                            <input
+                                                                type="date"
+                                                                value={restriction.date || ''}
+                                                                onChange={(e) => updateTimeRestriction(index, 'date', e.target.value)}
+                                                                required
+                                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                                Start Time *
+                                                            </label>
+                                                            <input
+                                                                type="time"
+                                                                value={restriction.start_time}
+                                                                onChange={(e) => updateTimeRestriction(index, 'start_time', e.target.value)}
+                                                                required
+                                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                                End Time *
+                                                            </label>
+                                                            <input
+                                                                type="time"
+                                                                value={restriction.end_time}
+                                                                onChange={(e) => updateTimeRestriction(index, 'end_time', e.target.value)}
+                                                                required
+                                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                                            Set Usage Hour Limit *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.5"
+                                                            min="0.5"
+                                                            value={restriction.limit_hours}
+                                                            onChange={(e) => updateTimeRestriction(index, 'limit_hours', parseFloat(e.target.value) || 1.0)}
+                                                            required
+                                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                                        />
+                                                        <p className="text-xs text-text-secondary mt-1">Maximum hours that can be used on this day/date within the time window</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {formData.time_restrictions.length === 0 && (
+                                            <div className="text-center py-4 text-text-secondary text-sm border border-border rounded-button bg-background">
+                                                No time restrictions. Package can be used anytime.
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex items-center">
                                         <input

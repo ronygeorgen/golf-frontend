@@ -386,24 +386,29 @@ function CoachingBooking() {
             setSelectedCoach(null); // Clear coach
             setBookingSuccess(true);
         } else {
-            const errorMessage = result.payload?.error || result.payload?.detail || result.payload?.message || 'Unknown error';
-            if (typeof errorMessage === 'object') {
-                // Handle validation errors object
-                const errorText = Object.entries(errorMessage)
-                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-                    .join('\n');
-                openPopup({
-                    type: 'error',
-                    title: 'Booking failed',
-                    message: `Error creating booking:\n${errorText}`,
-                });
-            } else {
-                openPopup({
-                    type: 'error',
-                    title: 'Booking failed',
-                    message: `Error creating booking: ${errorMessage}`,
-                });
+            // Handle different error response formats
+            let errorMessage = 'Unknown error';
+            
+            // Check if payload is an array (DRF ValidationError format)
+            if (Array.isArray(result.payload)) {
+                errorMessage = result.payload.join(' ');
             }
+            // Check if payload has nested error structure
+            else if (result.payload) {
+                errorMessage = result.payload.error || result.payload.detail || result.payload.message || 
+                             (Array.isArray(result.payload) ? result.payload.join(' ') : 
+                             (typeof result.payload === 'object' ? 
+                                Object.entries(result.payload)
+                                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                                    .join('\n') : 
+                                String(result.payload)));
+            }
+            
+            openPopup({
+                type: 'error',
+                title: 'Booking failed',
+                message: `Error creating booking: ${errorMessage}`,
+            });
         }
     };
 
