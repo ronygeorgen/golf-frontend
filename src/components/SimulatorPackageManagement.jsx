@@ -455,10 +455,10 @@ function SimulatorPackageManagement() {
                                                 type="button"
                                                 variant="secondary"
                                                 onClick={addTimeRestriction}
-                                                className="text-xs"
+                                                className="text-xs flex items-center gap-1"
                                             >
-                                                <Plus className="w-3 h-3 mr-1" />
-                                                Add Restriction
+                                                <Plus className="w-3 h-3" />
+                                                <span>Add Restriction</span>
                                             </Button>
                                         </div>
                                         <p className="text-xs text-text-secondary mb-3">Set specific days/times when this package can be used</p>
