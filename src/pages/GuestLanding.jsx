@@ -215,9 +215,9 @@ function GuestLanding() {
                 url.searchParams.set('recipient_phone', tempId);
                 url.searchParams.set('package_type', 'coaching');
                 // Add success redirect URL - payment gateway should redirect here after successful payment
-                // Use a payment success page that will redirect guest users to login
+                // Redirect to guest booking page after successful payment
                 const frontendBaseUrl = window.location.origin;
-                const successRedirectUrl = `${frontendBaseUrl}/payment-success?message=${encodeURIComponent('Package purchased successfully! Please login to view your bookings.')}`;
+                const successRedirectUrl = `${frontendBaseUrl}/payment-success?phone=${encodeURIComponent(registeredPhone)}&message=${encodeURIComponent('Package purchased successfully! You can now book a coaching session.')}`;
                 url.searchParams.set('success_redirect', encodeURIComponent(successRedirectUrl));
                 
                 openPopup({

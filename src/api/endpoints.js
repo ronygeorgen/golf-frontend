@@ -105,6 +105,7 @@ export const endpoints = {
         checkCoachingAvailability: '/bookings/check_coaching_availability/',
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
         availableSimulatorHours: '/bookings/available-simulator-hours/',
+        guestCreate: '/bookings/guest-create/',
     },
     
     // Simulator endpoints (public)
@@ -145,6 +146,7 @@ export const endpoints = {
         simulatorTransfers: '/coaching/simulator-transfers/',
         simulatorTransfersPending: '/coaching/simulator-transfers/pending/',
         simulatorTransferClaim: (id) => `/coaching/simulator-transfers/${id}/claim/`,
+        guestPackages: '/coaching/guest-packages/',
     },
 
     ghl: {

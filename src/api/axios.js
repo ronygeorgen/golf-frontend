@@ -56,7 +56,9 @@ apiClient.interceptors.response.use(
     },
     (error) => {
         // Handle 401 Unauthorized - logout user
-        if (error.response?.status === 401) {
+        // Don't redirect if we're on a guest booking page (they don't need auth)
+        const isGuestBookingPage = window.location.pathname === '/guest-booking';
+        if (error.response?.status === 401 && !isGuestBookingPage) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/signin';

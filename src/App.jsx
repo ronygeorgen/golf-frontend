@@ -6,6 +6,7 @@ import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
 import GuestLanding from './pages/GuestLanding';
 import PaymentSuccess from './pages/PaymentSuccess';
+import GuestCoachingBooking from './pages/GuestCoachingBooking';
 import Booking from './pages/Booking';
 import ClientPortal from './pages/ClientPortal';
 import AdminDashboard from './pages/AdminDashboard';
@@ -176,6 +177,7 @@ function AppContent() {
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/guest-booking" element={<GuestCoachingBooking />} />
             
             {/* Guest Landing Page - for non-logged-in users */}
             <Route 

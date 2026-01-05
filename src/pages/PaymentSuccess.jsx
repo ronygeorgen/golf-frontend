@@ -9,11 +9,23 @@ function PaymentSuccess() {
     const { user, token } = useAppSelector((state) => state.auth);
     
     useEffect(() => {
+        const message = searchParams.get('message');
+        const phone = searchParams.get('phone');
+        
         // Check if user is logged in
         if (!user || !token) {
-            // User is a guest - redirect to login with success message
-            const message = searchParams.get('message') || 'Package purchased successfully! Please login to access your package.';
-            navigate(`/signin?purchase_success=true&message=${encodeURIComponent(message)}`, { replace: true });
+            // User is a guest - check if we have phone for guest booking
+            if (phone) {
+                // Redirect to guest booking page
+                const redirectUrl = message 
+                    ? `/guest-booking?phone=${encodeURIComponent(phone)}&message=${encodeURIComponent(message)}`
+                    : `/guest-booking?phone=${encodeURIComponent(phone)}`;
+                navigate(redirectUrl, { replace: true });
+            } else {
+                // No phone - redirect to login with success message
+                const defaultMessage = message || 'Package purchased successfully! Please login to access your package.';
+                navigate(`/signin?purchase_success=true&message=${encodeURIComponent(defaultMessage)}`, { replace: true });
+            }
         } else {
             // User is logged in - redirect to packages page
             navigate('/packages?view=purchases', { replace: true });
