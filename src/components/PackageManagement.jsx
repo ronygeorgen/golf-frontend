@@ -30,7 +30,8 @@ function PackageManagement() {
         session_duration_minutes: 60,
         simulator_hours: 0,
         redirect_url: '',
-        is_active: true
+        is_active: true,
+        is_tpi_assessment: false
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -135,7 +136,8 @@ function PackageManagement() {
             session_duration_minutes: pkg.session_duration_minutes || 60,
             simulator_hours: pkg.simulator_hours || 0,
             redirect_url: pkg.redirect_url || '',
-            is_active: pkg.is_active
+            is_active: pkg.is_active,
+            is_tpi_assessment: pkg.is_tpi_assessment || false
         });
         setShowForm(true);
     };
@@ -353,6 +355,17 @@ function PackageManagement() {
                                         />
                                         <label className="ml-2 text-sm font-medium text-text-primary">
                                             Active
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_tpi_assessment}
+                                            onChange={(e) => setFormData({...formData, is_tpi_assessment: e.target.checked})}
+                                            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                                        />
+                                        <label className="ml-2 text-sm font-medium text-text-primary">
+                                            TPI Assessment Package (Non-transferable, personal use only)
                                         </label>
                                     </div>
                                     <div className="flex gap-4 pt-4">

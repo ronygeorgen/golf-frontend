@@ -354,7 +354,7 @@ function Packages() {
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
-                                            <span className="text-xs font-medium text-text-primary">{pkg.session_duration_minutes} min</span>
+                                            <span className="text-xs font-medium text-text-primary">Duration {pkg.session_duration_minutes} min</span>
                                         </div>
                                         {pkg.simulator_hours > 0 && (
                                             <div className="flex items-center gap-1.5">

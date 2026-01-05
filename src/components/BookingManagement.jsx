@@ -135,6 +135,7 @@ function BookingManagement() {
                             <option value="upcoming">Upcoming</option>
                             <option value="completed">Completed</option>
                             <option value="cancelled">Cancelled</option>
+                            <option value="tpi_assessment">TPI Assessment</option>
                         </select>
                         
                         <div className="flex flex-col sm:flex-row gap-2 flex-1">
@@ -242,9 +243,16 @@ function BookingManagement() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
-                                                <Badge status={booking.booking_type === 'simulator' ? 'pending' : 'personal'}>
-                                                    {booking.booking_type}
-                                                </Badge>
+                                                <div className="flex flex-col gap-1">
+                                                    <Badge status={booking.booking_type === 'simulator' ? 'pending' : 'personal'}>
+                                                        {booking.booking_type}
+                                                    </Badge>
+                                                    {booking.is_tpi_assessment && (
+                                                        <Badge status="confirmed" className="bg-purple-100 text-purple-700 border-purple-300">
+                                                            TPI Assessment
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <div className="text-sm text-text-primary">{date}</div>

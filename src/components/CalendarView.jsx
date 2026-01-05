@@ -59,11 +59,16 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         // Use design system colors
         let backgroundColor = '#1B3D2C'; // primary-light for simulator
         
-        // For simulator calendar, use primary-light; for coaching calendar, use primary
-        if (calendarType === 'coaching') {
-            backgroundColor = '#0F2A1D'; // primary
+        // Check if it's a TPI assessment booking first (purple color)
+        if (event.is_tpi_assessment) {
+            backgroundColor = '#9333EA'; // purple-600 for TPI assessment
         } else {
-            backgroundColor = '#1B3D2C'; // primary-light
+            // For simulator calendar, use primary-light; for coaching calendar, use primary
+            if (calendarType === 'coaching') {
+                backgroundColor = '#0F2A1D'; // primary
+            } else {
+                backgroundColor = '#1B3D2C'; // primary-light
+            }
         }
         
         if (event.status === 'cancelled') {
@@ -167,7 +172,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 coach: booking.coach_details,
                 package: booking.coaching_package_details,
                 total_price: booking.total_price,
-                status: booking.status
+                status: booking.status,
+                is_tpi_assessment: booking.is_tpi_assessment || false
             };
         });
 
@@ -263,6 +269,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     <div className="flex flex-wrap gap-4 md:gap-6">
                         {[
                             { color: calendarType === 'simulator' ? 'bg-primary-light' : 'bg-primary', label: calendarType === 'simulator' ? 'Simulator Bookings' : 'Coaching Sessions' },
+                            { color: 'bg-purple-600', label: 'TPI Assessment' },
                             { color: 'bg-danger', label: 'Cancelled' },
                             { color: 'bg-status-no_show-text', label: 'Completed' },
                         ].map((item, idx) => (

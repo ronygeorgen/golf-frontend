@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import DOBPopup from '../components/DOBPopup';
+import useToast from '../hooks/useToast';
+import Toast from '../components/ui/Toast';
 
 function SignIn() {
     const dispatch = useAppDispatch();
     const { loading, error, otpSent, otpMessage } = useAppSelector((state) => state.auth);
+    const location = useLocation();
     
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
@@ -16,13 +19,37 @@ function SignIn() {
     const [showDOBPopup, setShowDOBPopup] = useState(false);
     
     const navigate = useNavigate();
+    const { toast, showInfo, showSuccess, hideToast } = useToast();
 
     useEffect(() => {
         // Clear OTP state on mount
         dispatch(clearError());
         dispatch(clearOTP());
         setStep('phone');
-    }, [dispatch]);
+        
+        // Show toast message if redirected from guest landing page
+        if (location.state?.message) {
+            showInfo(location.state.message);
+            // Clear the state to prevent showing the message again on refresh
+            window.history.replaceState({}, document.title);
+        }
+        
+        // Check for purchase success message from URL params (after payment)
+        const searchParams = new URLSearchParams(location.search);
+        const purchaseSuccess = searchParams.get('purchase_success');
+        const message = searchParams.get('message');
+        if (purchaseSuccess === 'true' && message) {
+            showSuccess(decodeURIComponent(message));
+            // Clean up URL
+            searchParams.delete('purchase_success');
+            searchParams.delete('message');
+            const newSearch = searchParams.toString();
+            const newUrl = newSearch 
+                ? `${location.pathname}?${newSearch}` 
+                : location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    }, [dispatch, location.state, location.search, showInfo, showSuccess]);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
@@ -159,6 +186,17 @@ function SignIn() {
                     navigate('/'); // Navigate to root, LandingRedirect will handle role-based redirect
                 }}
             />
+            
+            {toast && (
+                <div className="fixed top-4 right-4 z-50">
+                    <Toast
+                        message={toast.message}
+                        type={toast.type}
+                        duration={toast.duration}
+                        onClose={hideToast}
+                    />
+                </div>
+            )}
         </div>
     );
 }

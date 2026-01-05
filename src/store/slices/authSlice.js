@@ -16,6 +16,24 @@ export const signup = createAsyncThunk(
     }
 );
 
+export const signupWithoutOTP = createAsyncThunk(
+    'auth/signupWithoutOTP',
+    async (userData, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.auth.signupWithoutOTP, userData);
+            // For simulator bookings, store token and user (they are logged in)
+            // For coaching/TPI, they remain guests (no token)
+            if (response.data.token && response.data.user) {
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const login = createAsyncThunk(
     'auth/login',
     async (credentials, { rejectWithValue }) => {
@@ -194,6 +212,32 @@ const authSlice = createSlice({
                 state.otpMessage = action.payload.message || 'OTP sent successfully';
             })
             .addCase(signup.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Signup Without OTP
+        builder
+            .addCase(signupWithoutOTP.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(signupWithoutOTP.fulfilled, (state, action) => {
+                state.loading = false;
+                // For simulator bookings, set user and token (they are logged in)
+                // For coaching/TPI, user remains a guest (no token in response)
+                if (action.payload.token && action.payload.user) {
+                    state.user = action.payload.user;
+                    state.token = action.payload.token;
+                    // Store location_id from user data
+                    if (action.payload.user?.ghl_location_id) {
+                        state.locationId = action.payload.user.ghl_location_id;
+                        localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                    }
+                }
+                state.error = null;
+            })
+            .addCase(signupWithoutOTP.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

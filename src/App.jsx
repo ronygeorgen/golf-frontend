@@ -4,6 +4,8 @@ import { useAppDispatch, useAppSelector } from './store/hooks';
 import { getProfile, autoLogin } from './store/slices/authSlice';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
+import GuestLanding from './pages/GuestLanding';
+import PaymentSuccess from './pages/PaymentSuccess';
 import Booking from './pages/Booking';
 import ClientPortal from './pages/ClientPortal';
 import AdminDashboard from './pages/AdminDashboard';
@@ -57,7 +59,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     }
     
     if (!user || !token) {
-        return <Navigate to="/signin" />;
+        return <Navigate to="/guest" />;
     }
     
     if (allowedRoles) {
@@ -173,6 +175,15 @@ function AppContent() {
         <Routes>
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            
+            {/* Guest Landing Page - for non-logged-in users */}
+            <Route 
+                path="/guest" 
+                element={
+                    !user || !token ? <GuestLanding /> : <Navigate to="/" replace />
+                } 
+            />
             
             {/* User Routes with UserLayout */}
             <Route 

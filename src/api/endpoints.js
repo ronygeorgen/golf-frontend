@@ -5,6 +5,7 @@ export const endpoints = {
     // Auth endpoints
     auth: {
         signup: '/auth/signup/',
+        signupWithoutOTP: '/auth/signup-without-otp/',
         login: '/auth/login/',
         logout: '/auth/logout/',
         profile: '/auth/profile/',

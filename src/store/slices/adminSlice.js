@@ -270,7 +270,13 @@ export const getBookings = createAsyncThunk(
     async ({ filter = 'all', dateRange = {}, page = 1, bookingType = 'all' } = {}, { rejectWithValue }) => {
         try {
             const params = new URLSearchParams();
-            if (filter !== 'all') params.append('status', filter);
+            if (filter !== 'all') {
+                if (filter === 'tpi_assessment') {
+                    params.append('status', 'tpi_assessment');
+                } else {
+                    params.append('status', filter);
+                }
+            }
             if (dateRange.start_date) params.append('start_date', dateRange.start_date);
             if (dateRange.end_date) params.append('end_date', dateRange.end_date);
             if (bookingType && bookingType !== 'all') params.append('booking_type', bookingType);
