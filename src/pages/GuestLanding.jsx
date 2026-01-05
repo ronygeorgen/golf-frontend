@@ -167,11 +167,91 @@ function GuestLanding() {
                     setStep('tpi-packages');
                 }
             } else {
-                const errorMsg = result.payload?.error || result.payload?.message || 'Registration failed. Please try again.';
-                showError(errorMsg);
+                // Check if account already exists
+                const errorData = result.payload;
+                const emailError = errorData?.email?.[0] || errorData?.email;
+                const phoneError = errorData?.phone?.[0] || errorData?.phone;
+                
+                if (emailError && emailError.toLowerCase().includes('already exists')) {
+                    openPopup({
+                        type: 'warning',
+                        title: 'Account Already Exists',
+                        message: 'An account with this email already exists. Please login to continue.',
+                        confirmText: 'Login Now',
+                        showCancel: true,
+                        cancelText: 'Cancel',
+                        onConfirm: () => {
+                            navigate('/signin', {
+                                state: {
+                                    message: 'Please login to book a simulator session.'
+                                }
+                            });
+                        }
+                    });
+                } else if (phoneError && phoneError.toLowerCase().includes('already exists')) {
+                    openPopup({
+                        type: 'warning',
+                        title: 'Account Already Exists',
+                        message: 'An account with this phone number already exists. Please login to continue.',
+                        confirmText: 'Login Now',
+                        showCancel: true,
+                        cancelText: 'Cancel',
+                        onConfirm: () => {
+                            navigate('/signin', {
+                                state: {
+                                    message: 'Please login to book a simulator session.'
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    const errorMsg = errorData?.error || errorData?.message || 
+                                    emailError || phoneError || 
+                                    'Registration failed. Please try again.';
+                    showError(errorMsg);
+                }
             }
         } catch (error) {
-            showError('Registration failed. Please try again.');
+            // Check if it's an account exists error in the catch block too
+            const errorData = error.response?.data;
+            const emailError = errorData?.email?.[0] || errorData?.email;
+            const phoneError = errorData?.phone?.[0] || errorData?.phone;
+            
+            if (emailError && emailError.toLowerCase().includes('already exists')) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Account Already Exists',
+                    message: 'An account with this email already exists. Please login to continue.',
+                    confirmText: 'Login Now',
+                    showCancel: true,
+                    cancelText: 'Cancel',
+                    onConfirm: () => {
+                        navigate('/signin', {
+                            state: {
+                                message: 'Please login to book a simulator session.'
+                            }
+                        });
+                    }
+                });
+            } else if (phoneError && phoneError.toLowerCase().includes('already exists')) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Account Already Exists',
+                    message: 'An account with this phone number already exists. Please login to continue.',
+                    confirmText: 'Login Now',
+                    showCancel: true,
+                    cancelText: 'Cancel',
+                    onConfirm: () => {
+                        navigate('/signin', {
+                            state: {
+                                message: 'Please login to book a simulator session.'
+                            }
+                        });
+                    }
+                });
+            } else {
+                showError('Registration failed. Please try again.');
+            }
         } finally {
             setRegistering(false);
         }
