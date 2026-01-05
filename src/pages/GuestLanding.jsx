@@ -35,6 +35,7 @@ function GuestLanding() {
     });
     const [registering, setRegistering] = useState(false);
     const [registeredPhone, setRegisteredPhone] = useState(null); // Store phone after successful registration
+    const [phoneError, setPhoneError] = useState(''); // Phone validation error
 
     // Fetch GHL locations on component mount
     useEffect(() => {
@@ -100,9 +101,35 @@ function GuestLanding() {
         }
     };
 
+    const handlePhoneChange = (e) => {
+        const value = e.target.value;
+        // Only allow digits
+        const digitsOnly = value.replace(/\D/g, '');
+        // Limit to 10 digits
+        const limitedDigits = digitsOnly.slice(0, 10);
+        
+        setRegistrationData({
+            ...registrationData,
+            phone: limitedDigits
+        });
+        
+        // Clear error when user starts typing
+        if (phoneError) {
+            setPhoneError('');
+        }
+    };
+
     const handleRegistrationSubmit = async (e) => {
         e.preventDefault();
         setRegistering(true);
+        
+        // Validate phone number - must be exactly 10 digits
+        if (!registrationData.phone || registrationData.phone.length !== 10) {
+            setPhoneError('Phone number must be exactly 10 digits');
+            showError('Please enter a valid 10-digit phone number');
+            setRegistering(false);
+            return;
+        }
         
         // Validate that location is selected (mandatory)
         if (!registrationData.ghl_location_id) {
@@ -395,18 +422,27 @@ function GuestLanding() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-text-primary mb-2">
-                                        Phone Number
+                                        Phone Number <span className="text-danger">*</span>
                                     </label>
                                     <input
                                         type="tel"
                                         value={registrationData.phone}
-                                        onChange={(e) => setRegistrationData({
-                                            ...registrationData,
-                                            phone: e.target.value
-                                        })}
-                                        className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                        onChange={handlePhoneChange}
+                                        placeholder="Enter 10-digit phone number"
+                                        maxLength={10}
+                                        className={`w-full px-4 py-3 border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary ${
+                                            phoneError ? 'border-danger' : 'border-border'
+                                        }`}
                                         required
                                     />
+                                    {phoneError && (
+                                        <p className="text-danger text-sm mt-1">{phoneError}</p>
+                                    )}
+                                    {registrationData.phone && registrationData.phone.length < 10 && (
+                                        <p className="text-text-secondary text-xs mt-1">
+                                            {10 - registrationData.phone.length} digits remaining
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-text-primary mb-2">
@@ -455,7 +491,7 @@ function GuestLanding() {
                                         variant="primary"
                                         className="flex-1"
                                     >
-                                        {registering ? 'Registering...' : 'Continue'}
+                                        {registering ? 'Submitting...' : 'Submit'}
                                     </Button>
                                 </div>
                             </form>
