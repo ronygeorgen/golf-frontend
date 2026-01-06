@@ -21,6 +21,7 @@ function UserLayout() {
 
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
     const isStaff = user?.role === 'staff';
+    const isStaffOrAdmin = isStaff || isAdmin;
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -104,8 +105,8 @@ function UserLayout() {
                         <div className="flex items-center space-x-4">
                             {/* Navigation Links */}
                             <nav className="hidden md:flex items-center space-x-2">
-                                {/* My Coaching Sessions Dropdown - Staff Only */}
-                                {isStaff && (
+                                {/* My Coaching Sessions Dropdown - Staff/Admin Only */}
+                                {isStaffOrAdmin && (
                                     <div className="relative" ref={coachingSessionsMenuRef}>
                                         <button
                                             onClick={() => setCoachingSessionsMenuOpen(!coachingSessionsMenuOpen)}
@@ -300,7 +301,7 @@ function UserLayout() {
                                         <div className="py-1">
                                             {/* Mobile Navigation Links - Only visible on mobile */}
                                             <div className="md:hidden border-b border-border pb-2 mb-2">
-                                                {isStaff && (
+                                                {isStaffOrAdmin && (
                                                     <>
                                                         <button
                                                             onClick={() => {
@@ -405,22 +406,7 @@ function UserLayout() {
                                                         <span>Manage Purchased Packages</span>
                                                     </button>
                                                 </div>
-                                                {isStaff && (
-                                                    <button
-                                                        onClick={() => {
-                                                            navigate('/member-list');
-                                                            setDropdownOpen(false);
-                                                        }}
-                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                            location.pathname === '/member-list'
-                                                                ? 'bg-primary-light text-white font-medium'
-                                                                : 'text-text-primary hover:bg-background'
-                                                        }`}
-                                                    >
-                                                        <UserCheck className="w-4 h-4" />
-                                                        <span>Member List</span>
-                                                    </button>
-                                                )}
+                                                {/* Member List is already shown in the isStaffOrAdmin block above */}
                                                 <button
                                                     onClick={() => {
                                                         navigate('/special-events');

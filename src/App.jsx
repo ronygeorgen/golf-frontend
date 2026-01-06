@@ -104,8 +104,9 @@ function LandingRedirect() {
         // Wait for loading to complete and user to be available with role
         if (!loading && user && user.role) {
             const isStaff = user.role === 'staff';
-            const redirectPath = isStaff ? "/coaching-sessions" : "/portal";
-            console.log('LandingRedirect - User role:', user.role, 'isStaff:', isStaff, 'Redirecting to:', redirectPath);
+            const isAdmin = user.role === 'admin' || user.is_superuser === true;
+            const redirectPath = (isStaff || isAdmin) ? "/coaching-sessions" : "/portal";
+            console.log('LandingRedirect - User role:', user.role, 'isStaff:', isStaff, 'isAdmin:', isAdmin, 'Redirecting to:', redirectPath);
             navigate(redirectPath, { replace: true });
         } else if (!loading && user && !user.role) {
             console.warn('LandingRedirect - User exists but no role property found!', user);
@@ -119,7 +120,8 @@ function LandingRedirect() {
     
     // Fallback - should not reach here if useEffect works
     const isStaff = user.role === 'staff';
-    return <Navigate to={isStaff ? "/coaching-sessions" : "/portal"} replace />;
+    const isAdmin = user.role === 'admin' || user.is_superuser === true;
+    return <Navigate to={(isStaff || isAdmin) ? "/coaching-sessions" : "/portal"} replace />;
 }
 
 function AppContent() {

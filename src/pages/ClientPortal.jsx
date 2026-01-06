@@ -702,7 +702,7 @@ function ClientPortal() {
                                         <span>View My Calendar</span>
                                     </div>
                                 </Button>
-                                {user?.role === 'staff' && (
+                                {(user?.role === 'staff' || user?.role === 'admin' || user?.is_superuser) && (
                                     <Button
                                         onClick={() => navigate('/coaching-sessions')}
                                         variant="primary"
