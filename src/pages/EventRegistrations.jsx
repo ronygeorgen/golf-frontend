@@ -9,7 +9,7 @@ import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { ArrowLeft, CheckCircle, UserPlus, X, Search } from 'lucide-react';
+import { ArrowLeft, CheckCircle, UserPlus, X, Search, Trash2 } from 'lucide-react';
 
 function EventRegistrations() {
     const { eventId } = useParams();
@@ -23,6 +23,7 @@ function EventRegistrations() {
     const [allRegistrations, setAllRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updatingStatus, setUpdatingStatus] = useState({});
+    const [removingRegistration, setRemovingRegistration] = useState({});
     const [showCancelled, setShowCancelled] = useState(false); // Toggle for showing cancelled
     
     // Modal state
@@ -203,6 +204,44 @@ function EventRegistrations() {
         });
     };
 
+    const handleRemoveRegistration = (registrationId) => {
+        const registration = allRegistrations.find(r => r.id === registrationId);
+        const userName = registration?.user_details?.first_name 
+            ? `${registration.user_details.first_name} ${registration.user_details.last_name || ''}`.trim()
+            : registration?.user_details?.username 
+            ? registration.user_details.username
+            : 'this user';
+        
+        openPopup({
+            type: 'warning',
+            title: 'Remove Registration',
+            message: `Are you sure you want to remove ${userName} from this event? This action cannot be undone.`,
+            showCancel: true,
+            confirmText: 'Yes, Remove',
+            cancelText: 'Cancel',
+            onConfirm: async () => {
+                setRemovingRegistration({ ...removingRegistration, [registrationId]: true });
+                try {
+                    await axios.delete(
+                        endpoints.specialEvents.removeRegistration(eventId),
+                        {
+                            data: {
+                                registration_id: registrationId
+                            }
+                        }
+                    );
+                    await fetchEventAndRegistrations();
+                    showSuccess('Registration removed successfully');
+                } catch (error) {
+                    console.error('Error removing registration:', error);
+                    showError(error.response?.data?.error || 'Failed to remove registration');
+                } finally {
+                    setRemovingRegistration({ ...removingRegistration, [registrationId]: false });
+                }
+            },
+        });
+    };
+
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -323,30 +362,49 @@ function EventRegistrations() {
                                         </td>
                                         {showActionsColumn && (
                                             <td className="px-4 py-3">
-                                                {reg.status === 'registered' ? (
+                                                <div className="flex items-center gap-2">
+                                                    {reg.status === 'registered' && (
+                                                        <button
+                                                            onClick={() => handleUpdateStatus(reg.id)}
+                                                            disabled={updatingStatus[reg.id] || removingRegistration[reg.id]}
+                                                            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-button hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                        >
+                                                            {updatingStatus[reg.id] ? (
+                                                                <>
+                                                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                    </svg>
+                                                                    <span>Updating...</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <CheckCircle className="w-4 h-4" />
+                                                                    <span>Mark as Showed Up</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={() => handleUpdateStatus(reg.id)}
-                                                        disabled={updatingStatus[reg.id]}
-                                                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-button hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                        onClick={() => {
+                                                            if (!removingRegistration[reg.id]) {
+                                                                handleRemoveRegistration(reg.id);
+                                                            }
+                                                        }}
+                                                        disabled={updatingStatus[reg.id] || removingRegistration[reg.id]}
+                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-button disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                        title="Remove Registration"
                                                     >
-                                                        {updatingStatus[reg.id] ? (
-                                                            <>
-                                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                </svg>
-                                                                <span>Updating...</span>
-                                                            </>
+                                                        {removingRegistration[reg.id] ? (
+                                                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
                                                         ) : (
-                                                            <>
-                                                                <CheckCircle className="w-4 h-4" />
-                                                                <span>Mark as Showed Up</span>
-                                                            </>
+                                                            <Trash2 className="w-4 h-4" />
                                                         )}
                                                     </button>
-                                                ) : (
-                                                    <span className="text-sm text-text-secondary">-</span>
-                                                )}
+                                                </div>
                                             </td>
                                         )}
                                     </tr>

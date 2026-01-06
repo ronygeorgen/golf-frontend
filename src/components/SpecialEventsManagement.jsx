@@ -45,7 +45,8 @@ function SpecialEventsManagement() {
         is_active: true,
         price: '',
         show_price: false,
-        is_private: false
+        is_private: false,
+        is_auto_enroll: false
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -135,7 +136,8 @@ function SpecialEventsManagement() {
             is_active: event.is_active !== undefined ? event.is_active : true,
             price: event.price || '',
             show_price: event.show_price !== undefined ? event.show_price : false,
-            is_private: event.is_private !== undefined ? event.is_private : false
+            is_private: event.is_private !== undefined ? event.is_private : false,
+            is_auto_enroll: event.is_auto_enroll !== undefined ? event.is_auto_enroll : false
         });
         setShowForm(true);
     };
@@ -516,6 +518,36 @@ function SpecialEventsManagement() {
                                             Private events are only visible to admins. Clients cannot see or register for private events.
                                         </p>
                                     </div>
+                                    
+                                    {/* Auto Enroll - Only show for weekly and monthly recurring events */}
+                                    {(formData.event_type === 'weekly' || formData.event_type === 'monthly') && (
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-3">
+                                                <label className="text-sm text-text-primary">Auto Enroll</label>
+                                                <div className="relative group">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, is_auto_enroll: !formData.is_auto_enroll })}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                                            formData.is_auto_enroll ? 'bg-primary' : 'bg-gray-300'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                                                                formData.is_auto_enroll ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                        {formData.is_auto_enroll ? 'No' : 'Yes'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-text-secondary">
+                                                When enabled, registered customers will be automatically enrolled for the next occurrence.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

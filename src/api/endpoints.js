@@ -171,6 +171,7 @@ export const endpoints = {
         cancelRegistration: (id) => `/special-events/events/${id}/cancel_registration/`,
         registrations: (id) => `/special-events/events/${id}/registrations/`,
         updateRegistrationStatus: (id) => `/special-events/events/${id}/update_registration_status/`,
+        removeRegistration: (id) => `/special-events/events/${id}/remove_registration/`,
         myRegistrations: '/special-events/registrations/',
     },
 };
