@@ -44,7 +44,8 @@ function SpecialEventsManagement() {
         max_capacity: 10,
         is_active: true,
         price: '',
-        show_price: false
+        show_price: false,
+        is_private: false
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -133,7 +134,8 @@ function SpecialEventsManagement() {
             max_capacity: event.max_capacity || 10,
             is_active: event.is_active !== undefined ? event.is_active : true,
             price: event.price || '',
-            show_price: event.show_price !== undefined ? event.show_price : false
+            show_price: event.show_price !== undefined ? event.show_price : false,
+            is_private: event.is_private !== undefined ? event.is_private : false
         });
         setShowForm(true);
     };
@@ -251,9 +253,16 @@ function SpecialEventsManagement() {
                                             {event.registered_count || 0} / {event.max_capacity}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Badge variant={event.is_active ? 'success' : 'secondary'}>
-                                                {event.is_active ? 'Active' : 'Inactive'}
-                                            </Badge>
+                                            <div className="flex flex-col gap-1">
+                                                <Badge variant={event.is_active ? 'success' : 'secondary'}>
+                                                    {event.is_active ? 'Active' : 'Inactive'}
+                                                </Badge>
+                                                {event.is_private && (
+                                                    <Badge variant="warning" className="text-xs">
+                                                        Private
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center space-x-2">
@@ -436,48 +445,76 @@ function SpecialEventsManagement() {
                                     />
                                 </div>
 
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <label className="text-sm text-text-primary">Active</label>
-                                        <div className="relative group">
-                                            <button
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                                    formData.is_active ? 'bg-primary' : 'bg-gray-300'
-                                                }`}
-                                            >
-                                                <span
-                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                                                        formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm text-text-primary">Active</label>
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                                        formData.is_active ? 'bg-primary' : 'bg-gray-300'
                                                     }`}
-                                                />
-                                            </button>
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                                                {formData.is_active ? 'No' : 'Yes'}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                                                            formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                                                        }`}
+                                                    />
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                    {formData.is_active ? 'No' : 'Yes'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm text-text-primary">Show Price to Users</label>
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, show_price: !formData.show_price })}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                                        formData.show_price ? 'bg-primary' : 'bg-gray-300'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                                                            formData.show_price ? 'translate-x-6' : 'translate-x-1'
+                                                        }`}
+                                                    />
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                    {formData.show_price ? 'No' : 'Yes'}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <label className="text-sm text-text-primary">Show Price to Users</label>
-                                        <div className="relative group">
-                                            <button
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, show_price: !formData.show_price })}
-                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                                    formData.show_price ? 'bg-primary' : 'bg-gray-300'
-                                                }`}
-                                            >
-                                                <span
-                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                                                        formData.show_price ? 'translate-x-6' : 'translate-x-1'
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm text-text-primary">Private Event</label>
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, is_private: !formData.is_private })}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                                        formData.is_private ? 'bg-primary' : 'bg-gray-300'
                                                     }`}
-                                                />
-                                            </button>
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                                                {formData.show_price ? 'No' : 'Yes'}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                                                            formData.is_private ? 'translate-x-6' : 'translate-x-1'
+                                                        }`}
+                                                    />
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                    {formData.is_private ? 'No' : 'Yes'}
+                                                </div>
                                             </div>
                                         </div>
+                                        <p className="text-xs text-text-secondary">
+                                            Private events are only visible to admins. Clients cannot see or register for private events.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
