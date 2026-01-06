@@ -5,6 +5,8 @@ import { getStaff, createStaff, updateStaff, deleteStaff } from '../store/slices
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { Edit, Trash2, Calendar, Users, UserCheck } from 'lucide-react';
@@ -15,6 +17,7 @@ function StaffManagement() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
+    const { toast, showError, showSuccess, hideToast } = useToast();
     const { list: staff, loading } = useAppSelector((state) => state.admin.staff);
     const { user } = useAppSelector((state) => state.auth);
     const modalRef = useRef(null);
@@ -93,13 +96,7 @@ function StaffManagement() {
         try {
             // For superadmin creating admin, ensure location_id is provided
             if (isSuperadmin && !editingStaff && !formData.ghl_location_id) {
-                openPopup({
-                    type: 'error',
-                    title: 'Location Required',
-                    message: 'Please select a location for the admin.',
-                    confirmText: 'OK',
-                    showCancel: false,
-                });
+                showError('Please select a location for the admin.');
                 setSubmitLoading(false);
                 return;
             }
@@ -110,23 +107,59 @@ function StaffManagement() {
                 delete submitData.ghl_location_id;
             }
 
+            let result;
             if (editingStaff) {
-                await dispatch(updateStaff({ id: editingStaff.id, staffData: submitData }));
+                result = await dispatch(updateStaff({ id: editingStaff.id, staffData: submitData }));
             } else {
-                await dispatch(createStaff(submitData));
+                result = await dispatch(createStaff(submitData));
             }
-            setShowForm(false);
-            setEditingStaff(null);
-            setFormData({ 
-                first_name: '', 
-                last_name: '', 
-                email: '', 
-                phone: '', 
-                role: isSuperadmin ? 'admin' : 'staff',
-                date_of_birth: '',
-                ghl_location_id: ''
-            });
-            // No need to refetch - Redux already updates the state optimistically
+
+            // Check if the action was successful
+            if (editingStaff ? updateStaff.fulfilled.match(result) : createStaff.fulfilled.match(result)) {
+                showSuccess(editingStaff ? 'Staff member updated successfully!' : 'Staff member created successfully!');
+                setShowForm(false);
+                setEditingStaff(null);
+                setFormData({ 
+                    first_name: '', 
+                    last_name: '', 
+                    email: '', 
+                    phone: '', 
+                    role: isSuperadmin ? 'admin' : 'staff',
+                    date_of_birth: '',
+                    ghl_location_id: ''
+                });
+                // No need to refetch - Redux already updates the state optimistically
+            } else if (editingStaff ? updateStaff.rejected.match(result) : createStaff.rejected.match(result)) {
+                // Handle error - parse error message from payload
+                let errorMessage = 'An error occurred. Please try again.';
+                
+                if (result.payload) {
+                    // Handle different error response formats
+                    if (typeof result.payload === 'string') {
+                        errorMessage = result.payload;
+                    } else if (Array.isArray(result.payload)) {
+                        errorMessage = result.payload.join(' ');
+                    } else if (typeof result.payload === 'object') {
+                        // Handle object with field errors like { phone: "error message", email: "error message" }
+                        const errorMessages = [];
+                        for (const [key, value] of Object.entries(result.payload)) {
+                            if (Array.isArray(value)) {
+                                errorMessages.push(...value);
+                            } else if (typeof value === 'string') {
+                                errorMessages.push(value);
+                            }
+                        }
+                        errorMessage = errorMessages.length > 0 
+                            ? errorMessages.join('. ') 
+                            : result.payload.error || result.payload.detail || result.payload.message || errorMessage;
+                    }
+                }
+
+                showError(errorMessage);
+            }
+        } catch (error) {
+            // Handle unexpected errors
+            showError(error.message || 'An unexpected error occurred. Please try again.');
         } finally {
             setSubmitLoading(false);
         }
@@ -504,6 +537,14 @@ function StaffManagement() {
                 onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
                 onClose={closePopup}
             />
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
+            )}
         </>
     );
 }
