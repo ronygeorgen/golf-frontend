@@ -33,18 +33,21 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             // For month view, get start and end of the month
             startDate = moment(date).startOf('month').toDate();
             endDate = moment(date).endOf('month').toDate();
-        } else if (view === 'week') {
-            // For week view, get start and end of the week
-            startDate = moment(date).startOf('week').toDate();
-            endDate = moment(date).endOf('week').toDate();
-        } else if (view === 'day') {
+        } 
+        // Week view commented out - only month view is needed for now
+        // else if (view === 'week') {
+        //     // For week view, get start and end of the week
+        //     startDate = moment(date).startOf('week').toDate();
+        //     endDate = moment(date).endOf('week').toDate();
+        // } 
+        else if (view === 'day') {
             // For day view, get start and end of the day
             startDate = moment(date).startOf('day').toDate();
             endDate = moment(date).endOf('day').toDate();
         } else {
-            // Default to week if view is unknown
-            startDate = moment(date).startOf('week').toDate();
-            endDate = moment(date).endOf('week').toDate();
+            // Default to month if view is unknown
+            startDate = moment(date).startOf('month').toDate();
+            endDate = moment(date).endOf('month').toDate();
         }
         
         dispatch(getCalendarBookings({ 
@@ -92,7 +95,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const handleSelectEvent = (event) => {
         const details = (
             <div className="space-y-1 text-sm leading-5">
-                {!isUserView && (
+                {event.client && (
                     <p>
                         <span className="font-semibold">Client:</span>{' '}
                         {event.client?.first_name || 'N/A'} {event.client?.last_name || ''}
@@ -143,7 +146,13 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     };
 
     const handleView = (newView) => {
-        setView(newView);
+        // Only allow month view for now - week view is disabled
+        if (newView === 'month') {
+            setView(newView);
+        } else {
+            // Force month view if any other view is attempted
+            setView('month');
+        }
     };
 
     // Transform events for calendar - convert UTC to local time
@@ -237,12 +246,13 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             timeslots={2}
                             min={new Date(0, 0, 0, 0, 0, 0)}
                             max={new Date(0, 0, 0, 23, 59, 0)}
+                            views={['month']} // Only allow month view - week view is disabled
                             messages={{
                                 next: "Next",
                                 previous: "Prev",
                                 today: "Today",
                                 month: "Month",
-                                week: "Week",
+                                // week: "Week", // Week view commented out
                                 day: "Day"
                             }}
                         />
