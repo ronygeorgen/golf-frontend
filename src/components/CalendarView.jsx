@@ -13,7 +13,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const dispatch = useAppDispatch();
     const { calendarEvents: events, loading } = useAppSelector((state) => state.booking);
     const { popup, openPopup, closePopup } = usePopup();
-    
+
     const [view, setView] = useState('month'); // Default to month view
     const [date, setDate] = useState(new Date());
     const [calendarType, setCalendarType] = useState(coachId ? 'coaching' : 'simulator'); // 'simulator' or 'coaching'
@@ -28,12 +28,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     useEffect(() => {
         // Calculate date range based on current view
         let startDate, endDate;
-        
+
         if (view === 'month') {
             // For month view, get start and end of the month
             startDate = moment(date).startOf('month').toDate();
             endDate = moment(date).endOf('month').toDate();
-        } 
+        }
         // Week view commented out - only month view is needed for now
         // else if (view === 'week') {
         //     // For week view, get start and end of the week
@@ -49,19 +49,21 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             startDate = moment(date).startOf('month').toDate();
             endDate = moment(date).endOf('month').toDate();
         }
-        
-        dispatch(getCalendarBookings({ 
-            startDate, 
+
+        dispatch(getCalendarBookings({
+            startDate,
             endDate,
             bookingType: calendarType,
-            coachId: coachId 
+            coachId: coachId
         }));
     }, [dispatch, date, calendarType, coachId, view]); // Add 'view' to dependencies
+
+
 
     const eventStyleGetter = (event) => {
         // Use design system colors
         let backgroundColor = '#1B3D2C'; // primary-light for simulator
-        
+
         // Check if it's a TPI assessment booking first (purple color)
         if (event.is_tpi_assessment) {
             backgroundColor = '#9333EA'; // purple-600 for TPI assessment
@@ -73,22 +75,28 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 backgroundColor = '#1B3D2C'; // primary-light
             }
         }
-        
+
         if (event.status === 'cancelled') {
             backgroundColor = '#DC2626'; // danger
         } else if (event.status === 'completed') {
             backgroundColor = '#374151'; // no_show text color (gray)
         }
-        
+
+
+
+        const baseStyle = {
+            backgroundColor,
+            borderRadius: '5px',
+            opacity: 0.8,
+            color: 'white',
+            border: '0px',
+            display: 'block'
+        };
+
+
+
         return {
-            style: {
-                backgroundColor,
-                borderRadius: '5px',
-                opacity: 0.8,
-                color: 'white',
-                border: '0px',
-                display: 'block'
-            }
+            style: baseStyle
         };
     };
 
@@ -146,8 +154,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     };
 
     const handleView = (newView) => {
-        // Only allow month view for now - week view is disabled
-        if (newView === 'month') {
+        // Allow month and day views - week view is disabled
+        if (newView === 'month' || newView === 'day') {
             setView(newView);
         } else {
             // Force month view if any other view is attempted
@@ -155,25 +163,73 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }
     };
 
+    // Handle when a day slot is clicked in month view
+    const handleSelectSlot = (slotInfo) => {
+        if (view === 'month') {
+            // Get all events for the selected day
+            const dayEvents = calendarEvents.filter(event => {
+                const eventDate = moment(event.start).format('YYYY-MM-DD');
+                const slotDate = moment(slotInfo.start).format('YYYY-MM-DD');
+                return eventDate === slotDate;
+            });
+
+            // If there are multiple bookings, show them in a modal or switch to day view
+            if (dayEvents.length > 0) {
+                if (dayEvents.length === 1) {
+                    // Single event - show its details
+                    handleSelectEvent(dayEvents[0]);
+                } else {
+                    // Multiple events - show all in a modal or switch to day view
+                    // Option 1: Switch to day view
+                    setDate(slotInfo.start);
+                    setView('day');
+
+                    // Option 2: Show modal with all bookings (commented out - using day view instead)
+                    // const eventsList = (
+                    //     <div className="space-y-2 max-h-96 overflow-y-auto">
+                    //         <p className="font-semibold text-sm mb-2">
+                    //             {dayEvents.length} bookings on {moment(slotInfo.start).format('MMM Do YYYY')}
+                    //         </p>
+                    //         {dayEvents.map((event, idx) => (
+                    //             <div key={idx} className="border-b border-border pb-2">
+                    //                 <p className="font-medium">{event.title}</p>
+                    //                 <p className="text-xs text-text-secondary">
+                    //                     {moment(event.start).format('h:mm a')} - {moment(event.end).format('h:mm a')}
+                    //                 </p>
+                    //             </div>
+                    //         ))}
+                    //     </div>
+                    // );
+                    // openPopup({
+                    //     type: 'info',
+                    //     title: `Bookings for ${moment(slotInfo.start).format('MMM Do YYYY')}`,
+                    //     message: eventsList,
+                    //     confirmText: 'Close',
+                    // });
+                }
+            }
+        }
+    };
+
     // Transform events for calendar - convert UTC to local time
     // Backend already filters by booking_type, but we keep this filter as safety measure
-    const calendarEvents = events
+    const transformedEvents = events
         .filter(booking => booking.booking_type === calendarType)
         .map(booking => {
             // Parse UTC times from backend (ISO 8601 format) and convert to local time
             // Backend sends UTC times, moment.utc() parses them and .local() converts to user's timezone
             const startTime = moment.utc(booking.start_time).local().toDate();
             const endTime = moment.utc(booking.end_time).local().toDate();
-            
+
             return {
                 id: booking.id,
-                title: isUserView 
+                title: isUserView
                     ? `${booking.booking_type === 'simulator' ? 'Simulator' : 'Coaching'} - ${booking.booking_type === 'simulator' ? `Bay ${booking.simulator_details?.bay_number || ''}` : booking.coach_details ? `${booking.coach_details.first_name} ${booking.coach_details.last_name}` : 'Any Coach'}`
                     : `${booking.booking_type === 'simulator' ? 'Simulator' : 'Coaching'} - ${booking.client_details?.first_name || 'N/A'}`,
                 start: startTime,
                 end: endTime,
-                resourceId: booking.booking_type === 'simulator' ? 
-                    `simulator-${booking.simulator_details?.bay_number || ''}` : 
+                resourceId: booking.booking_type === 'simulator' ?
+                    `simulator-${booking.simulator_details?.bay_number || ''}` :
                     `coach-${booking.coach_details?.id || 'any'}`,
                 type: booking.booking_type,
                 client: booking.client_details,
@@ -186,8 +242,38 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             };
         });
 
+    // Use transformed events directly
+    const calendarEvents = transformedEvents;
+
+
+
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
+            <style>{`
+                /* Force events to take proper width in day view to prevent overlapping */
+                .rbc-day-slot .rbc-event {
+                    max-width: 20% !important;
+                    margin-right: 4px !important;
+                }
+                
+                /* Override react-big-calendar's default width calculation */
+                .rbc-events-container .rbc-event {
+                    width: 20% !important;
+                }
+                
+                /* Ensure events in the same time slot are properly spaced */
+                .rbc-time-slot .rbc-event-content {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+                
+                /* Ensure proper positioning for overlapping events */
+                .rbc-day-slot .rbc-events-container {
+                    display: flex;
+                    gap: 4px;
+                }
+            `}</style>
             <div className="w-full">
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
@@ -200,11 +286,10 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 <div className="flex items-center justify-between gap-2 sm:gap-4 bg-background rounded-2xl p-1.5 sm:p-2 shadow-inner">
                                     <button
                                         onClick={() => setCalendarType('simulator')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${
-                                            calendarType === 'simulator'
-                                                ? 'bg-primary-light text-white shadow-md scale-[1.02]'
-                                                : 'text-text-secondary hover:bg-surface'
-                                        }`}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'simulator'
+                                            ? 'bg-primary-light text-white shadow-md scale-[1.02]'
+                                            : 'text-text-secondary hover:bg-surface'
+                                            }`}
                                         title="Normal Simulator Calendar"
                                     >
                                         <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary-light flex-shrink-0"></span>
@@ -212,11 +297,10 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     </button>
                                     <button
                                         onClick={() => setCalendarType('coaching')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${
-                                            calendarType === 'coaching'
-                                                ? 'bg-primary text-white shadow-md scale-[1.02]'
-                                                : 'text-text-secondary hover:bg-surface'
-                                        }`}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'coaching'
+                                            ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                            : 'text-text-secondary hover:bg-surface'
+                                            }`}
                                         title="Coaching Simulator Calendar"
                                     >
                                         <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary flex-shrink-0"></span>
@@ -237,6 +321,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             endAccessor="end"
                             style={{ height: '100%' }}
                             onSelectEvent={handleSelectEvent}
+                            onSelectSlot={handleSelectSlot}
+                            selectable={view === 'month'} // Allow selecting day slots in month view
                             onNavigate={handleNavigate}
                             onView={handleView}
                             view={view}
@@ -246,7 +332,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             timeslots={2}
                             min={new Date(0, 0, 0, 0, 0, 0)}
                             max={new Date(0, 0, 0, 23, 59, 0)}
-                            views={['month']} // Only allow month view - week view is disabled
+                            views={['month', 'day']} // Allow month and day views - week view is disabled
                             messages={{
                                 next: "Next",
                                 previous: "Prev",
@@ -257,12 +343,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             }}
                         />
                         {loading && (
-                            <div 
+                            <div
                                 className="absolute bg-surface bg-opacity-95 pointer-events-none z-10"
-                                style={{ 
-                                    top: '50px', 
-                                    left: 0, 
-                                    right: 0, 
+                                style={{
+                                    top: '50px',
+                                    left: 0,
+                                    right: 0,
                                     bottom: 0,
                                     display: 'flex',
                                     alignItems: 'center',
