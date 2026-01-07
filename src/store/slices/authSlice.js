@@ -2,6 +2,13 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../api/axios';
 import { endpoints } from '../../api/endpoints';
 
+// Helper function to trim location_id (remove leading/trailing whitespace and '+' characters)
+const trimLocationId = (locationId) => {
+    if (!locationId) return null;
+    const trimmed = String(locationId).trim().replace(/\+$/, '').trim();
+    return trimmed || null;
+};
+
 // Async thunks
 export const signup = createAsyncThunk(
     'auth/signup',
@@ -161,10 +168,14 @@ export const logout = createAsyncThunk(
 // Initial state
 const getInitialState = () => {
     const user = JSON.parse(localStorage.getItem('user')) || null;
-    const locationId = user?.ghl_location_id || localStorage.getItem('locationId') || null;
-    if (locationId && !localStorage.getItem('locationId')) {
+    let locationId = user?.ghl_location_id || localStorage.getItem('locationId') || null;
+    locationId = trimLocationId(locationId);
+    
+    // Update localStorage with trimmed location_id if it exists
+    if (locationId) {
         localStorage.setItem('locationId', locationId);
     }
+    
     return {
         user: user,
         token: localStorage.getItem('token') || null,
@@ -231,8 +242,11 @@ const authSlice = createSlice({
                     state.token = action.payload.token;
                     // Store location_id from user data
                     if (action.payload.user?.ghl_location_id) {
-                        state.locationId = action.payload.user.ghl_location_id;
-                        localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                        const trimmedLocationId = trimLocationId(action.payload.user.ghl_location_id);
+                        state.locationId = trimmedLocationId;
+                        if (trimmedLocationId) {
+                            localStorage.setItem('locationId', trimmedLocationId);
+                        }
                     }
                 }
                 state.error = null;
@@ -315,8 +329,11 @@ const authSlice = createSlice({
                 state.user = action.payload;
                 // Update location_id from user data
                 if (action.payload?.ghl_location_id) {
-                    state.locationId = action.payload.ghl_location_id;
-                    localStorage.setItem('locationId', action.payload.ghl_location_id);
+                    const trimmedLocationId = trimLocationId(action.payload.ghl_location_id);
+                    state.locationId = trimmedLocationId;
+                    if (trimmedLocationId) {
+                        localStorage.setItem('locationId', trimmedLocationId);
+                    }
                 }
             })
             .addCase(getProfile.rejected, (state, action) => {

@@ -21,23 +21,29 @@ apiClient.interceptors.request.use(
         // Add location_id to all requests (GET, POST, PUT, DELETE, PATCH)
         const locationId = localStorage.getItem('locationId');
         if (locationId) {
-            // For GET requests, add as query parameter
-            if (config.method === 'get' || config.method === 'GET') {
-                config.params = config.params || {};
-                config.params.location_id = locationId;
-            } else {
-                // For POST, PUT, DELETE, PATCH, add to request body
-                // But if data is a list or FormData, add as query parameter instead
-                if (Array.isArray(config.data) || config.data instanceof FormData) {
-                    // If data is a list or FormData, add location_id as query parameter
+            // Trim location_id to remove leading/trailing whitespace and '+' characters
+            const trimmedLocationId = locationId.trim().replace(/\+$/, '').trim();
+            
+            // Only add if location_id is not empty after trimming
+            if (trimmedLocationId) {
+                // For GET requests, add as query parameter
+                if (config.method === 'get' || config.method === 'GET') {
                     config.params = config.params || {};
-                    config.params.location_id = locationId;
-                } else if (typeof config.data === 'object' && config.data !== null) {
-                    // If data is an object (dict), add location_id to the body
-                    config.data.location_id = locationId;
+                    config.params.location_id = trimmedLocationId;
                 } else {
-                    // If data is null/undefined, create an object with location_id
-                    config.data = { location_id: locationId };
+                    // For POST, PUT, DELETE, PATCH, add to request body
+                    // But if data is a list or FormData, add as query parameter instead
+                    if (Array.isArray(config.data) || config.data instanceof FormData) {
+                        // If data is a list or FormData, add location_id as query parameter
+                        config.params = config.params || {};
+                        config.params.location_id = trimmedLocationId;
+                    } else if (typeof config.data === 'object' && config.data !== null) {
+                        // If data is an object (dict), add location_id to the body
+                        config.data.location_id = trimmedLocationId;
+                    } else {
+                        // If data is null/undefined, create an object with location_id
+                        config.data = { location_id: trimmedLocationId };
+                    }
                 }
             }
         }
