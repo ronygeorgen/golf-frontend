@@ -12,7 +12,7 @@ function MemberList() {
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.auth);
     const { toast, showSuccess, showError, hideToast } = useToast();
-    
+
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState(null);
@@ -43,7 +43,7 @@ function MemberList() {
             } else {
                 params.page = pageNum;
             }
-            
+
             const response = await apiClient.get(endpoints.auth.memberList, { params });
             setMembers(response.data.members || []);
             setPagination({
@@ -64,12 +64,12 @@ function MemberList() {
     const handleSearchChange = (e) => {
         const value = e.target.value;
         setSearchQuery(value);
-        
+
         // Clear existing timeout
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
-        
+
         // Set new timeout for debounced search
         searchTimeoutRef.current = setTimeout(() => {
             if (value.trim()) {
@@ -145,7 +145,7 @@ function MemberList() {
 
         try {
             setPurchasingPackageId(packageId);
-            
+
             // Create temp purchase with referral_id
             const response = await apiClient.post('/coaching/temp-purchase/', {
                 package_id: packageId,
@@ -166,7 +166,7 @@ function MemberList() {
                 if (user.id) {
                     url.searchParams.set('referral_id', user.id.toString()); // Staff user ID who referred this purchase
                 }
-                
+
                 // Redirect to payment page with all parameters
                 window.location.href = url.toString();
             } else {
@@ -242,7 +242,7 @@ function MemberList() {
                                             </td>
                                             <td className="py-3 px-4 text-sm text-text-primary">{member.email}</td>
                                             <td className="py-3 px-4 text-sm text-text-primary">{member.phone}</td>
-                                            <td 
+                                            <td
                                                 className="py-3 px-4 text-sm text-text-primary cursor-pointer hover:text-primary transition-colors"
                                                 onClick={() => handleViewPackages(member)}
                                             >
@@ -308,7 +308,7 @@ function MemberList() {
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Search Results Count */}
                     {!loading && isSearching && searchQuery.trim() && (
                         <div className="mt-6 pt-6 border-t border-border">
@@ -325,7 +325,7 @@ function MemberList() {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-surface rounded-card shadow-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
-                            <div className="flex justify-between items-center mb-4">
+                            <div className="flex justify-between items-start gap-4 mb-4">
                                 <h2 className="text-2xl font-bold text-text-primary">
                                     {selectedMember.first_name} {selectedMember.last_name}
                                 </h2>
@@ -384,10 +384,11 @@ function MemberList() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3">
+                            <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
                                 <Button
                                     onClick={handleAddPackage}
                                     variant="primary"
+                                    className="w-full sm:w-auto"
                                 >
                                     <PackageIcon className="w-4 h-4 inline mr-2" />
                                     Add Package
@@ -395,6 +396,7 @@ function MemberList() {
                                 <Button
                                     onClick={closeModal}
                                     variant="secondary"
+                                    className="w-full sm:w-auto"
                                 >
                                     Close
                                 </Button>
@@ -434,20 +436,20 @@ function MemberList() {
                                             key={pkg.id}
                                             className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
                                         >
-                                            <div className="flex justify-between items-start">
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                                                 <div className="flex-1">
-                                                    <h3 className="font-semibold text-text-primary">{pkg.title}</h3>
-                                                    <p className="text-sm text-text-secondary mt-1">{pkg.description}</p>
-                                                    <div className="mt-2 flex gap-4 text-sm">
+                                                    <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
+                                                    <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
+                                                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
                                                         <span className="text-text-secondary">
-                                                            Sessions: {pkg.session_count}
+                                                            Sessions: <span className="font-medium text-text-primary">{pkg.session_count}</span>
                                                         </span>
                                                         {pkg.simulator_hours > 0 && (
                                                             <span className="text-text-secondary">
-                                                                Simulator Hours: {pkg.simulator_hours}
+                                                                Simulator Hours: <span className="font-medium text-text-primary">{pkg.simulator_hours}</span>
                                                             </span>
                                                         )}
-                                                        <span className="font-semibold text-text-primary">
+                                                        <span className="font-bold text-primary text-base">
                                                             ${pkg.price}
                                                         </span>
                                                     </div>
@@ -456,7 +458,7 @@ function MemberList() {
                                                     onClick={() => handlePurchasePackage(pkg.id)}
                                                     variant="primary"
                                                     disabled={purchasingPackageId === pkg.id}
-                                                    className="ml-4"
+                                                    className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
                                                 >
                                                     {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
                                                 </Button>
