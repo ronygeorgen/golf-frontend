@@ -1,24 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getUsers, toggleUserPause } from '../store/slices/adminSlice';
+import { getUsers, toggleUserPause, createUser } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
+import CreateUserModal from './CreateUserModal';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
-import { Pause, Play, Search, Filter } from 'lucide-react';
+import { Pause, Play, Search, Filter, Plus } from 'lucide-react';
 
 function UserManagement() {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
     const { list: users, loading, pagination } = useAppSelector((state) => state.admin.users);
-    
+    const { user: currentUser } = useAppSelector((state) => state.auth);
+
+    // Permission checks
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.is_superuser === true;
+    const canManage = isAdmin; // Only admin can pause/unpause
+    const canCreate = isAdmin || currentUser?.role === 'staff';
+
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize] = useState(20);
     const [roleFilter, setRoleFilter] = useState('');
     const [pausedFilter, setPausedFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchInput, setSearchInput] = useState('');
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     useEffect(() => {
         const params = {
@@ -44,7 +52,34 @@ function UserManagement() {
         setCurrentPage(1);
     };
 
+    const handleCreateUser = async (formData) => {
+        try {
+            const storedLocationId = localStorage.getItem('locationId');
+            const userData = {
+                ...formData,
+                ghl_location_id: currentUser?.ghl_location_id || storedLocationId,
+                role: 'client' // Enforce client role on frontend explicitly
+            };
+            const result = await dispatch(createUser(userData));
+            if (createUser.fulfilled.match(result)) {
+                openPopup({
+                    type: 'success',
+                    title: 'Success',
+                    message: 'User created successfully',
+                    confirmText: 'OK',
+                });
+            } else {
+                throw new Error(result.payload?.error || 'Failed to create user');
+            }
+        } catch (error) {
+            // Error handling is done in the modal via error prop/state, but we can also show popup
+            throw error; // Re-throw to let modal handle it
+        }
+    };
+
     const handleTogglePause = (user) => {
+        if (!canManage) return;
+
         const action = user.is_paused ? 'unpause' : 'pause';
         openPopup({
             type: 'warning',
@@ -132,6 +167,18 @@ function UserManagement() {
                             </Button>
                         </div>
 
+                        {/* Can Create User Button */}
+                        {canCreate && (
+                            <Button
+                                onClick={() => setIsCreateModalOpen(true)}
+                                variant="primary"
+                                className="px-4 whitespace-nowrap flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create User
+                            </Button>
+                        )}
+
                         {/* Filters on right */}
                         <div className="flex items-center gap-3 ml-auto">
                             <div className="flex items-center gap-2">
@@ -176,7 +223,7 @@ function UserManagement() {
                         </div>
                     </div>
 
-                    {/* Mobile: Search on top, Filters (Role & Status) on same line below */}
+                    {/* Mobile: Search on top, Create Button, Filters (Role & Status) on same line below */}
                     <div className="md:hidden space-y-3">
                         {/* Search Row */}
                         <div className="flex gap-3">
@@ -201,6 +248,17 @@ function UserManagement() {
                                 Search
                             </Button>
                         </div>
+
+                        {canCreate && (
+                            <Button
+                                onClick={() => setIsCreateModalOpen(true)}
+                                variant="primary"
+                                className="w-full px-4 whitespace-nowrap flex items-center justify-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create User
+                            </Button>
+                        )}
 
                         {/* Filters Row - Role and Status on same line */}
                         <div className="flex items-center gap-3">
@@ -311,28 +369,30 @@ function UserManagement() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                                    <Button
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            handleTogglePause(user);
-                                                        }}
-                                                        variant={user.is_paused ? "primary" : "secondary"}
-                                                        className="px-3 py-1 flex items-center gap-2"
-                                                        type="button"
-                                                    >
-                                                        {user.is_paused ? (
-                                                            <>
-                                                                <Play className="w-4 h-4" />
-                                                                Unpause
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Pause className="w-4 h-4" />
-                                                                Pause
-                                                            </>
-                                                        )}
-                                                    </Button>
+                                                    {canManage && (
+                                                        <Button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleTogglePause(user);
+                                                            }}
+                                                            variant={user.is_paused ? "primary" : "secondary"}
+                                                            className="px-3 py-1 flex items-center gap-2"
+                                                            type="button"
+                                                        >
+                                                            {user.is_paused ? (
+                                                                <>
+                                                                    <Play className="w-4 h-4" />
+                                                                    Unpause
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Pause className="w-4 h-4" />
+                                                                    Pause
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
@@ -373,6 +433,12 @@ function UserManagement() {
                     )}
                 </div>
             </div>
+
+            <CreateUserModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSave={handleCreateUser}
+            />
 
             <PopupMessage
                 open={popup.open}

@@ -282,7 +282,7 @@ export const getBookings = createAsyncThunk(
             if (bookingType && bookingType !== 'all') params.append('booking_type', bookingType);
             if (page) params.append('page', page);
             const queryString = params.toString();
-            const url = queryString 
+            const url = queryString
                 ? `${endpoints.admin.bookings.list}?${queryString}`
                 : endpoints.admin.bookings.list;
             const response = await apiClient.get(url);
@@ -368,9 +368,9 @@ export const getUsers = createAsyncThunk(
             if (role) params.append('role', role);
             if (isPaused !== null) params.append('is_paused', isPaused);
             if (search) params.append('search', search);
-            
+
             const queryString = params.toString();
-            const url = queryString 
+            const url = queryString
                 ? `${endpoints.admin.users.list}?${queryString}`
                 : endpoints.admin.users.list;
             const response = await apiClient.get(url);
@@ -386,6 +386,18 @@ export const toggleUserPause = createAsyncThunk(
     async (userId, { rejectWithValue }) => {
         try {
             const response = await apiClient.post(endpoints.admin.users.togglePause(userId));
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const createUser = createAsyncThunk(
+    'admin/createUser',
+    async (userData, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.admin.users.list, userData);
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -738,7 +750,7 @@ const adminSlice = createSlice({
                     }
                 }
             });
-        
+
         builder
             .addCase(grantCoachingSessions.pending, (state) => {
                 state.overrides.coaching.loading = true;
@@ -778,7 +790,7 @@ const adminSlice = createSlice({
                 state.overrides.lockedBookings.loading = false;
                 state.overrides.lockedBookings.error = action.payload || 'Unable to fetch locked bookings.';
             });
-        
+
         // User management
         builder
             .addCase(getUsers.pending, (state) => {
@@ -797,6 +809,10 @@ const adminSlice = createSlice({
                     currentPage,
                     totalPages: Math.max(1, Math.ceil(count / pageSize) || 1),
                 };
+            })
+            .addCase(createUser.fulfilled, (state, action) => {
+                state.users.list.unshift(action.payload);
+                state.users.pagination.count += 1;
             })
             .addCase(getUsers.rejected, (state, action) => {
                 state.users.loading = false;

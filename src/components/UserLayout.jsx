@@ -47,7 +47,7 @@ function UserLayout() {
     useEffect(() => {
         // Check if we've already shown the popup in this session
         const dobPopupShown = sessionStorage.getItem('dobPopupShown');
-        
+
         if (user && !user.date_of_birth && location.pathname !== '/profile' && !dobPopupShown) {
             // Small delay to ensure layout is rendered, and don't show on profile page
             const timer = setTimeout(() => {
@@ -89,9 +89,9 @@ function UserLayout() {
                         {/* Left side - Logo/Title */}
                         <div className="flex items-center space-x-2 md:space-x-4">
                             <div className="bg-white p-1 rounded-md">
-                                <img 
-                                    src={logo} 
-                                    alt="Hole 9 Golf Logo" 
+                                <img
+                                    src={logo}
+                                    alt="Hole 9 Golf Logo"
                                     className="h-10 w-auto md:h-10 object-contain"
                                 />
                             </div>
@@ -110,11 +110,10 @@ function UserLayout() {
                                     <div className="relative" ref={coachingSessionsMenuRef}>
                                         <button
                                             onClick={() => setCoachingSessionsMenuOpen(!coachingSessionsMenuOpen)}
-                                            className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                                location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions') || location.pathname === '/member-list'
-                                                    ? 'bg-primary-light text-white'
-                                                    : 'text-text-secondary hover:bg-background'
-                                            }`}
+                                            className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions') || location.pathname === '/member-list'
+                                                ? 'bg-primary-light text-white'
+                                                : 'text-text-secondary hover:bg-background'
+                                                }`}
                                         >
                                             <Users className="w-4 h-4" />
                                             <span>Manage</span>
@@ -129,11 +128,10 @@ function UserLayout() {
                                                         navigate('/coaching-sessions');
                                                         setCoachingSessionsMenuOpen(false);
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
-                                                            ? 'bg-primary-light/10 text-primary font-semibold'
-                                                            : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
+                                                        ? 'bg-primary-light/10 text-primary font-semibold'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
                                                 >
                                                     <Users className="w-4 h-4" />
                                                     <span>My Coaching Sessions</span>
@@ -143,26 +141,25 @@ function UserLayout() {
                                                         navigate('/member-list');
                                                         setCoachingSessionsMenuOpen(false);
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/member-list'
-                                                            ? 'bg-primary-light/10 text-primary font-semibold'
-                                                            : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/member-list'
+                                                        ? 'bg-primary-light/10 text-primary font-semibold'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
                                                 >
                                                     <UserCheck className="w-4 h-4" />
                                                     <span>Member List</span>
                                                 </button>
+                                                {/* Button Removed */}
                                             </div>
                                         )}
                                     </div>
                                 )}
                                 <button
                                     onClick={() => navigate('/portal')}
-                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                        location.pathname === '/portal'
-                                            ? 'bg-primary-light text-white'
-                                            : 'text-text-secondary hover:bg-background'
-                                    }`}
+                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/portal'
+                                        ? 'bg-primary-light text-white'
+                                        : 'text-text-secondary hover:bg-background'
+                                        }`}
                                 >
                                     <div className="flex items-center space-x-1">
                                         <Home className="w-4 h-4" />
@@ -171,21 +168,19 @@ function UserLayout() {
                                 </button>
                                 <button
                                     onClick={() => navigate('/booking')}
-                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                        location.pathname === '/booking'
-                                            ? 'bg-primary-light text-white'
-                                            : 'text-text-secondary hover:bg-background'
-                                    }`}
+                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/booking'
+                                        ? 'bg-primary-light text-white'
+                                        : 'text-text-secondary hover:bg-background'
+                                        }`}
                                 >
                                     Book Session
                                 </button>
                                 <button
                                     onClick={() => navigate('/calendar')}
-                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                        location.pathname === '/calendar'
-                                            ? 'bg-primary-light text-white'
-                                            : 'text-text-secondary hover:bg-background'
-                                    }`}
+                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/calendar'
+                                        ? 'bg-primary-light text-white'
+                                        : 'text-text-secondary hover:bg-background'
+                                        }`}
                                 >
                                     <div className="flex items-center space-x-1">
                                         <Calendar className="w-4 h-4" />
@@ -196,11 +191,10 @@ function UserLayout() {
                                 <div className="relative" ref={packagesMenuRef}>
                                     <button
                                         onClick={() => setPackagesMenuOpen(!packagesMenuOpen)}
-                                        className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                            location.pathname === '/packages'
-                                                ? 'bg-primary-light text-white'
-                                                : 'text-text-secondary hover:bg-background'
-                                        }`}
+                                        className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/packages'
+                                            ? 'bg-primary-light text-white'
+                                            : 'text-text-secondary hover:bg-background'
+                                            }`}
                                     >
                                         <Package className="w-4 h-4" />
                                         <span>Packages</span>
@@ -215,11 +209,10 @@ function UserLayout() {
                                                     navigate('/packages?view=packages');
                                                     setPackagesMenuOpen(false);
                                                 }}
-                                                className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                    location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
-                                                        ? 'bg-primary-light/10 text-primary font-semibold'
-                                                        : 'text-text-primary hover:bg-background'
-                                                }`}
+                                                className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
+                                                    ? 'bg-primary-light/10 text-primary font-semibold'
+                                                    : 'text-text-primary hover:bg-background'
+                                                    }`}
                                             >
                                                 <Package className="w-4 h-4" />
                                                 <span>Purchase Packages</span>
@@ -229,11 +222,10 @@ function UserLayout() {
                                                     navigate('/packages?view=purchases');
                                                     setPackagesMenuOpen(false);
                                                 }}
-                                                className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                    location.pathname === '/packages' && location.search.includes('view=purchases')
-                                                        ? 'bg-primary-light/10 text-primary font-semibold'
-                                                        : 'text-text-primary hover:bg-background'
-                                                }`}
+                                                className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && location.search.includes('view=purchases')
+                                                    ? 'bg-primary-light/10 text-primary font-semibold'
+                                                    : 'text-text-primary hover:bg-background'
+                                                    }`}
                                             >
                                                 <User className="w-4 h-4" />
                                                 <span>Manage Purchased Packages</span>
@@ -243,11 +235,10 @@ function UserLayout() {
                                 </div>
                                 <button
                                     onClick={() => navigate('/special-events')}
-                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${
-                                        location.pathname === '/special-events'
-                                            ? 'bg-primary-light text-white'
-                                            : 'text-text-secondary hover:bg-background'
-                                    }`}
+                                    className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/special-events'
+                                        ? 'bg-primary-light text-white'
+                                        : 'text-text-secondary hover:bg-background'
+                                        }`}
                                 >
                                     Special Events
                                 </button>
@@ -308,11 +299,10 @@ function UserLayout() {
                                                                 navigate('/coaching-sessions');
                                                                 setDropdownOpen(false);
                                                             }}
-                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                                location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
-                                                                    ? 'bg-primary-light text-white font-medium'
-                                                                    : 'text-text-primary hover:bg-background'
-                                                            }`}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                                }`}
                                                         >
                                                             <Users className="w-4 h-4" />
                                                             <span>My Coaching Sessions</span>
@@ -322,15 +312,15 @@ function UserLayout() {
                                                                 navigate('/member-list');
                                                                 setDropdownOpen(false);
                                                             }}
-                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                                location.pathname === '/member-list'
-                                                                    ? 'bg-primary-light text-white font-medium'
-                                                                    : 'text-text-primary hover:bg-background'
-                                                            }`}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/member-list'
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                                }`}
                                                         >
                                                             <UserCheck className="w-4 h-4" />
                                                             <span>Member List</span>
                                                         </button>
+                                                        {/* Button Removed */}
                                                     </>
                                                 )}
                                                 <button
@@ -338,11 +328,10 @@ function UserLayout() {
                                                         navigate('/portal');
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/portal'
-                                                            ? 'bg-primary-light text-white font-medium'
-                                                            : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/portal'
+                                                        ? 'bg-primary-light text-white font-medium'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
                                                 >
                                                     <Home className="w-4 h-4" />
                                                     <span>Portal</span>
@@ -352,11 +341,10 @@ function UserLayout() {
                                                         navigate('/booking');
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/booking'
-                                                            ? 'bg-primary-light text-white font-medium'
-                                                            : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/booking'
+                                                        ? 'bg-primary-light text-white font-medium'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
                                                 >
                                                     <Calendar className="w-4 h-4" />
                                                     <span>Book Session</span>
@@ -366,11 +354,10 @@ function UserLayout() {
                                                         navigate('/calendar');
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/calendar'
-                                                            ? 'bg-primary-light text-white font-medium'
-                                                            : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/calendar'
+                                                        ? 'bg-primary-light text-white font-medium'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
                                                 >
                                                     <Calendar className="w-4 h-4" />
                                                     <span>Calendar</span>
@@ -382,11 +369,10 @@ function UserLayout() {
                                                             navigate('/packages?view=packages');
                                                             setDropdownOpen(false);
                                                         }}
-                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                            location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
-                                                                ? 'bg-primary-light text-white font-medium'
-                                                                : 'text-text-primary hover:bg-background'
-                                                        }`}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
+                                                            ? 'bg-primary-light text-white font-medium'
+                                                            : 'text-text-primary hover:bg-background'
+                                                            }`}
                                                     >
                                                         <Package className="w-4 h-4" />
                                                         <span>Purchase Packages</span>
@@ -396,11 +382,10 @@ function UserLayout() {
                                                             navigate('/packages?view=purchases');
                                                             setDropdownOpen(false);
                                                         }}
-                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                            location.pathname === '/packages' && location.search.includes('view=purchases')
-                                                                ? 'bg-primary-light text-white font-medium'
-                                                                : 'text-text-primary hover:bg-background'
-                                                        }`}
+                                                        className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && location.search.includes('view=purchases')
+                                                            ? 'bg-primary-light text-white font-medium'
+                                                            : 'text-text-primary hover:bg-background'
+                                                            }`}
                                                     >
                                                         <User className="w-4 h-4" />
                                                         <span>Manage Purchased Packages</span>
@@ -412,11 +397,10 @@ function UserLayout() {
                                                         navigate('/special-events');
                                                         setDropdownOpen(false);
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        location.pathname === '/special-events'
-                                                            ? 'bg-primary-light text-white font-medium'
-                                                            : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/special-events'
+                                                        ? 'bg-primary-light text-white font-medium'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
                                                 >
                                                     <Calendar className="w-4 h-4" />
                                                     <span>Special Events</span>
@@ -469,8 +453,8 @@ function UserLayout() {
             <main className="pt-0">
                 <Outlet />
             </main>
-            
-            <DOBPopup 
+
+            <DOBPopup
                 isOpen={showDOBPopup}
                 onClose={() => {
                     setShowDOBPopup(false);

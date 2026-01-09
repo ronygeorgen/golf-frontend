@@ -42,7 +42,7 @@ import MemberList from './pages/MemberList';
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
     const { user, token, loading } = useAppSelector((state) => state.auth);
-    
+
     // Fetch fresh user profile if token exists but user data might be stale
     // Only check once on mount, not on every user update
     useEffect(() => {
@@ -51,40 +51,40 @@ function ProtectedRoute({ children, allowedRoles }) {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]); // Only depend on token, not user - to avoid infinite loop
-    
+
     // Show loading only if we don't have a user yet (initial load)
     // Don't show loading if user exists - let individual components handle their own loading states
     // This prevents the global loader from showing during profile updates
     if (loading && !user) {
         return <div className="min-h-screen flex items-center justify-center"><div className="text-gray-600">Loading...</div></div>;
     }
-    
+
     if (!user || !token) {
         return <Navigate to="/guest" />;
     }
-    
+
     if (allowedRoles) {
         // Check if user has the required role OR is a superuser (for backward compatibility)
         const userRole = user.role || '';
         const hasRole = userRole && allowedRoles.includes(userRole);
         const isSuperuser = user.is_superuser === true; // Explicitly check for true
-        
+
         // Debug logging (remove in production)
         if (allowedRoles.includes('admin')) {
-            console.log('Admin route check:', { 
-                userRole, 
-                hasRole, 
-                isSuperuser, 
-                user: { role: user.role, is_superuser: user.is_superuser } 
+            console.log('Admin route check:', {
+                userRole,
+                hasRole,
+                isSuperuser,
+                user: { role: user.role, is_superuser: user.is_superuser }
             });
         }
-        
+
         // Superusers can access admin routes, or users with matching role
         if (!hasRole && !(isSuperuser && allowedRoles.includes('admin'))) {
             return <Navigate to="/unauthorized" />;
         }
     }
-    
+
     return children;
 }
 
@@ -92,15 +92,15 @@ function ProtectedRoute({ children, allowedRoles }) {
 function LandingRedirect() {
     const { user, loading } = useAppSelector((state) => state.auth);
     const navigate = useNavigate();
-    
+
     useEffect(() => {
-        console.log('LandingRedirect - useEffect triggered', { 
-            loading, 
-            hasUser: !!user, 
+        console.log('LandingRedirect - useEffect triggered', {
+            loading,
+            hasUser: !!user,
             userRole: user?.role,
-            userObject: user 
+            userObject: user
         });
-        
+
         // Wait for loading to complete and user to be available with role
         if (!loading && user && user.role) {
             const isStaff = user.role === 'staff';
@@ -112,12 +112,12 @@ function LandingRedirect() {
             console.warn('LandingRedirect - User exists but no role property found!', user);
         }
     }, [user, loading, navigate]);
-    
+
     // Show loading while waiting for user data or redirect
     if (loading || !user || !user.role) {
         return <div className="min-h-screen flex items-center justify-center"><div className="text-gray-600">Loading...</div></div>;
     }
-    
+
     // Fallback - should not reach here if useEffect works
     const isStaff = user.role === 'staff';
     const isAdmin = user.role === 'admin' || user.is_superuser === true;
@@ -129,12 +129,12 @@ function AppContent() {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, token } = useAppSelector((state) => state.auth);
-    
+
     // Check for email query parameter and auto-login if admin
     useEffect(() => {
         const searchParams = new URLSearchParams(location.search);
         const email = searchParams.get('email');
-        
+
         if (email) {
             if (!token) {
                 // Only attempt auto-login if not already logged in
@@ -148,8 +148,8 @@ function AppContent() {
                         // Remove email param even on failure
                         searchParams.delete('email');
                         const newSearch = searchParams.toString();
-                        const newUrl = newSearch 
-                            ? `${location.pathname}?${newSearch}` 
+                        const newUrl = newSearch
+                            ? `${location.pathname}?${newSearch}`
                             : location.pathname;
                         navigate(newUrl, { replace: true });
                     }
@@ -158,14 +158,14 @@ function AppContent() {
                 // Already logged in, just remove email param from URL
                 searchParams.delete('email');
                 const newSearch = searchParams.toString();
-                const newUrl = newSearch 
-                    ? `${location.pathname}?${newSearch}` 
+                const newUrl = newSearch
+                    ? `${location.pathname}?${newSearch}`
                     : location.pathname;
                 navigate(newUrl, { replace: true });
             }
         }
     }, [location.search, dispatch, navigate, token]);
-    
+
     // Fetch fresh user profile on app load if user exists but data might be stale
     // This is handled by ProtectedRoute now, so we can remove this duplicate
     // useEffect(() => {
@@ -173,25 +173,25 @@ function AppContent() {
     //         dispatch(getProfile());
     //     }
     // }, []); // Only run on mount
-    
+
     return (
         <Routes>
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/guest-booking" element={<GuestCoachingBooking />} />
-            
+
             {/* Guest Landing Page - for non-logged-in users */}
-            <Route 
-                path="/guest" 
+            <Route
+                path="/guest"
                 element={
                     !user || !token ? <GuestLanding /> : <Navigate to="/" replace />
-                } 
+                }
             />
-            
+
             {/* User Routes with UserLayout */}
-            <Route 
-                path="/" 
+            <Route
+                path="/"
                 element={
                     <ProtectedRoute>
                         <UserLayout />
@@ -214,8 +214,8 @@ function AppContent() {
             </Route>
 
             {/* Admin Routes with AdminLayout */}
-            <Route 
-                path="/admin" 
+            <Route
+                path="/admin"
                 element={
                     <ProtectedRoute allowedRoles={['admin', 'staff']}>
                         <AdminLayout />

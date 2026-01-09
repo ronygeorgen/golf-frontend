@@ -4,9 +4,11 @@ import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { TableSkeleton } from '../components/skeletons/SkeletonLoader';
 import Button from '../components/ui/Button';
-import { Eye, Package as PackageIcon, X } from 'lucide-react';
+import { Eye, Package as PackageIcon, X, UserPlus } from 'lucide-react';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
+import CreateUserModal from '../components/CreateUserModal';
+import { createUser } from '../store/slices/adminSlice';
 
 function MemberList() {
     const dispatch = useAppDispatch();
@@ -17,6 +19,7 @@ function MemberList() {
     const [loading, setLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
     const [showPackageModal, setShowPackageModal] = useState(false);
     const [showPackagesListModal, setShowPackagesListModal] = useState(false);
     const [selectedMemberPackages, setSelectedMemberPackages] = useState([]);
@@ -191,6 +194,27 @@ function MemberList() {
         setSelectedMemberPackages([]);
     };
 
+    const handleCreateUser = async (formData) => {
+        try {
+            const storedLocationId = localStorage.getItem('locationId');
+            const userData = {
+                ...formData,
+                ghl_location_id: user?.ghl_location_id || storedLocationId,
+                role: 'client'
+            };
+            const result = await dispatch(createUser(userData));
+            if (createUser.fulfilled.match(result)) {
+                showSuccess('User created successfully');
+                // Refresh list
+                fetchMembers(page);
+            } else {
+                throw new Error(result.payload?.error || 'Failed to create user');
+            }
+        } catch (error) {
+            throw error;
+        }
+    };
+
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
             <div className="w-full">
@@ -204,7 +228,7 @@ function MemberList() {
                 </div>
 
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
-                    <div className="relative">
+                    <div className="relative flex flex-col md:flex-row gap-4 items-center">
                         <input
                             type="text"
                             placeholder="Search by name, email, or phone number..."
@@ -212,6 +236,14 @@ function MemberList() {
                             onChange={handleSearchChange}
                             className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary placeholder-text-secondary"
                         />
+                        <Button
+                            onClick={() => setShowCreateModal(true)}
+                            variant="primary"
+                            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 whitespace-nowrap"
+                        >
+                            <UserPlus className="w-5 h-5" />
+                            Create User
+                        </Button>
                     </div>
                 </div>
 
@@ -524,6 +556,12 @@ function MemberList() {
                     onClose={hideToast}
                 />
             )}
+
+            <CreateUserModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onSave={handleCreateUser}
+            />
         </div>
     );
 }
