@@ -148,7 +148,10 @@ function SimulatorBooking({ client }) {
     // Move to slots step when slots are fetched (only if explicitly checked by user)
     useEffect(() => {
         if (availability.simulator && availability.simulator.length > 0 && currentStep === 'form' && explicitAvailabilityCheckRef.current) {
-            setCurrentStep('slots');
+            // Ensure we don't move to slots if there's a special event message
+            if (!availability.specialEventMessage) {
+                setCurrentStep('slots');
+            }
             explicitAvailabilityCheckRef.current = false; // Reset flag
         }
 
@@ -161,7 +164,7 @@ function SimulatorBooking({ client }) {
                 hourly_price_type: typeof availability.hourly_price
             });
         }
-    }, [availability.simulator, availability.hourly_price, currentStep]);
+    }, [availability.simulator, availability.hourly_price, availability.specialEventMessage, currentStep]);
 
     // Refetch available hours when moving to payment step to ensure we have latest data
     useEffect(() => {
@@ -184,6 +187,12 @@ function SimulatorBooking({ client }) {
             });
             return;
         }
+
+        if (availability.specialEventMessage) {
+            showError(availability.specialEventMessage);
+            return;
+        }
+
 
         // Store current values for back navigation
         setPreviousDate(date);
@@ -670,7 +679,7 @@ function SimulatorBooking({ client }) {
 
                         <Button
                             onClick={checkAvailability}
-                            disabled={loading || fetchingMaxSimulators}
+                            disabled={loading || fetchingMaxSimulators || !!availability.specialEventMessage}
                             variant="primary"
                             className="w-full py-3"
                         >
