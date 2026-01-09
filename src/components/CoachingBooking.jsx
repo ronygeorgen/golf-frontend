@@ -202,14 +202,15 @@ function CoachingBooking({ client }) {
     // Move to slots step when slots are fetched - ONLY for manual checks
     useEffect(() => {
         if (availability.coaching && availability.coaching.length > 0) {
-            if (currentStep === 'form' && !isAutoCheck.current) {
+            // Ensure we don't move to slots if there's a special event message
+            if (currentStep === 'form' && !isAutoCheck.current && !availability.specialEventMessage) {
                 setCurrentStep('slots');
             }
         } else if (availability.coaching && availability.coaching.length === 0 && currentStep === 'slots') {
             // If slots were cleared, go back to form
             setCurrentStep('form');
         }
-    }, [availability.coaching, currentStep]);
+    }, [availability.coaching, availability.specialEventMessage, currentStep]);
 
     const handlePurchasePackage = async () => {
         if (client) {
@@ -277,7 +278,8 @@ function CoachingBooking({ client }) {
         if (checkCoachingAvailability.fulfilled.match(result)) {
             const payload = result.payload || {};
             const slots = payload.slots || [];
-            if (slots.length === 0) {
+            // Block if no slots OR if there is a specific special event message
+            if (slots.length === 0 || payload.specialEventMessage) {
                 setToast({
                     show: true,
                     message: payload.specialEventMessage || payload.message || 'No available time slots found for the selected date and package. Please try a different date or package.'
@@ -293,6 +295,12 @@ function CoachingBooking({ client }) {
     // Helper to determine if the date is blocked based on availability check
     const isDateBlocked = useMemo(() => {
         if (!hasChecked || loading) return false;
+
+        // If there is a special event message, consider it blocked immediately
+        if (availability.specialEventMessage) {
+            return true;
+        }
+
         // If we have availability data, check it
         // Only consider it blocked if we have an explicit message OR slots count is 0
         // But be careful not to block initially when nothing is fetched
@@ -301,7 +309,7 @@ function CoachingBooking({ client }) {
             return true;
         }
         return false;
-    }, [availability.coaching, hasChecked, loading]);
+    }, [availability.coaching, availability.specialEventMessage, hasChecked, loading]);
 
     const blockMessage = useMemo(() => {
         if (!isDateBlocked) return null;
