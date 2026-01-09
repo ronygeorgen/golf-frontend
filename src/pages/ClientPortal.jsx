@@ -171,6 +171,12 @@ function ClientPortal() {
 
         if (cancelBooking.fulfilled.match(result)) {
             dispatch(getUpcomingBookings({ page, bookingType }));
+
+            // Refresh package data to update session counts
+            dispatch(getMyPackagePurchases({ page: 1 }));
+            dispatch(getOrganizationPackages());
+            dispatch(getMySimulatorPurchases({ page: 1 }));
+
             if (booking.booking_type === 'simulator') {
                 dispatch(getSimulatorCredits());
             }
@@ -239,7 +245,7 @@ function ClientPortal() {
                     coachId: rescheduleTarget.coach,
                     duration: rescheduleTarget.duration_minutes || 60
                 }));
-                
+
                 if (checkCoachingAvailability.fulfilled.match(result)) {
                     const payload = result.payload || {};
                     const slots = payload.slots || [];
@@ -255,11 +261,11 @@ function ClientPortal() {
                     }
                 } else {
                     // Handle rejected case
-                    const errorMessage = result.payload?.error || 
-                                        result.payload?.message || 
-                                        result.payload?.detail ||
-                                        result.payload ||
-                                        'Failed to check availability';
+                    const errorMessage = result.payload?.error ||
+                        result.payload?.message ||
+                        result.payload?.detail ||
+                        result.payload ||
+                        'Failed to check availability';
                     setRescheduleError(typeof errorMessage === 'string' ? errorMessage : 'Failed to check availability');
                 }
             } else if (rescheduleTarget.booking_type === 'simulator') {
@@ -267,7 +273,7 @@ function ClientPortal() {
                     date: rescheduleDate,
                     duration: rescheduleTarget.duration_minutes || 60
                 }));
-                
+
                 if (checkSimulatorAvailability.fulfilled.match(result)) {
                     const payload = result.payload || {};
                     const slots = payload.slots || [];
@@ -283,11 +289,11 @@ function ClientPortal() {
                     }
                 } else {
                     // Handle rejected case
-                    const errorMessage = result.payload?.error || 
-                                        result.payload?.message || 
-                                        result.payload?.detail ||
-                                        result.payload ||
-                                        'Failed to check availability';
+                    const errorMessage = result.payload?.error ||
+                        result.payload?.message ||
+                        result.payload?.detail ||
+                        result.payload ||
+                        'Failed to check availability';
                     setRescheduleError(typeof errorMessage === 'string' ? errorMessage : 'Failed to check availability');
                 }
             }
@@ -303,10 +309,10 @@ function ClientPortal() {
             // For coaching, check if slot is disabled
             const startTime = new Date(slot.start_time);
             const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
-            const maxAvailableEndTime = slot.availability_end_time 
+            const maxAvailableEndTime = slot.availability_end_time
                 ? new Date(slot.availability_end_time)
                 : new Date(slot.end_time);
-            
+
             if (requestedEndTime > maxAvailableEndTime) {
                 return; // Don't allow selection of disabled slots
             }
@@ -314,10 +320,10 @@ function ClientPortal() {
             // For simulator, check if slot is disabled
             const startTime = new Date(slot.start_time);
             const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
-            const maxAvailableEndTime = slot.availability_end_time 
+            const maxAvailableEndTime = slot.availability_end_time
                 ? new Date(slot.availability_end_time)
                 : new Date(slot.end_time);
-            
+
             if (requestedEndTime > maxAvailableEndTime) {
                 return; // Don't allow selection of disabled slots
             }
@@ -334,14 +340,14 @@ function ClientPortal() {
         // When user clicks a slot, calculate end_time based on booking duration
         const startTime = new Date(slot.start_time);
         const endTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
-        
+
         setRescheduleSelectedSlot({
             ...slot,
             start_time: startTime.toISOString(),
             end_time: endTime.toISOString(),
             duration_minutes: rescheduleTarget.duration_minutes || 60
         });
-        
+
         // Update the time input to match selected slot
         setRescheduleTime(formatTimeForInput(startTime));
     };
@@ -349,7 +355,7 @@ function ClientPortal() {
     const isRescheduleSlotDisabled = (slot) => {
         const startTime = new Date(slot.start_time);
         const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
-        const maxAvailableEndTime = slot.availability_end_time 
+        const maxAvailableEndTime = slot.availability_end_time
             ? new Date(slot.availability_end_time)
             : new Date(slot.end_time);
         return requestedEndTime > maxAvailableEndTime;
@@ -362,7 +368,7 @@ function ClientPortal() {
             const timeoutId = setTimeout(() => {
                 checkRescheduleAvailability();
             }, 500);
-            
+
             return () => clearTimeout(timeoutId);
         }
     }, [rescheduleDate, rescheduleTarget, checkRescheduleAvailability]);
@@ -457,11 +463,10 @@ function ClientPortal() {
                                             <button
                                                 key={tab.id}
                                                 onClick={() => setActiveTab(tab.id)}
-                                                className={`px-3 sm:px-4 md:px-6 py-3 text-xs sm:text-sm font-medium border-b-2 transition whitespace-nowrap flex-shrink-0 ${
-                                                    activeTab === tab.id
+                                                className={`px-3 sm:px-4 md:px-6 py-3 text-xs sm:text-sm font-medium border-b-2 transition whitespace-nowrap flex-shrink-0 ${activeTab === tab.id
                                                         ? 'border-primary text-primary bg-primary/5'
                                                         : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border hover:bg-background'
-                                                }`}
+                                                    }`}
                                             >
                                                 <span className="flex items-center gap-1 sm:gap-2">
                                                     {tab.label}
@@ -492,175 +497,174 @@ function ClientPortal() {
                         </div>
 
                         {activeTab === 'bookings' && (
-                        <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                                <h2 className="text-xl font-bold text-text-primary">Upcoming Bookings</h2>
-                                <div className="inline-flex rounded-full border border-border bg-surface shadow-sm text-xs font-medium">
-                                    {['all', 'simulator', 'coaching'].map((type) => (
-                                        <button
-                                            key={type}
-                                            onClick={() => {
-                                                setBookingType(type);
-                                                setPage(1);
-                                            }}
-                                            className={`px-3 py-1 rounded-full transition ${
-                                                bookingType === type
-                                                    ? 'bg-primary/10 text-primary border border-primary'
-                                                    : 'text-text-secondary hover:bg-background'
-                                            }`}
-                                        >
-                                            {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            {loading ? (
-                                <BookingCardSkeleton count={3} />
-                            ) : filteredBookings.length > 0 ? (
-                                <div className="space-y-4">
-                                    {filteredBookings.map(booking => {
-                                        const rescheduleAllowed = booking.status === 'confirmed' && canCancelBooking(booking);
-                                        return (
-                                        <div key={booking.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition duration-200 bg-surface">
-                                            <div className="flex justify-between items-start">
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-text-primary">
-                                                        {booking.booking_type === 'simulator' ? 'Simulator Session' : 'Coaching Session'}
-                                                    </h3>
-                                                    <div className="mt-2 space-y-1">
-                                                        <p className="text-sm text-text-secondary">
-                                                            <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
-                                                        </p>
-                                                        <p className="text-sm text-text-secondary">
-                                                            <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                        </p>
-                                                        <p className="text-sm text-text-secondary">
-                                                            <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                        </p>
-                                                        <p className="text-sm text-text-secondary">
-                                                            <span className="font-medium">Duration:</span> {booking.duration_minutes >= 60 ? `${Math.floor(booking.duration_minutes / 60)}h ${booking.duration_minutes % 60 > 0 ? booking.duration_minutes % 60 + 'min' : ''}`.trim() : `${booking.duration_minutes}min`}
-                                                        </p>
-                                                        {booking.booking_type === 'simulator' && booking.simulator_details && (
-                                                            <p className="text-sm text-text-secondary">
-                                                                <span className="font-medium">Bay:</span> {booking.simulator_details.bay_number} - {booking.simulator_details.name}
-                                                            </p>
-                                                        )}
-                                                        {booking.booking_type === 'simulator' && booking.uses_simulator_credit && (
-                                                            <p className="text-xs text-status-personal-text font-semibold">
-                                                                Simulator credit applied
-                                                            </p>
-                                                        )}
-                                                        {booking.booking_type === 'coaching' && booking.coach_details && (
-                                                            <p className="text-sm text-text-secondary">
-                                                                <span className="font-medium">Coach:</span> {booking.coach_details.first_name} {booking.coach_details.last_name}
-                                                            </p>
-                                                        )}
-                                                        {booking.booking_type === 'coaching' && booking.package_details && (
-                                                            <p className="text-sm text-text-secondary">
-                                                                <span className="font-medium">Package:</span> {booking.package_details.title}
-                                                            </p>
-                                                        )}
-                                                        {booking.booking_type === 'coaching' && booking.package_purchase_details && booking.purchase_type_label && (
-                                                            <p className="text-sm">
-                                                                <Badge status={
-                                                                    booking.purchase_type_label === 'Personal' ? 'personal' :
-                                                                    booking.purchase_type_label === 'Gifted' ? 'pending' :
-                                                                    booking.purchase_type_label === 'Organization' ? 'confirmed' :
-                                                                    'pending'
-                                                                }>
-                                                                    {booking.purchase_type_label}
-                                                                </Badge>
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2 w-40">
-                                                    <Badge status={
-                                                        booking.status === 'confirmed' ? 'confirmed' :
-                                                        booking.status === 'pending' ? 'pending' :
-                                                        booking.status === 'completed' ? 'completed' :
-                                                        'no_show'
-                                                    }>
-                                                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                                    </Badge>
-                                                    {booking.status === 'confirmed' && (
-                                                        <div className="flex flex-col gap-2 w-full">
-                                                            <Button
-                                                                type="button"
-                                                                onClick={() => openRescheduleModal(booking)}
-                                                                disabled={!rescheduleAllowed}
-                                                                variant="secondary"
-                                                                className="text-sm px-3 py-1"
-                                                            >
-                                                                Change Time
-                                                            </Button>
-                                                            <Button
-                                                                onClick={() => handleCancelBooking(booking)}
-                                                                disabled={!canCancelBooking(booking) || cancellingId === booking.id}
-                                                                variant="danger"
-                                                                className="text-sm px-3 py-1"
-                                                            >
-                                                                {cancellingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {!canCancelBooking(booking) && booking.status === 'confirmed' && (
-                                                <p className="mt-2 text-xs text-danger">
-                                                    Starts in less than 24 hours. Contact an admin to make changes.
-                                                </p>
-                                            )}
-                                            {booking.booking_type === 'coaching' ? (
-                                                <p className="mt-2 text-xs text-text-secondary">
-                                                    Cancel ≥24 hrs in advance to restore this session to your package.
-                                                </p>
-                                            ) : (
-                                                <p className="mt-2 text-xs text-text-secondary">
-                                                    Cancel ≥24 hrs in advance to receive a simulator credit.
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <p className="text-text-secondary">No upcoming bookings</p>
-                                </div>
-                            )}
-                            {!loading && (
-                                <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6">
-                                    <p className="text-sm text-text-secondary">
-                                        Showing{' '}
-                                        {filteredBookings.length === 0
-                                            ? '0'
-                                            : `${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, filteredBookings.length)}`} of {filteredBookings.length} {bookingType === 'all' ? 'bookings' : bookingType + ' booking' + (filteredBookings.length !== 1 ? 's' : '')}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                                            disabled={page <= 1}
-                                            variant="secondary"
-                                            className="px-3 py-1"
-                                        >
-                                            Previous
-                                        </Button>
-                                    <span className="text-sm font-medium text-text-primary">
-                                        Page {page} of {totalPages}
-                                    </span>
-                                        <Button
-                                            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                                            disabled={page >= totalPages}
-                                            variant="secondary"
-                                            className="px-3 py-1"
-                                        >
-                                            Next
-                                        </Button>
+                            <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                                    <h2 className="text-xl font-bold text-text-primary">Upcoming Bookings</h2>
+                                    <div className="inline-flex rounded-full border border-border bg-surface shadow-sm text-xs font-medium">
+                                        {['all', 'simulator', 'coaching'].map((type) => (
+                                            <button
+                                                key={type}
+                                                onClick={() => {
+                                                    setBookingType(type);
+                                                    setPage(1);
+                                                }}
+                                                className={`px-3 py-1 rounded-full transition ${bookingType === type
+                                                        ? 'bg-primary/10 text-primary border border-primary'
+                                                        : 'text-text-secondary hover:bg-background'
+                                                    }`}
+                                            >
+                                                {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                                {loading ? (
+                                    <BookingCardSkeleton count={3} />
+                                ) : filteredBookings.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {filteredBookings.map(booking => {
+                                            const rescheduleAllowed = booking.status === 'confirmed' && canCancelBooking(booking);
+                                            return (
+                                                <div key={booking.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition duration-200 bg-surface">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="flex-1">
+                                                            <h3 className="font-semibold text-text-primary">
+                                                                {booking.booking_type === 'simulator' ? 'Simulator Session' : 'Coaching Session'}
+                                                            </h3>
+                                                            <div className="mt-2 space-y-1">
+                                                                <p className="text-sm text-text-secondary">
+                                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                                </p>
+                                                                <p className="text-sm text-text-secondary">
+                                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                                </p>
+                                                                <p className="text-sm text-text-secondary">
+                                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                                </p>
+                                                                <p className="text-sm text-text-secondary">
+                                                                    <span className="font-medium">Duration:</span> {booking.duration_minutes >= 60 ? `${Math.floor(booking.duration_minutes / 60)}h ${booking.duration_minutes % 60 > 0 ? booking.duration_minutes % 60 + 'min' : ''}`.trim() : `${booking.duration_minutes}min`}
+                                                                </p>
+                                                                {booking.booking_type === 'simulator' && booking.simulator_details && (
+                                                                    <p className="text-sm text-text-secondary">
+                                                                        <span className="font-medium">Bay:</span> {booking.simulator_details.bay_number} - {booking.simulator_details.name}
+                                                                    </p>
+                                                                )}
+                                                                {booking.booking_type === 'simulator' && booking.uses_simulator_credit && (
+                                                                    <p className="text-xs text-status-personal-text font-semibold">
+                                                                        Simulator credit applied
+                                                                    </p>
+                                                                )}
+                                                                {booking.booking_type === 'coaching' && booking.coach_details && (
+                                                                    <p className="text-sm text-text-secondary">
+                                                                        <span className="font-medium">Coach:</span> {booking.coach_details.first_name} {booking.coach_details.last_name}
+                                                                    </p>
+                                                                )}
+                                                                {booking.booking_type === 'coaching' && booking.package_details && (
+                                                                    <p className="text-sm text-text-secondary">
+                                                                        <span className="font-medium">Package:</span> {booking.package_details.title}
+                                                                    </p>
+                                                                )}
+                                                                {booking.booking_type === 'coaching' && booking.package_purchase_details && booking.purchase_type_label && (
+                                                                    <p className="text-sm">
+                                                                        <Badge status={
+                                                                            booking.purchase_type_label === 'Personal' ? 'personal' :
+                                                                                booking.purchase_type_label === 'Gifted' ? 'pending' :
+                                                                                    booking.purchase_type_label === 'Organization' ? 'confirmed' :
+                                                                                        'pending'
+                                                                        }>
+                                                                            {booking.purchase_type_label}
+                                                                        </Badge>
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-2 w-40">
+                                                            <Badge status={
+                                                                booking.status === 'confirmed' ? 'confirmed' :
+                                                                    booking.status === 'pending' ? 'pending' :
+                                                                        booking.status === 'completed' ? 'completed' :
+                                                                            'no_show'
+                                                            }>
+                                                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                                            </Badge>
+                                                            {booking.status === 'confirmed' && (
+                                                                <div className="flex flex-col gap-2 w-full">
+                                                                    <Button
+                                                                        type="button"
+                                                                        onClick={() => openRescheduleModal(booking)}
+                                                                        disabled={!rescheduleAllowed}
+                                                                        variant="secondary"
+                                                                        className="text-sm px-3 py-1"
+                                                                    >
+                                                                        Change Time
+                                                                    </Button>
+                                                                    <Button
+                                                                        onClick={() => handleCancelBooking(booking)}
+                                                                        disabled={!canCancelBooking(booking) || cancellingId === booking.id}
+                                                                        variant="danger"
+                                                                        className="text-sm px-3 py-1"
+                                                                    >
+                                                                        {cancellingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {!canCancelBooking(booking) && booking.status === 'confirmed' && (
+                                                        <p className="mt-2 text-xs text-danger">
+                                                            Starts in less than 24 hours. Contact an admin to make changes.
+                                                        </p>
+                                                    )}
+                                                    {booking.booking_type === 'coaching' ? (
+                                                        <p className="mt-2 text-xs text-text-secondary">
+                                                            Cancel ≥24 hrs in advance to restore this session to your package.
+                                                        </p>
+                                                    ) : (
+                                                        <p className="mt-2 text-xs text-text-secondary">
+                                                            Cancel ≥24 hrs in advance to receive a simulator credit.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <p className="text-text-secondary">No upcoming bookings</p>
+                                    </div>
+                                )}
+                                {!loading && (
+                                    <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6">
+                                        <p className="text-sm text-text-secondary">
+                                            Showing{' '}
+                                            {filteredBookings.length === 0
+                                                ? '0'
+                                                : `${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, filteredBookings.length)}`} of {filteredBookings.length} {bookingType === 'all' ? 'bookings' : bookingType + ' booking' + (filteredBookings.length !== 1 ? 's' : '')}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                                                disabled={page <= 1}
+                                                variant="secondary"
+                                                className="px-3 py-1"
+                                            >
+                                                Previous
+                                            </Button>
+                                            <span className="text-sm font-medium text-text-primary">
+                                                Page {page} of {totalPages}
+                                            </span>
+                                            <Button
+                                                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                                                disabled={page >= totalPages}
+                                                variant="secondary"
+                                                className="px-3 py-1"
+                                            >
+                                                Next
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {activeTab === 'gifts' && (
@@ -738,7 +742,7 @@ function ClientPortal() {
                                     </div>
                                 </div>
                             ) : null}
-                             {(purchasesLoading || organizationPackagesLoading) ? (
+                            {(purchasesLoading || organizationPackagesLoading) ? (
                                 <PackagesSkeleton />
                             ) : (personalPackagesList.length > 0 || groupPackagesList.length > 0) ? (
                                 <div className="bg-background border border-border rounded-card p-4 text-sm text-text-primary space-y-4">
@@ -837,23 +841,22 @@ function ClientPortal() {
                                                 {availability.coaching.map((slot, index) => {
                                                     const isDisabled = isRescheduleSlotDisabled(slot);
                                                     const isSelected = rescheduleSelectedSlot && new Date(rescheduleSelectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
-                                                    
+
                                                     return (
                                                         <div
                                                             key={index}
-                                                            className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${
-                                                                isDisabled
+                                                            className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${isDisabled
                                                                     ? 'border-border bg-background cursor-not-allowed opacity-60'
                                                                     : isSelected
                                                                         ? 'border-primary bg-primary-light/20 shadow-card-hover'
                                                                         : 'border-border hover:border-primary hover:bg-background'
-                                                            }`}
+                                                                }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
                                                             title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
                                                         >
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
-                                                                {new Date(slot.start_time).toLocaleTimeString('en-US', { 
-                                                                    hour: '2-digit', 
+                                                                {new Date(slot.start_time).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
                                                                     minute: '2-digit'
                                                                 })}
                                                             </div>
@@ -874,23 +877,22 @@ function ClientPortal() {
                                                 {availability.simulator.map((slot, index) => {
                                                     const isDisabled = isRescheduleSlotDisabled(slot);
                                                     const isSelected = rescheduleSelectedSlot && new Date(rescheduleSelectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
-                                                    
+
                                                     return (
                                                         <div
                                                             key={index}
-                                                            className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${
-                                                                isDisabled
+                                                            className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${isDisabled
                                                                     ? 'border-border bg-background cursor-not-allowed opacity-60'
                                                                     : isSelected
                                                                         ? 'border-primary bg-primary-light/20 shadow-card-hover'
                                                                         : 'border-border hover:border-primary hover:bg-background'
-                                                            }`}
+                                                                }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
                                                             title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
                                                         >
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
-                                                                {new Date(slot.start_time).toLocaleTimeString('en-US', { 
-                                                                    hour: '2-digit', 
+                                                                {new Date(slot.start_time).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
                                                                     minute: '2-digit'
                                                                 })}
                                                             </div>
@@ -906,23 +908,23 @@ function ClientPortal() {
 
                                     {/* Manual time input fallback */}
                                     {((rescheduleTarget.booking_type === 'coaching' && (!availability.coaching || availability.coaching.length === 0)) ||
-                                      (rescheduleTarget.booking_type === 'simulator' && (!availability.simulator || availability.simulator.length === 0))) && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-1">New Start Time (Manual Entry)</label>
-                                            <input
-                                                type="time"
-                                                value={rescheduleTime}
-                                                onChange={(e) => {
-                                                    setRescheduleTime(e.target.value);
-                                                    setRescheduleSelectedSlot(null);
-                                                }}
-                                                className="w-full"
-                                            />
-                                            <p className="text-xs text-text-secondary mt-1">
-                                                No available slots found. You can manually enter a time, but it may not be available.
-                                            </p>
-                                        </div>
-                                    )}
+                                        (rescheduleTarget.booking_type === 'simulator' && (!availability.simulator || availability.simulator.length === 0))) && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-1">New Start Time (Manual Entry)</label>
+                                                <input
+                                                    type="time"
+                                                    value={rescheduleTime}
+                                                    onChange={(e) => {
+                                                        setRescheduleTime(e.target.value);
+                                                        setRescheduleSelectedSlot(null);
+                                                    }}
+                                                    className="w-full"
+                                                />
+                                                <p className="text-xs text-text-secondary mt-1">
+                                                    No available slots found. You can manually enter a time, but it may not be available.
+                                                </p>
+                                            </div>
+                                        )}
                                 </>
                             )}
 

@@ -5,12 +5,15 @@ import { logout, getProfile } from '../store/slices/authSlice';
 import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package, UserCheck } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 import DOBPopup from './DOBPopup';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
 
 function UserLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.auth);
+    const { toast, showError, hideToast } = useToast();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
     const [coachingSessionsMenuOpen, setCoachingSessionsMenuOpen] = useState(false);
@@ -22,6 +25,20 @@ function UserLayout() {
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
     const isStaff = user?.role === 'staff';
     const isStaffOrAdmin = isStaff || isAdmin;
+
+    const isClientBooking = location.pathname === '/booking' && location.state?.client;
+
+    const handleNavigation = (path) => {
+        if (isClientBooking && path.includes('/packages')) {
+            showError('Cannot access packages while booking for a client. Please reset booking flow first.');
+            return;
+        }
+
+        navigate(path);
+        setDropdownOpen(false);
+        setPackagesMenuOpen(false);
+        setCoachingSessionsMenuOpen(false);
+    };
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -124,10 +141,7 @@ function UserLayout() {
                                         {coachingSessionsMenuOpen && (
                                             <div className="absolute top-full left-0 mt-1 min-w-56 w-auto bg-surface rounded-card shadow-card border border-border py-2 z-[60] whitespace-nowrap">
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/coaching-sessions');
-                                                        setCoachingSessionsMenuOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/coaching-sessions')}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
                                                         ? 'bg-primary-light/10 text-primary font-semibold'
                                                         : 'text-text-primary hover:bg-background'
@@ -137,10 +151,7 @@ function UserLayout() {
                                                     <span>My Coaching Sessions</span>
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/member-list');
-                                                        setCoachingSessionsMenuOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/member-list')}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/member-list'
                                                         ? 'bg-primary-light/10 text-primary font-semibold'
                                                         : 'text-text-primary hover:bg-background'
@@ -155,7 +166,7 @@ function UserLayout() {
                                     </div>
                                 )}
                                 <button
-                                    onClick={() => navigate('/portal')}
+                                    onClick={() => handleNavigation('/portal')}
                                     className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/portal'
                                         ? 'bg-primary-light text-white'
                                         : 'text-text-secondary hover:bg-background'
@@ -167,7 +178,7 @@ function UserLayout() {
                                     </div>
                                 </button>
                                 <button
-                                    onClick={() => navigate('/booking')}
+                                    onClick={() => handleNavigation('/booking')}
                                     className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/booking'
                                         ? 'bg-primary-light text-white'
                                         : 'text-text-secondary hover:bg-background'
@@ -176,7 +187,7 @@ function UserLayout() {
                                     Book Session
                                 </button>
                                 <button
-                                    onClick={() => navigate('/calendar')}
+                                    onClick={() => handleNavigation('/calendar')}
                                     className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/calendar'
                                         ? 'bg-primary-light text-white'
                                         : 'text-text-secondary hover:bg-background'
@@ -205,10 +216,7 @@ function UserLayout() {
                                     {packagesMenuOpen && (
                                         <div className="absolute top-full left-0 mt-1 min-w-56 w-auto bg-surface rounded-card shadow-card border border-border py-2 z-[60] whitespace-nowrap">
                                             <button
-                                                onClick={() => {
-                                                    navigate('/packages?view=packages');
-                                                    setPackagesMenuOpen(false);
-                                                }}
+                                                onClick={() => handleNavigation('/packages?view=packages')}
                                                 className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
                                                     ? 'bg-primary-light/10 text-primary font-semibold'
                                                     : 'text-text-primary hover:bg-background'
@@ -218,10 +226,7 @@ function UserLayout() {
                                                 <span>Purchase Packages</span>
                                             </button>
                                             <button
-                                                onClick={() => {
-                                                    navigate('/packages?view=purchases');
-                                                    setPackagesMenuOpen(false);
-                                                }}
+                                                onClick={() => handleNavigation('/packages?view=purchases')}
                                                 className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && location.search.includes('view=purchases')
                                                     ? 'bg-primary-light/10 text-primary font-semibold'
                                                     : 'text-text-primary hover:bg-background'
@@ -234,7 +239,7 @@ function UserLayout() {
                                     )}
                                 </div>
                                 <button
-                                    onClick={() => navigate('/special-events')}
+                                    onClick={() => handleNavigation('/special-events')}
                                     className={`px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/special-events'
                                         ? 'bg-primary-light text-white'
                                         : 'text-text-secondary hover:bg-background'
@@ -295,10 +300,7 @@ function UserLayout() {
                                                 {isStaffOrAdmin && (
                                                     <>
                                                         <button
-                                                            onClick={() => {
-                                                                navigate('/coaching-sessions');
-                                                                setDropdownOpen(false);
-                                                            }}
+                                                            onClick={() => handleNavigation('/coaching-sessions')}
                                                             className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/coaching-sessions' || (location.pathname.startsWith('/coaching-sessions') && location.pathname !== '/member-list')
                                                                 ? 'bg-primary-light text-white font-medium'
                                                                 : 'text-text-primary hover:bg-background'
@@ -308,10 +310,7 @@ function UserLayout() {
                                                             <span>My Coaching Sessions</span>
                                                         </button>
                                                         <button
-                                                            onClick={() => {
-                                                                navigate('/member-list');
-                                                                setDropdownOpen(false);
-                                                            }}
+                                                            onClick={() => handleNavigation('/member-list')}
                                                             className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/member-list'
                                                                 ? 'bg-primary-light text-white font-medium'
                                                                 : 'text-text-primary hover:bg-background'
@@ -324,10 +323,7 @@ function UserLayout() {
                                                     </>
                                                 )}
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/portal');
-                                                        setDropdownOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/portal')}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/portal'
                                                         ? 'bg-primary-light text-white font-medium'
                                                         : 'text-text-primary hover:bg-background'
@@ -337,10 +333,7 @@ function UserLayout() {
                                                     <span>Portal</span>
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/booking');
-                                                        setDropdownOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/booking')}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/booking'
                                                         ? 'bg-primary-light text-white font-medium'
                                                         : 'text-text-primary hover:bg-background'
@@ -350,10 +343,7 @@ function UserLayout() {
                                                     <span>Book Session</span>
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/calendar');
-                                                        setDropdownOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/calendar')}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/calendar'
                                                         ? 'bg-primary-light text-white font-medium'
                                                         : 'text-text-primary hover:bg-background'
@@ -365,10 +355,7 @@ function UserLayout() {
                                                 {/* Packages Dropdown for Mobile */}
                                                 <div className="border-b border-border pb-2 mb-2">
                                                     <button
-                                                        onClick={() => {
-                                                            navigate('/packages?view=packages');
-                                                            setDropdownOpen(false);
-                                                        }}
+                                                        onClick={() => handleNavigation('/packages?view=packages')}
                                                         className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && (!location.search || location.search.includes('view=packages'))
                                                             ? 'bg-primary-light text-white font-medium'
                                                             : 'text-text-primary hover:bg-background'
@@ -378,10 +365,7 @@ function UserLayout() {
                                                         <span>Purchase Packages</span>
                                                     </button>
                                                     <button
-                                                        onClick={() => {
-                                                            navigate('/packages?view=purchases');
-                                                            setDropdownOpen(false);
-                                                        }}
+                                                        onClick={() => handleNavigation('/packages?view=purchases')}
                                                         className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/packages' && location.search.includes('view=purchases')
                                                             ? 'bg-primary-light text-white font-medium'
                                                             : 'text-text-primary hover:bg-background'
@@ -393,10 +377,7 @@ function UserLayout() {
                                                 </div>
                                                 {/* Member List is already shown in the isStaffOrAdmin block above */}
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/special-events');
-                                                        setDropdownOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/special-events')}
                                                     className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/special-events'
                                                         ? 'bg-primary-light text-white font-medium'
                                                         : 'text-text-primary hover:bg-background'
@@ -410,10 +391,7 @@ function UserLayout() {
                                             {/* Admin Options */}
                                             {isAdmin && (
                                                 <button
-                                                    onClick={() => {
-                                                        navigate('/admin');
-                                                        setDropdownOpen(false);
-                                                    }}
+                                                    onClick={() => handleNavigation('/admin')}
                                                     className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
                                                 >
                                                     <Settings className="w-4 h-4" />
@@ -421,10 +399,7 @@ function UserLayout() {
                                                 </button>
                                             )}
                                             <button
-                                                onClick={() => {
-                                                    navigate('/profile');
-                                                    setDropdownOpen(false);
-                                                }}
+                                                onClick={() => handleNavigation('/profile')}
                                                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
                                             >
                                                 <User className="w-4 h-4" />
@@ -468,6 +443,14 @@ function UserLayout() {
                     // Don't refresh on skip - user data hasn't changed
                 }}
             />
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
+            )}
         </div>
     );
 }

@@ -11,7 +11,7 @@ export const getBookings = createAsyncThunk(
             if (filter !== 'all') params.append('status', filter);
             if (dateRange.start_date) params.append('start_date', dateRange.start_date);
             if (dateRange.end_date) params.append('end_date', dateRange.end_date);
-            
+
             const response = await apiClient.get(
                 `${endpoints.bookings.list}?${params.toString()}`
             );
@@ -230,7 +230,7 @@ export const checkCoachingAvailability = createAsyncThunk(
             const params = { date: date, duration: duration };
             if (packageId) params.package_id = packageId;
             if (coachId) params.coach_id = coachId;
-            
+
             const response = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
                 params: params,
             });
@@ -248,10 +248,12 @@ export const checkCoachingAvailability = createAsyncThunk(
 
 export const getSimulatorCredits = createAsyncThunk(
     'booking/getSimulatorCredits',
-    async (_, { rejectWithValue }) => {
+    async ({ user_id } = {}, { rejectWithValue }) => {
         try {
+            const params = { status: 'available' };
+            if (user_id) params.client_id = user_id;
             const response = await apiClient.get(endpoints.simulators.credits, {
-                params: { status: 'available' },
+                params: params,
             });
             return response.data;
         } catch (error) {
@@ -262,10 +264,11 @@ export const getSimulatorCredits = createAsyncThunk(
 
 export const getAvailableSimulatorHours = createAsyncThunk(
     'booking/getAvailableSimulatorHours',
-    async ({ use_organization = false } = {}, { rejectWithValue }) => {
+    async ({ use_organization = false, user_id } = {}, { rejectWithValue }) => {
         try {
             const params = new URLSearchParams();
             if (use_organization) params.append('use_organization', 'true');
+            if (user_id) params.append('user_id', user_id);
             const queryString = params.toString();
             const url = queryString
                 ? `${endpoints.bookings.availableSimulatorHours}?${queryString}`
@@ -327,9 +330,9 @@ const bookingSlice = createSlice({
         clearAvailability: (state) => {
             // Preserve hourly_price when clearing availability
             const hourly_price = state.availability.hourly_price;
-            state.availability = { 
-                simulator: [], 
-                coaching: [], 
+            state.availability = {
+                simulator: [],
+                coaching: [],
                 specialEventMessage: null,
                 hourly_price: hourly_price || null
             };
@@ -487,7 +490,7 @@ const bookingSlice = createSlice({
                 const count = payload?.count ?? results.length ?? 0;
                 const pageSize = 5;
                 const currentPage = action.meta?.arg?.page || 1;
-                
+
                 if (filter === 'completed') {
                     state.completedBookings = results;
                     state.completedPagination = {

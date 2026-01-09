@@ -16,7 +16,7 @@ export const endpoints = {
         updateDob: '/auth/update-dob/',
         memberList: '/auth/member-list/',
     },
-    
+
     // Admin endpoints
     admin: {
         dashboard: {
@@ -86,7 +86,7 @@ export const endpoints = {
             checkDatetime: '/admin/closed-days/check-datetime/',
         },
     },
-    
+
     // Booking endpoints
     bookings: {
         list: '/bookings/',
@@ -107,7 +107,7 @@ export const endpoints = {
         availableSimulatorHours: '/bookings/available-simulator-hours/',
         guestCreate: '/bookings/guest-create/',
     },
-    
+
     // Simulator endpoints (public)
     simulators: {
         list: '/simulators/simulators/',
@@ -115,7 +115,7 @@ export const endpoints = {
         durationPrices: '/simulators/duration-prices/',
         credits: '/simulators/credits/',
     },
-    
+
     // Coaching endpoints (public)
     coaching: {
         packages: '/coaching/packages/',
@@ -123,6 +123,7 @@ export const endpoints = {
         purchases: '/coaching/purchases/',
         purchaseDetail: (id) => `/coaching/purchases/${id}/`,
         myPurchases: '/coaching/purchases/my/',
+        userPurchases: '/coaching/purchases/user_purchases/',
         transferablePurchases: '/coaching/purchases/transferable_purchases/',
         giftsPending: '/coaching/purchases/gifts_pending/',
         giftClaim: (token) => `/coaching/gifts/claim/${token}/`,
@@ -142,6 +143,7 @@ export const endpoints = {
         simulatorPurchases: '/coaching/simulator-purchases/',
         simulatorPurchaseDetail: (id) => `/coaching/simulator-purchases/${id}/`,
         mySimulatorPurchases: '/coaching/simulator-purchases/my/',
+        userSimulatorPurchases: '/coaching/simulator-purchases/user_purchases/',
         transferableSimulatorPurchases: '/coaching/simulator-purchases/transferable_purchases/',
         simulatorTransfers: '/coaching/simulator-transfers/',
         simulatorTransfersPending: '/coaching/simulator-transfers/pending/',
@@ -157,7 +159,7 @@ export const endpoints = {
             setCompanyName: '/ghlpage/admin/locations/set-company-name/',
         },
     },
-    
+
     // Special Events endpoints
     specialEvents: {
         list: '/special-events/events/',

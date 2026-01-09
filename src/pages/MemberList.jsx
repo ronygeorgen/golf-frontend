@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { TableSkeleton } from '../components/skeletons/SkeletonLoader';
@@ -9,11 +10,19 @@ import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
 import CreateUserModal from '../components/CreateUserModal';
 import { createUser } from '../store/slices/adminSlice';
+import { getUserPurchases, getUserSimulatorPurchases } from '../store/slices/coachingSlice';
 
 function MemberList() {
     const dispatch = useAppDispatch();
+    const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
     const { toast, showSuccess, showError, hideToast } = useToast();
+    const {
+        purchases,
+        simulatorPurchases,
+        purchasesLoading,
+        simulatorPurchasesLoading
+    } = useAppSelector((state) => state.coaching);
 
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -36,6 +45,7 @@ function MemberList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const searchTimeoutRef = useRef(null);
+    const [activeTab, setActiveTab] = useState('details'); // 'details', 'coaching', 'simulator'
 
     const fetchMembers = async (pageNum = 1, search = '') => {
         try {
@@ -88,10 +98,10 @@ function MemberList() {
 
     // Fetch members when component mounts or page changes (only if not searching)
     useEffect(() => {
+        window.scrollTo(0, 0);
         if (!isSearching && !searchQuery.trim()) {
             fetchMembers(page);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page]);
 
     // Cleanup timeout on unmount
@@ -128,6 +138,9 @@ function MemberList() {
 
     const handleViewMember = (member) => {
         setSelectedMember(member);
+        setActiveTab('details');
+        dispatch(getUserPurchases({ userId: member.id }));
+        dispatch(getUserSimulatorPurchases({ userId: member.id }));
         setShowModal(true);
     };
 
@@ -161,16 +174,16 @@ function MemberList() {
             if (response.data.redirect_url && response.data.temp_id) {
                 // Build redirect URL with all required query parameters
                 const url = new URL(response.data.redirect_url);
-                url.searchParams.set('phone', selectedMember.phone); // Client's phone (the one who will receive the package)
+                url.searchParams.set('phone', selectedMember.phone); // Client's phone
                 url.searchParams.set('package_id', packageId.toString());
                 url.searchParams.set('purchase_type', 'normal');
-                url.searchParams.set('recipient_phone', response.data.temp_id); // recipient_phone contains temp_id (UUID)
+                url.searchParams.set('recipient_phone', response.data.temp_id); // recipient_phone contains temp_id
                 url.searchParams.set('package_type', 'coaching');
                 if (user.id) {
-                    url.searchParams.set('referral_id', user.id.toString()); // Staff user ID who referred this purchase
+                    url.searchParams.set('referral_id', user.id.toString());
                 }
 
-                // Redirect to payment page with all parameters
+                // Redirect to payment page
                 window.location.href = url.toString();
             } else {
                 showError('Failed to initiate purchase');
@@ -205,7 +218,6 @@ function MemberList() {
             const result = await dispatch(createUser(userData));
             if (createUser.fulfilled.match(result)) {
                 showSuccess('User created successfully');
-                // Refresh list
                 fetchMembers(page);
             } else {
                 throw new Error(result.payload?.error || 'Failed to create user');
@@ -213,6 +225,20 @@ function MemberList() {
         } catch (error) {
             throw error;
         }
+    };
+
+    const renderPurchaseStatus = (status) => {
+        const colors = {
+            active: 'bg-green-100 text-green-800',
+            expired: 'bg-red-100 text-red-800',
+            completed: 'bg-gray-100 text-gray-800',
+            cancelled: 'bg-red-100 text-red-800'
+        };
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
+                {status?.charAt(0).toUpperCase() + status?.slice(1)}
+            </span>
+        );
     };
 
     return (
@@ -308,7 +334,6 @@ function MemberList() {
                         </div>
                     )}
 
-                    {/* Pagination Controls - Only show when not searching */}
                     {!loading && members.length > 0 && !isSearching && !searchQuery.trim() && (
                         <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6 pt-6 border-t border-border">
                             <p className="text-sm text-text-secondary">
@@ -341,7 +366,6 @@ function MemberList() {
                         </div>
                     )}
 
-                    {/* Search Results Count */}
                     {!loading && isSearching && searchQuery.trim() && (
                         <div className="mt-6 pt-6 border-t border-border">
                             <p className="text-sm text-text-secondary">
@@ -355,12 +379,15 @@ function MemberList() {
             {/* Member Details Modal */}
             {showModal && selectedMember && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface rounded-card shadow-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="bg-surface rounded-card shadow-card max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
-                            <div className="flex justify-between items-start gap-4 mb-4">
-                                <h2 className="text-2xl font-bold text-text-primary">
-                                    {selectedMember.first_name} {selectedMember.last_name}
-                                </h2>
+                            <div className="flex justify-between items-start gap-4 mb-6">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-text-primary">
+                                        {selectedMember.first_name} {selectedMember.last_name}
+                                    </h2>
+                                    <p className="text-text-secondary">{selectedMember.email}</p>
+                                </div>
                                 <button
                                     onClick={closeModal}
                                     className="text-text-secondary hover:text-text-primary"
@@ -369,54 +396,165 @@ function MemberList() {
                                 </button>
                             </div>
 
-                            <div className="space-y-4 mb-6">
-                                <div>
-                                    <label className="text-sm font-medium text-text-secondary">Email</label>
-                                    <p className="text-text-primary">{selectedMember.email}</p>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-text-secondary">Phone</label>
-                                    <p className="text-text-primary">{selectedMember.phone}</p>
-                                </div>
+                            <div className="flex border-b border-border mb-6">
+                                <button
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'details'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-text-secondary hover:text-text-primary'
+                                        }`}
+                                    onClick={() => setActiveTab('details')}
+                                >
+                                    Details
+                                </button>
+                                <button
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'coaching'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-text-secondary hover:text-text-primary'
+                                        }`}
+                                    onClick={() => setActiveTab('coaching')}
+                                >
+                                    Coaching Packages ({purchases?.length || 0})
+                                </button>
+                                <button
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'simulator'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-text-secondary hover:text-text-primary'
+                                        }`}
+                                    onClick={() => setActiveTab('simulator')}
+                                >
+                                    Simulator Packages ({simulatorPurchases?.length || 0})
+                                </button>
+                            </div>
 
-                                <div className="border-t border-border pt-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-text-primary mb-3">Custom Fields</h3>
+                            {activeTab === 'details' && (
+                                <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-sm font-medium text-text-secondary">Total Coaching Sessions</label>
-                                            <p className="text-text-primary">{selectedMember.custom_fields?.total_coaching_session || '0'}</p>
+                                            <label className="text-sm font-medium text-text-secondary">Phone</label>
+                                            <p className="text-text-primary">{selectedMember.phone}</p>
                                         </div>
                                         <div>
-                                            <label className="text-sm font-medium text-text-secondary">Total Simulator Hours</label>
-                                            <p className="text-text-primary">{selectedMember.custom_fields?.total_simulator_hour || '0'}</p>
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <label className="text-sm font-medium text-text-secondary">Last Active Package</label>
-                                            <p className="text-text-primary">{selectedMember.custom_fields?.last_active_package || 'None'}</p>
+                                            <label className="text-sm font-medium text-text-secondary">Role</label>
+                                            <p className="text-text-primary capitalize">{selectedMember.role}</p>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="border-t border-border pt-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-text-primary mb-3">Staff Referred Packages</h3>
-                                    {selectedMember.staff_referred_purchases && selectedMember.staff_referred_purchases.length > 0 ? (
-                                        <div className="space-y-2">
-                                            {selectedMember.staff_referred_purchases.map((purchase) => (
-                                                <div key={purchase.id} className="p-3 bg-background rounded-card">
-                                                    <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
-                                                    <p className="text-sm text-text-secondary">
-                                                        Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
-                                                    </p>
+                                    <div className="border-t border-border pt-4 mt-4">
+                                        <h3 className="text-lg font-semibold text-text-primary mb-3">Statistics</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-sm font-medium text-text-secondary">Total Coaching Sessions</label>
+                                                <p className="text-text-primary">{selectedMember.custom_fields?.total_coaching_session || '0'}</p>
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-medium text-text-secondary">Total Simulator Hours</label>
+                                                <p className="text-text-primary">{selectedMember.custom_fields?.total_simulator_hour || '0'}</p>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="text-sm font-medium text-text-secondary">Last Active Package</label>
+                                                <p className="text-text-primary">{selectedMember.custom_fields?.last_active_package || 'None'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-border pt-4 mt-4">
+                                        <h3 className="text-lg font-semibold text-text-primary mb-3">Staff Referred Packages</h3>
+                                        {selectedMember.staff_referred_purchases && selectedMember.staff_referred_purchases.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {selectedMember.staff_referred_purchases.map((purchase) => (
+                                                    <div key={purchase.id} className="p-3 bg-background rounded-card border border-border">
+                                                        <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
+                                                        <p className="text-sm text-text-secondary">
+                                                            Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-text-secondary">No packages referred yet</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'coaching' && (
+                                <div className="space-y-4">
+                                    {purchasesLoading ? (
+                                        <div className="text-center py-8 text-text-secondary">Loading purchases...</div>
+                                    ) : purchases?.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {purchases.map((purchase) => (
+                                                <div key={purchase.id} className="p-4 bg-background rounded-card border border-border">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-semibold text-text-primary">{purchase.purchase_name}</h4>
+                                                        {renderPurchaseStatus(purchase.package_status)}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                                        <div>
+                                                            <span className="text-text-secondary">Sessions Remaining:</span>
+                                                            <span className="ml-2 font-medium text-text-primary">{purchase.sessions_remaining}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-text-secondary">Purchased:</span>
+                                                            <span className="ml-2 font-medium text-text-primary">
+                                                                {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-text-secondary">No packages referred yet</p>
+                                        <div className="text-center py-8 text-text-secondary">
+                                            No coaching packages found.
+                                        </div>
                                     )}
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                            {activeTab === 'simulator' && (
+                                <div className="space-y-4">
+                                    {simulatorPurchasesLoading ? (
+                                        <div className="text-center py-8 text-text-secondary">Loading purchases...</div>
+                                    ) : simulatorPurchases?.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {simulatorPurchases.map((purchase) => (
+                                                <div key={purchase.id} className="p-4 bg-background rounded-card border border-border">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-semibold text-text-primary">{purchase.purchase_name}</h4>
+                                                        {renderPurchaseStatus(purchase.package_status)}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                                        <div>
+                                                            <span className="text-text-secondary">Hours Remaining:</span>
+                                                            <span className="ml-2 font-medium text-text-primary">{purchase.simulator_hours_remaining}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-text-secondary">Purchased:</span>
+                                                            <span className="ml-2 font-medium text-text-primary">
+                                                                {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-text-secondary">
+                                            No simulator packages found.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 mt-8 pt-4 border-t border-border">
+                                <Button
+                                    onClick={() => navigate('/booking', { state: { client: selectedMember } })}
+                                    variant="primary"
+                                    className="w-full sm:w-auto"
+                                >
+                                    Book Session
+                                </Button>
                                 <Button
                                     onClick={handleAddPackage}
                                     variant="primary"
@@ -438,7 +576,6 @@ function MemberList() {
                 </div>
             )}
 
-            {/* Package Selection Modal */}
             {showPackageModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-surface rounded-card shadow-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -504,7 +641,6 @@ function MemberList() {
                 </div>
             )}
 
-            {/* Packages List Modal */}
             {showPackagesListModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-surface rounded-card shadow-card max-w-md w-full">
@@ -567,4 +703,3 @@ function MemberList() {
 }
 
 export default MemberList;
-

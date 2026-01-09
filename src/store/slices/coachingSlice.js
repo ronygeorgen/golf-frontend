@@ -105,6 +105,34 @@ export const getMyPackagePurchases = createAsyncThunk(
     }
 );
 
+export const getUserPurchases = createAsyncThunk(
+    'coaching/getUserPurchases',
+    async ({ userId, page = 1 }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.userPurchases, {
+                params: { user_id: userId, page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getUserSimulatorPurchases = createAsyncThunk(
+    'coaching/getUserSimulatorPurchases',
+    async ({ userId, page = 1 }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.coaching.userSimulatorPurchases, {
+                params: { user_id: userId, page }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const createTempPurchase = createAsyncThunk(
     'coaching/createTempPurchase',
     async ({ packageId, buyerPhone, purchaseType = 'normal', recipients = [], packageType }, { rejectWithValue }) => {
@@ -112,7 +140,7 @@ export const createTempPurchase = createAsyncThunk(
             if (!packageType || !['coaching', 'simulator'].includes(packageType)) {
                 return rejectWithValue({ error: 'packageType is required and must be either "coaching" or "simulator"' });
             }
-            
+
             const payload = {
                 package_id: packageId,
                 buyer_phone: buyerPhone,
@@ -436,7 +464,7 @@ const coachingSlice = createSlice({
             .addCase(getActivePackages.fulfilled, (state, action) => {
                 state.loading = false;
                 // Preserve category from backend if it exists, otherwise determine it from package data
-                const packagesWithCategory = Array.isArray(action.payload) 
+                const packagesWithCategory = Array.isArray(action.payload)
                     ? action.payload.map(pkg => {
                         // If backend already sent category, preserve it (check for truthy string values)
                         if (pkg.category && (pkg.category === 'coaching' || pkg.category === 'combo' || pkg.category === 'simulator')) {
@@ -446,12 +474,12 @@ const coachingSlice = createSlice({
                         // Combo packages have simulator_hours > 0
                         const hasSimulatorHours = pkg.simulator_hours && parseFloat(pkg.simulator_hours) > 0;
                         const determinedCategory = hasSimulatorHours ? 'combo' : 'coaching';
-                        console.log('📦 Package category determined:', { 
-                            id: pkg.id, 
-                            title: pkg.title, 
-                            backendCategory: pkg.category, 
+                        console.log('📦 Package category determined:', {
+                            id: pkg.id,
+                            title: pkg.title,
+                            backendCategory: pkg.category,
                             determinedCategory,
-                            simulator_hours: pkg.simulator_hours 
+                            simulator_hours: pkg.simulator_hours
                         });
                         return { ...pkg, category: determinedCategory };
                     })
@@ -683,8 +711,8 @@ const coachingSlice = createSlice({
                 state.simulatorPackagesLoading = false;
                 // Preserve category from backend if it exists, otherwise set to 'simulator'
                 state.simulatorPackages = Array.isArray(action.payload)
-                    ? action.payload.map(pkg => ({ 
-                        ...pkg, 
+                    ? action.payload.map(pkg => ({
+                        ...pkg,
                         category: pkg.category || 'simulator' // Preserve backend category or default to 'simulator'
                     }))
                     : action.payload;
@@ -701,8 +729,8 @@ const coachingSlice = createSlice({
                 state.simulatorPackagesLoading = false;
                 // Preserve category from backend if it exists, otherwise set to 'simulator'
                 state.simulatorPackages = Array.isArray(action.payload)
-                    ? action.payload.map(pkg => ({ 
-                        ...pkg, 
+                    ? action.payload.map(pkg => ({
+                        ...pkg,
                         category: pkg.category || 'simulator' // Preserve backend category or default to 'simulator'
                     }))
                     : action.payload;
@@ -738,6 +766,46 @@ const coachingSlice = createSlice({
                 }
             })
             .addCase(getMySimulatorPurchases.rejected, (state, action) => {
+                state.simulatorPurchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getUserPurchases.pending, (state) => {
+                state.purchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getUserPurchases.fulfilled, (state, action) => {
+                state.purchasesLoading = false;
+                // Store in same purchases state but for the user
+                if (action.payload.results !== undefined) {
+                    state.purchases = action.payload.results;
+                    state.purchasesPagination = {
+                        count: action.payload.count || 0,
+                        totalPages: action.payload.total_pages || 0,
+                        currentPage: action.payload.current_page || 1,
+                        pageSize: action.payload.page_size || 10,
+                    };
+                } else {
+                    state.purchases = action.payload;
+                }
+            })
+            .addCase(getUserPurchases.rejected, (state, action) => {
+                state.purchasesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(getUserSimulatorPurchases.pending, (state) => {
+                state.simulatorPurchasesLoading = true;
+                state.error = null;
+            })
+            .addCase(getUserSimulatorPurchases.fulfilled, (state, action) => {
+                state.simulatorPurchasesLoading = false;
+                // Store in same simulatorPurchases state but for the user
+                if (action.payload.results !== undefined) {
+                    state.simulatorPurchases = action.payload.results;
+                } else {
+                    state.simulatorPurchases = action.payload;
+                }
+            })
+            .addCase(getUserSimulatorPurchases.rejected, (state, action) => {
                 state.simulatorPurchasesLoading = false;
                 state.error = action.payload;
             })
