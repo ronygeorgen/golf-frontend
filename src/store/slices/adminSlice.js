@@ -267,7 +267,7 @@ export const deletePackage = createAsyncThunk(
 // Booking management thunks
 export const getBookings = createAsyncThunk(
     'admin/getBookings',
-    async ({ filter = 'all', dateRange = {}, page = 1, bookingType = 'all' } = {}, { rejectWithValue }) => {
+    async ({ filter = 'all', dateRange = {}, page = 1, bookingType = 'all', search = '' } = {}, { rejectWithValue }) => {
         try {
             const params = new URLSearchParams();
             if (filter !== 'all') {
@@ -280,6 +280,7 @@ export const getBookings = createAsyncThunk(
             if (dateRange.start_date) params.append('start_date', dateRange.start_date);
             if (dateRange.end_date) params.append('end_date', dateRange.end_date);
             if (bookingType && bookingType !== 'all') params.append('booking_type', bookingType);
+            if (search) params.append('search', search);
             if (page) params.append('page', page);
             const queryString = params.toString();
             const url = queryString
