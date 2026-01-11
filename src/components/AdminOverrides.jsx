@@ -100,6 +100,12 @@ function AdminOverrides() {
 
     const handleCoachingSubmit = async (e) => {
         e.preventDefault();
+
+        if (!coachingForm.packageId) {
+            showError('Please select a package.');
+            return;
+        }
+
         dispatch(resetOverrideStatus('coaching'));
         const payload = {
             client_identifier: coachingForm.clientIdentifier,
@@ -225,10 +231,11 @@ function AdminOverrides() {
                                 <div>
                                     <label className="block text-sm font-medium text-text-primary mb-1">Package</label>
                                     <select
+                                        required
                                         value={coachingForm.packageId}
                                         onChange={(e) => setCoachingForm({ ...coachingForm, packageId: e.target.value, simulatorHours: 0 })}
                                     >
-                                        <option value="">Latest purchase for client</option>
+                                        <option value="" disabled>Select a Package</option>
                                         {packages.list.map((pkg) => (
                                             <option key={pkg.id} value={pkg.id}>
                                                 {pkg.title}

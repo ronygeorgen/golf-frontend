@@ -74,8 +74,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const fetchSpecialEvents = async (startDate, endDate) => {
         setSpecialEventsLoading(true);
         try {
-            const startDateStr = moment(startDate).format('YYYY-MM-DD');
-            const endDateStr = moment(endDate).format('YYYY-MM-DD');
+            const startDateStr = moment(startDate).subtract(1, 'days').format('YYYY-MM-DD');
+            const endDateStr = moment(endDate).add(1, 'days').format('YYYY-MM-DD');
 
             const response = await axios.get(endpoints.specialEvents.calendarEvents, {
                 params: {
