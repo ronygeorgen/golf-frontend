@@ -12,12 +12,16 @@ import Button from './ui/Button';
 import Badge from './ui/Badge';
 import usePopup from '../hooks/usePopup';
 import PopupMessage from './PopupMessage';
+import useToast from '../hooks/useToast';
+import Toast from './ui/Toast';
 import moment from 'moment';
 
 function AdminOverrides() {
     const dispatch = useAppDispatch();
     const { packages, overrides } = useAppSelector((state) => state.admin);
     const { popup, openPopup, closePopup } = usePopup();
+    const { toast, showSuccess, showError, hideToast } = useToast();
+
     const [coachingForm, setCoachingForm] = useState({
         clientIdentifier: '',
         packageId: '',
@@ -44,13 +48,13 @@ function AdminOverrides() {
     useEffect(() => {
         // Fetch locked bookings on mount
         dispatch(getLockedBookings());
-        
+
         return () => {
             dispatch(resetOverrideStatus('coaching'));
             dispatch(resetOverrideStatus('simulator'));
         };
     }, [dispatch]);
-    
+
     const handleCancelBooking = async (booking) => {
         openPopup({
             type: 'warning',
@@ -67,19 +71,9 @@ function AdminOverrides() {
                     if (adminCancelBooking.fulfilled.match(result)) {
                         // Refresh locked bookings list
                         dispatch(getLockedBookings());
-                        openPopup({
-                            type: 'success',
-                            title: 'Booking Cancelled',
-                            message: result.payload?.message || 'Booking cancelled successfully. Credits/sessions have been restored.',
-                            confirmText: 'OK',
-                        });
+                        showSuccess(result.payload?.message || 'Booking cancelled successfully. Credits/sessions have been restored.');
                     } else {
-                        openPopup({
-                            type: 'error',
-                            title: 'Cancellation Failed',
-                            message: result.payload?.error || result.payload?.detail || 'Unable to cancel booking.',
-                            confirmText: 'OK',
-                        });
+                        showError(result.payload?.error || result.payload?.detail || 'Unable to cancel booking.');
                     }
                 } finally {
                     setCancellingBookingId(null); // Clear loading state
@@ -87,24 +81,24 @@ function AdminOverrides() {
             },
         });
     };
-    
+
     const formatDateTime = (dateTimeStr) => {
         return moment(dateTimeStr).format('MMM Do YYYY, h:mm A');
     };
-    
+
     const getTimeUntilBooking = (startTime) => {
         const now = moment();
         const start = moment(startTime);
         const diff = start.diff(now);
         const duration = moment.duration(diff);
-        
+
         if (duration.asHours() < 1) {
             return `${Math.floor(duration.asMinutes())} minutes`;
         }
         return `${Math.floor(duration.asHours())} hours ${duration.minutes()} minutes`;
     };
 
-    const handleCoachingSubmit = (e) => {
+    const handleCoachingSubmit = async (e) => {
         e.preventDefault();
         dispatch(resetOverrideStatus('coaching'));
         const payload = {
@@ -117,19 +111,74 @@ function AdminOverrides() {
         if (coachingForm.simulatorHours > 0) {
             payload.simulator_hours = Number(coachingForm.simulatorHours);
         }
-        dispatch(grantCoachingSessions(payload));
+
+        try {
+            const result = await dispatch(grantCoachingSessions(payload));
+
+            if (grantCoachingSessions.fulfilled.match(result)) {
+                showSuccess(result.payload?.message || 'Coaching sessions added successfully.');
+                setCoachingForm({ clientIdentifier: '', packageId: '', sessionCount: 1, simulatorHours: 0, note: '' });
+            } else if (grantCoachingSessions.rejected.match(result)) {
+                const errorData = result.payload;
+                const nonFieldErrors = errorData?.non_field_errors;
+                const errorMessage = Array.isArray(nonFieldErrors) ? nonFieldErrors[0] : (errorData?.detail || errorData?.error || 'Unknown error');
+
+                // Check if this is the "no active purchase" error
+                if (errorMessage === "The client does not have an active purchase for the selected package.") {
+                    openPopup({
+                        type: 'warning',
+                        title: 'No Active Package',
+                        message: "The client does not have an active purchase for this package.\n\nDo you want to create a package for them and add the session(s)?",
+                        confirmText: 'Yes, Create & Add',
+                        cancelText: 'Cancel',
+                        showCancel: true,
+                        onConfirm: async () => {
+                            const retryPayload = { ...payload, create_if_missing: true };
+                            const retryResult = await dispatch(grantCoachingSessions(retryPayload));
+
+                            if (grantCoachingSessions.fulfilled.match(retryResult)) {
+                                showSuccess(retryResult.payload?.message || 'Package created and sessions added successfully.');
+                                setCoachingForm({ clientIdentifier: '', packageId: '', sessionCount: 1, simulatorHours: 0, note: '' });
+                            } else {
+                                const retryError = retryResult.payload?.error || retryResult.payload?.detail || 'Failed to create package.';
+                                showError(typeof retryError === 'string' ? retryError : JSON.stringify(retryError));
+                            }
+                        }
+                    });
+                } else {
+                    showError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            showError('An unexpected error occurred.');
+        }
     };
 
-    const handleSimulatorSubmit = (e) => {
+    const handleSimulatorSubmit = async (e) => {
         e.preventDefault();
         dispatch(resetOverrideStatus('simulator'));
-        dispatch(
-            grantSimulatorCredits({
-                client_identifier: simForm.clientIdentifier,
-                hours: Number(simForm.hours) || 1,
-                note: simForm.note,
-            })
-        );
+
+        try {
+            const result = await dispatch(
+                grantSimulatorCredits({
+                    client_identifier: simForm.clientIdentifier,
+                    hours: Number(simForm.hours) || 1,
+                    note: simForm.note,
+                })
+            );
+
+            if (grantSimulatorCredits.fulfilled.match(result)) {
+                showSuccess(result.payload?.message || 'Simulator credits granted successfully.');
+                setSimForm({ clientIdentifier: '', hours: 1, note: '' });
+            } else {
+                const error = result.payload?.error || result.payload?.detail || 'Failed to grant credits.';
+                showError(typeof error === 'string' ? error : JSON.stringify(error));
+            }
+        } catch (err) {
+            console.error(err);
+            showError('An unexpected error occurred.');
+        }
     };
 
     return (
@@ -201,29 +250,20 @@ function AdminOverrides() {
                                         if (!coachingForm.packageId) {
                                             return null;
                                         }
-                                        
+
                                         const selectedPackage = packages.list.find(pkg => pkg.id === Number(coachingForm.packageId));
                                         if (!selectedPackage) {
                                             return null;
                                         }
-                                        
+
                                         // Check if package has simulator hours (combo package)
                                         // Only show field if simulator_hours exists and is greater than 0
                                         const simulatorHours = selectedPackage.simulator_hours;
-                                        const hoursValue = simulatorHours !== null && simulatorHours !== undefined 
-                                            ? parseFloat(simulatorHours) 
+                                        const hoursValue = simulatorHours !== null && simulatorHours !== undefined
+                                            ? parseFloat(simulatorHours)
                                             : 0;
                                         const hasSimulatorHours = hoursValue > 0;
-                                        
-                                        // Debug: Log package info (can be removed later)
-                                        console.log('Package check:', {
-                                            packageId: selectedPackage.id,
-                                            packageTitle: selectedPackage.title,
-                                            simulator_hours: simulatorHours,
-                                            hoursValue: hoursValue,
-                                            hasSimulatorHours: hasSimulatorHours
-                                        });
-                                        
+
                                         // Only show simulator hours field if combo package is selected
                                         if (hasSimulatorHours) {
                                             return (
@@ -255,18 +295,6 @@ function AdminOverrides() {
                                         placeholder="Optional admin note"
                                     />
                                 </div>
-                                {overrides.coaching.error && (
-                                    <div className="text-sm text-danger bg-danger/10 border border-danger/20 rounded-lg p-3">
-                                        {typeof overrides.coaching.error === 'string'
-                                            ? overrides.coaching.error
-                                            : JSON.stringify(overrides.coaching.error)}
-                                    </div>
-                                )}
-                                {overrides.coaching.success && (
-                                    <div className="text-sm text-status-confirmed-text bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-3">
-                                        {overrides.coaching.success}
-                                    </div>
-                                )}
                                 <Button
                                     type="submit"
                                     disabled={overrides.coaching.loading}
@@ -314,18 +342,6 @@ function AdminOverrides() {
                                         placeholder="Optional admin note"
                                     />
                                 </div>
-                                {overrides.simulator.error && (
-                                    <div className="text-sm text-danger bg-danger/10 border border-danger/20 rounded-lg p-3">
-                                        {typeof overrides.simulator.error === 'string'
-                                            ? overrides.simulator.error
-                                            : JSON.stringify(overrides.simulator.error)}
-                                    </div>
-                                )}
-                                {overrides.simulator.success && (
-                                    <div className="text-sm text-status-confirmed-text bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-3">
-                                        {overrides.simulator.success}
-                                    </div>
-                                )}
                                 <Button
                                     type="submit"
                                     disabled={overrides.simulator.loading}
@@ -356,11 +372,10 @@ function AdminOverrides() {
                                 <button
                                     key={filter}
                                     onClick={() => setBookingFilter(filter)}
-                                    className={`px-3 py-1 rounded-full transition ${
-                                        bookingFilter === filter
-                                            ? 'bg-primary text-white border border-primary'
-                                            : 'text-text-secondary hover:bg-background'
-                                    }`}
+                                    className={`px-3 py-1 rounded-full transition ${bookingFilter === filter
+                                        ? 'bg-primary text-white border border-primary'
+                                        : 'text-text-secondary hover:bg-background'
+                                        }`}
                                 >
                                     {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
                                 </button>
@@ -375,7 +390,7 @@ function AdminOverrides() {
                         </Button>
                     </div>
                 </div>
-                
+
                 {/* Search Bar */}
                 <div className="mb-4">
                     <input
@@ -386,7 +401,7 @@ function AdminOverrides() {
                         className="w-full px-4 py-2 border border-border rounded-lg bg-background text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                 </div>
-                
+
                 {overrides.lockedBookings.loading && overrides.lockedBookings.list.length === 0 ? (
                     <div className="text-center py-8 text-text-secondary">Loading locked bookings...</div>
                 ) : overrides.lockedBookings.error ? (
@@ -402,7 +417,7 @@ function AdminOverrides() {
                         if (bookingFilter !== 'all' && booking.booking_type !== bookingFilter) {
                             return false;
                         }
-                        
+
                         // Filter by search query
                         if (searchQuery.trim()) {
                             const query = searchQuery.toLowerCase().trim();
@@ -412,7 +427,7 @@ function AdminOverrides() {
                             const fullName = `${firstName} ${lastName}`.trim();
                             const phone = (client.phone || '').toLowerCase();
                             const email = (client.email || '').toLowerCase();
-                            
+
                             return (
                                 fullName.includes(query) ||
                                 firstName.includes(query) ||
@@ -421,10 +436,10 @@ function AdminOverrides() {
                                 email.includes(query)
                             );
                         }
-                        
+
                         return true;
                     });
-                    
+
                     if (overrides.lockedBookings.list.length === 0) {
                         return (
                             <div className="text-center py-8 text-text-secondary">
@@ -432,7 +447,7 @@ function AdminOverrides() {
                             </div>
                         );
                     }
-                    
+
                     if (filteredBookings.length === 0) {
                         return (
                             <div className="text-center py-8 text-text-secondary">
@@ -440,77 +455,77 @@ function AdminOverrides() {
                             </div>
                         );
                     }
-                    
+
                     return (
                         <div className="space-y-4">
                             {filteredBookings.map((booking) => (
-                            <div
-                                key={booking.id}
-                                className="bg-background border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
-                            >
-                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Badge status={booking.booking_type === 'coaching' ? 'pending' : 'personal'}>
-                                                {booking.booking_type === 'coaching' ? 'Coaching' : 'Simulator'}
-                                            </Badge>
-                                            <span className="text-xs text-text-secondary">
-                                                Starts in: {getTimeUntilBooking(booking.start_time)}
-                                            </span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm font-medium text-text-primary">
-                                                <span className="text-text-secondary">Client:</span>{' '}
-                                                {booking.client_details?.first_name || 'N/A'}{' '}
-                                                {booking.client_details?.last_name || ''}
-                                                {booking.client_details?.phone && (
-                                                    <span className="text-text-secondary ml-2">
-                                                        ({booking.client_details.phone})
-                                                    </span>
+                                <div
+                                    key={booking.id}
+                                    className="bg-background border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
+                                >
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Badge status={booking.booking_type === 'coaching' ? 'pending' : 'personal'}>
+                                                    {booking.booking_type === 'coaching' ? 'Coaching' : 'Simulator'}
+                                                </Badge>
+                                                <span className="text-xs text-text-secondary">
+                                                    Starts in: {getTimeUntilBooking(booking.start_time)}
+                                                </span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-medium text-text-primary">
+                                                    <span className="text-text-secondary">Client:</span>{' '}
+                                                    {booking.client_details?.first_name || 'N/A'}{' '}
+                                                    {booking.client_details?.last_name || ''}
+                                                    {booking.client_details?.phone && (
+                                                        <span className="text-text-secondary ml-2">
+                                                            ({booking.client_details.phone})
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                <p className="text-sm text-text-secondary">
+                                                    <span className="font-medium">Time:</span>{' '}
+                                                    {formatDateTime(booking.start_time)} - {moment(booking.end_time).format('h:mm A')}
+                                                </p>
+                                                {booking.booking_type === 'coaching' && booking.coach_details && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        <span className="font-medium">Coach:</span>{' '}
+                                                        {booking.coach_details.first_name} {booking.coach_details.last_name}
+                                                    </p>
                                                 )}
-                                            </p>
-                                            <p className="text-sm text-text-secondary">
-                                                <span className="font-medium">Time:</span>{' '}
-                                                {formatDateTime(booking.start_time)} - {moment(booking.end_time).format('h:mm A')}
-                                            </p>
-                                            {booking.booking_type === 'coaching' && booking.coach_details && (
-                                                <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Coach:</span>{' '}
-                                                    {booking.coach_details.first_name} {booking.coach_details.last_name}
-                                                </p>
-                                            )}
-                                            {booking.booking_type === 'simulator' && booking.simulator_details && (
-                                                <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Simulator:</span>{' '}
-                                                    Bay {booking.simulator_details.bay_number} - {booking.simulator_details.name}
-                                                </p>
-                                            )}
-                                            {booking.package_purchase_details && (
-                                                <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Package:</span>{' '}
-                                                    {booking.package_purchase_details.package_details?.title || 'N/A'}
-                                                </p>
-                                            )}
+                                                {booking.booking_type === 'simulator' && booking.simulator_details && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        <span className="font-medium">Simulator:</span>{' '}
+                                                        Bay {booking.simulator_details.bay_number} - {booking.simulator_details.name}
+                                                    </p>
+                                                )}
+                                                {booking.package_purchase_details && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        <span className="font-medium">Package:</span>{' '}
+                                                        {booking.package_purchase_details.package_details?.title || 'N/A'}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            onClick={() => handleCancelBooking(booking)}
-                                            variant="danger"
-                                            className="whitespace-nowrap"
-                                            disabled={cancellingBookingId === booking.id}
-                                        >
-                                            {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                onClick={() => handleCancelBooking(booking)}
+                                                variant="danger"
+                                                className="whitespace-nowrap"
+                                                disabled={cancellingBookingId === booking.id}
+                                            >
+                                                {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
                     );
                 })()}
             </div>
-            
+
             <PopupMessage
                 open={popup.open}
                 type={popup.type}
@@ -520,14 +535,17 @@ function AdminOverrides() {
                 cancelText={popup.cancelText}
                 showCancel={popup.showCancel}
                 onConfirm={popup.onConfirm ? async () => {
-                    await popup.onConfirm();
+                    const action = popup.onConfirm;
                     closePopup();
+                    if (action) {
+                        await action();
+                    }
                 } : closePopup}
                 onClose={closePopup}
             />
+            {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} duration={toast.duration} />}
         </div>
     );
 }
 
 export default AdminOverrides;
-

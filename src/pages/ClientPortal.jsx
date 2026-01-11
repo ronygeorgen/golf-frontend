@@ -48,10 +48,12 @@ function ClientPortal() {
                 acc[packageId] = {
                     packageId,
                     packageTitle: purchase.package_details?.title || 'Unknown Package',
-                    sessionsRemaining: 0
+                    sessionsRemaining: 0,
+                    simulatorHoursRemaining: 0
                 };
             }
             acc[packageId].sessionsRemaining += purchase.sessions_remaining || 0;
+            acc[packageId].simulatorHoursRemaining += parseFloat(purchase.simulator_hours_remaining) || 0;
             return acc;
         }, {});
 
@@ -464,8 +466,8 @@ function ClientPortal() {
                                                 key={tab.id}
                                                 onClick={() => setActiveTab(tab.id)}
                                                 className={`px-3 sm:px-4 md:px-6 py-3 text-xs sm:text-sm font-medium border-b-2 transition whitespace-nowrap flex-shrink-0 ${activeTab === tab.id
-                                                        ? 'border-primary text-primary bg-primary/5'
-                                                        : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border hover:bg-background'
+                                                    ? 'border-primary text-primary bg-primary/5'
+                                                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border hover:bg-background'
                                                     }`}
                                             >
                                                 <span className="flex items-center gap-1 sm:gap-2">
@@ -509,8 +511,8 @@ function ClientPortal() {
                                                     setPage(1);
                                                 }}
                                                 className={`px-3 py-1 rounded-full transition ${bookingType === type
-                                                        ? 'bg-primary/10 text-primary border border-primary'
-                                                        : 'text-text-secondary hover:bg-background'
+                                                    ? 'bg-primary/10 text-primary border border-primary'
+                                                    : 'text-text-secondary hover:bg-background'
                                                     }`}
                                             >
                                                 {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
@@ -751,9 +753,18 @@ function ClientPortal() {
                                             <p className="font-semibold text-text-primary mb-2">Coaching Sessions</p>
                                             <div className="space-y-2">
                                                 {personalPackagesList.map((pkg) => (
-                                                    <div key={pkg.packageId} className="flex items-center justify-between py-1 border-b border-border/50 last:border-b-0">
-                                                        <span className="text-text-secondary">{pkg.packageTitle}</span>
-                                                        <span className="font-bold text-text-primary">{pkg.sessionsRemaining} session{pkg.sessionsRemaining === 1 ? '' : 's'}</span>
+                                                    <div key={pkg.packageId} className="flex flex-col py-2 border-b border-border/50 last:border-b-0 space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-text-secondary">{pkg.packageTitle}</span>
+                                                            <span className="font-bold text-text-primary">{pkg.sessionsRemaining} session{pkg.sessionsRemaining === 1 ? '' : 's'}</span>
+                                                        </div>
+                                                        {pkg.simulatorHoursRemaining > 0 && (
+                                                            <div className="flex items-center justify-end">
+                                                                <span className="text-xs text-text-secondary bg-surface-hover px-2 py-0.5 rounded-full">
+                                                                    + {pkg.simulatorHoursRemaining.toFixed(2)} sim hour{pkg.simulatorHoursRemaining === 1 ? '' : 's'}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -846,10 +857,10 @@ function ClientPortal() {
                                                         <div
                                                             key={index}
                                                             className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${isDisabled
-                                                                    ? 'border-border bg-background cursor-not-allowed opacity-60'
-                                                                    : isSelected
-                                                                        ? 'border-primary bg-primary-light/20 shadow-card-hover'
-                                                                        : 'border-border hover:border-primary hover:bg-background'
+                                                                ? 'border-border bg-background cursor-not-allowed opacity-60'
+                                                                : isSelected
+                                                                    ? 'border-primary bg-primary-light/20 shadow-card-hover'
+                                                                    : 'border-border hover:border-primary hover:bg-background'
                                                                 }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
                                                             title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
@@ -882,10 +893,10 @@ function ClientPortal() {
                                                         <div
                                                             key={index}
                                                             className={`p-3 border-2 rounded-card transition duration-200 cursor-pointer ${isDisabled
-                                                                    ? 'border-border bg-background cursor-not-allowed opacity-60'
-                                                                    : isSelected
-                                                                        ? 'border-primary bg-primary-light/20 shadow-card-hover'
-                                                                        : 'border-border hover:border-primary hover:bg-background'
+                                                                ? 'border-border bg-background cursor-not-allowed opacity-60'
+                                                                : isSelected
+                                                                    ? 'border-primary bg-primary-light/20 shadow-card-hover'
+                                                                    : 'border-border hover:border-primary hover:bg-background'
                                                                 }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
                                                             title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
