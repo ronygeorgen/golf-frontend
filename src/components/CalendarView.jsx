@@ -8,6 +8,7 @@ import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
+import { utcTimeToLocal } from '../utils/timezone';
 
 const localizer = momentLocalizer(moment);
 
@@ -268,15 +269,26 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         });
 
     // Transform Special Events - convert UTC to local time
+    // Match the approach used in SpecialEvents.jsx page
     const transformedSpecialEvents = specialEvents.map(event => {
-        // Combine date and time as UTC, then convert to local time
-        // event.date is YYYY-MM-DD, event.start_time and event.end_time are HH:MM in UTC
-        const start = moment.utc(`${event.date}T${event.start_time}`).local().toDate();
-        let end = moment.utc(`${event.date}T${event.end_time}`).local().toDate();
+        // Parse date manually to avoid UTC shift (like formatDate in SpecialEvents.jsx)
+        const [year, month, day] = event.date.split('-').map(Number);
+        
+        // Convert UTC time to local time using the event date
+        const startTimeLocal = utcTimeToLocal(event.start_time);
+        const endTimeLocal = utcTimeToLocal(event.end_time);
+        
+        // Parse local time components
+        const [startHours, startMinutes] = startTimeLocal.split(':').map(Number);
+        const [endHours, endMinutes] = endTimeLocal.split(':').map(Number);
+        
+        // Create date objects in local timezone using the parsed date and converted time
+        const start = new Date(year, month - 1, day, startHours, startMinutes);
+        let end = new Date(year, month - 1, day, endHours, endMinutes);
 
         // If end_time is before or same as start_time, it likely crosses midnight to the next day
-        if (moment(end).isSameOrBefore(start)) {
-            end = moment(end).add(1, 'day').toDate();
+        if (end <= start) {
+            end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // Add 1 day
         }
 
         return {
