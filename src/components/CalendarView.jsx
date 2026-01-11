@@ -267,12 +267,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             };
         });
 
-    // Transform Special Events
+    // Transform Special Events - convert UTC to local time
     const transformedSpecialEvents = specialEvents.map(event => {
-        // We treat Special Event times as local to the facility/client (no UTC shift)
-        // This ensures they stay on the day the admin intended.
-        const start = moment(`${event.date}T${event.start_time}`).toDate();
-        let end = moment(`${event.date}T${event.end_time}`).toDate();
+        // Combine date and time as UTC, then convert to local time
+        // event.date is YYYY-MM-DD, event.start_time and event.end_time are HH:MM in UTC
+        const start = moment.utc(`${event.date}T${event.start_time}`).local().toDate();
+        let end = moment.utc(`${event.date}T${event.end_time}`).local().toDate();
 
         // If end_time is before or same as start_time, it likely crosses midnight to the next day
         if (moment(end).isSameOrBefore(start)) {
