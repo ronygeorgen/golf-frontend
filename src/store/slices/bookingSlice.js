@@ -246,6 +246,20 @@ export const checkCoachingAvailability = createAsyncThunk(
     }
 );
 
+export const checkSpecialEventsOnDate = createAsyncThunk(
+    'booking/checkSpecialEventsOnDate',
+    async (date, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.specialEvents.eventsOnDate, {
+                params: { date }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const getSimulatorCredits = createAsyncThunk(
     'booking/getSimulatorCredits',
     async ({ user_id } = {}, { rejectWithValue }) => {
@@ -306,6 +320,7 @@ const initialState = {
         simulator: [],
         coaching: [],
         specialEventMessage: null,
+        specialEventsOnDate: [], // Store special events for the selected date
         hourly_price: null, // Store hourly_price for price calculation
     },
     loading: false,
@@ -334,6 +349,7 @@ const bookingSlice = createSlice({
                 simulator: [],
                 coaching: [],
                 specialEventMessage: null,
+                specialEventsOnDate: [],
                 hourly_price: hourly_price || null
             };
         },
@@ -546,6 +562,9 @@ const bookingSlice = createSlice({
             .addCase(checkCoachingAvailability.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(checkSpecialEventsOnDate.fulfilled, (state, action) => {
+                state.availability.specialEventsOnDate = action.payload || [];
             });
 
         // Simulator Credits

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours } from '../store/slices/bookingSlice';
+import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
@@ -188,12 +188,6 @@ function SimulatorBooking({ client }) {
             return;
         }
 
-        if (availability.specialEventMessage) {
-            showError(availability.specialEventMessage);
-            return;
-        }
-
-
         // Store current values for back navigation
         setPreviousDate(date);
         setPreviousDuration(duration);
@@ -206,6 +200,9 @@ function SimulatorBooking({ client }) {
         explicitAvailabilityCheckRef.current = true;
 
         setLoading(true);
+        // Fetch special events first
+        await dispatch(checkSpecialEventsOnDate(date));
+
         const count = simulatorCount && simulatorCount >= 1 ? simulatorCount : 1;
         const result = await dispatch(checkSimulatorAvailability({ date, duration, simulator_count: count }));
         setLoading(false);
@@ -241,12 +238,13 @@ function SimulatorBooking({ client }) {
                 showError(payload.message);
             } else if (payload.error) {
                 showError(payload.error);
-            } else if (payload.specialEventMessage) {
-                // Show special event message if no regular message
-                showError(payload.specialEventMessage);
             } else if (slots.length === 0) {
-                // If no slots and no messages, show a default message
-                showError('No available time slots found for the selected date. Please try a different date.');
+                // If there are no slots, we can show the special event message if it exists
+                if (payload.specialEventMessage) {
+                    showError(payload.specialEventMessage);
+                } else {
+                    showError('No available time slots found for the selected date. Please try a different date.');
+                }
             }
             // Step will be updated by useEffect when slots are available
         } else if (checkSimulatorAvailability.rejected.match(result)) {
@@ -260,7 +258,52 @@ function SimulatorBooking({ client }) {
         }
     };
 
+    const getSpecialEventConflict = (slot) => {
+        if (!availability.specialEventsOnDate || availability.specialEventsOnDate.length === 0) return null;
+
+        // Slot duration in ms
+        const durationMs = duration * 60000;
+        const slotStart = new Date(slot.start_time);
+        const slotEnd = new Date(slotStart.getTime() + durationMs);
+
+        for (const event of availability.specialEventsOnDate) {
+            const [startH, startM, startS] = event.start_time.split(':').map(Number);
+            const [endH, endM, endS] = event.end_time.split(':').map(Number);
+
+            // Construct event start/end times relative to the slot date
+            const eventStart = new Date(slotStart);
+            eventStart.setHours(startH, startM, startS, 0);
+
+            let eventEnd = new Date(slotStart);
+            eventEnd.setHours(endH, endM, endS, 0);
+
+            // Handle event crossing midnight: increment day for end time if it's earlier than start
+            if (eventEnd < eventStart) {
+                eventEnd.setDate(eventEnd.getDate() + 1);
+            }
+
+            // Check strict overlap + abutment (users want to block slots ending at event start):
+            // Block if the requested slot's interval [slotStart, slotEnd) 
+            // touches or overlaps with the event's interval [eventStart, eventEnd).
+            if (slotStart < eventEnd && slotEnd >= eventStart) {
+                const isDurationConflict = slotStart < eventStart;
+                const maxDuration = isDurationConflict ? Math.floor((eventStart - slotStart) / 60000) : 0;
+
+                return {
+                    event,
+                    isDurationConflict,
+                    eventStartTime: eventStart,
+                    maxDuration
+                };
+            }
+        }
+        return null;
+    };
+
     const isSlotDisabled = (slot) => {
+        // Check special event conflict first
+        if (getSpecialEventConflict(slot)) return true;
+
         // Check if the selected duration would exceed the slot's availability window
         // The backend returns availability_end_time which is when the simulator's availability actually ends
         const startTime = new Date(slot.start_time);
@@ -728,18 +771,21 @@ function SimulatorBooking({ client }) {
                             // Check if this slot is selected (compare by start_time since that's unique)
                             const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
                             const isDisabled = isSlotDisabled(slot);
+                            const conflict = getSpecialEventConflict(slot);
+                            const specialEvent = conflict?.event;
+                            const isDurationConflict = conflict?.isDurationConflict;
+                            const eventStartTime = conflict?.eventStartTime;
 
                             return (
                                 <div
                                     key={index}
-                                    className={`p-4 border-2 rounded-card transition duration-200 relative ${isDisabled
+                                    className={`p-4 border-2 rounded-card transition duration-200 relative group ${isDisabled
                                         ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
                                         : isSelected
                                             ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
                                             : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                         }`}
                                     onClick={() => handleSlotSelect(slot)}
-                                    title={isDisabled ? `This slot cannot accommodate ${duration} minutes. Maximum available: ${getSuggestedDuration(slot)}` : ''}
                                 >
                                     <div className={`text-lg font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                         {new Date(slot.start_time).toLocaleTimeString('en-US', {
@@ -755,11 +801,64 @@ function SimulatorBooking({ client }) {
                                     </div>
                                     {isDisabled && (
                                         <div className="mt-2 pt-2 border-t border-danger/30">
-                                            <div className="text-xs text-danger font-medium">
-                                                Exceeds availability
-                                            </div>
-                                            <div className="text-xs text-danger/80 mt-1">
-                                                Max: {getSuggestedDuration(slot)}
+                                            {specialEvent ? (
+                                                <div className="text-xs text-danger font-medium">
+                                                    {isDurationConflict ? (
+                                                        <>
+                                                            Exceeds availability
+                                                            <div className="text-danger/80 mt-1">
+                                                                Max: {conflict.maxDuration} mins
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        `Special Event: ${specialEvent.title}`
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="text-xs text-danger font-medium">
+                                                        Exceeds availability
+                                                    </div>
+                                                    <div className="text-xs text-danger/80 mt-1">
+                                                        Max: {getSuggestedDuration(slot)}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Tooltip on hover */}
+                                    {isDisabled && (
+                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                            <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg w-max max-w-xs sm:max-w-md text-center">
+                                                {specialEvent ? (
+                                                    isDurationConflict ? (
+                                                        <>
+                                                            <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
+                                                            <div className="mb-1">
+                                                                Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                                            </div>
+                                                            <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="font-semibold mb-1">⚠️ Unavailable</div>
+                                                            <div className="mb-1">Special Event: {specialEvent.title}</div>
+                                                            <div className="text-yellow-300 font-medium">Please select a different time</div>
+                                                        </>
+                                                    )
+                                                ) : (
+                                                    <>
+                                                        <div className="font-semibold mb-1">⚠️ Duration too long</div>
+                                                        <div className="mb-1">
+                                                            Simulator available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                        <div className="text-yellow-300 font-medium">💡 Try {getSuggestedDuration(slot)} or less</div>
+                                                    </>
+                                                )}
+                                                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+                                                    <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                </div>
                                             </div>
                                         </div>
                                     )}

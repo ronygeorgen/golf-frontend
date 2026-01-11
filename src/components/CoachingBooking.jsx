@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { checkCoachingAvailability, createBooking, clearAvailability } from '../store/slices/bookingSlice';
+import { checkCoachingAvailability, createBooking, clearAvailability, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
 import { getActiveCoachingPackages, getMyPackagePurchases, getOrganizationPackages, getUserPurchases } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -202,8 +202,8 @@ function CoachingBooking({ client }) {
     // Move to slots step when slots are fetched - ONLY for manual checks
     useEffect(() => {
         if (availability.coaching && availability.coaching.length > 0) {
-            // Ensure we don't move to slots if there's a special event message
-            if (currentStep === 'form' && !isAutoCheck.current && !availability.specialEventMessage) {
+            // Ensure we move to slots even if there's a special event message, as we now handle granular conflicts
+            if (currentStep === 'form' && !isAutoCheck.current) {
                 setCurrentStep('slots');
             }
         } else if (availability.coaching && availability.coaching.length === 0 && currentStep === 'slots') {
@@ -266,6 +266,9 @@ function CoachingBooking({ client }) {
         // Mark as manual check
         isAutoCheck.current = false;
 
+        // Fetch special events first
+        await dispatch(checkSpecialEventsOnDate(date));
+
         const result = await dispatch(checkCoachingAvailability({
             date,
             packageId: selectedPackage,
@@ -294,12 +297,8 @@ function CoachingBooking({ client }) {
 
     // Helper to determine if the date is blocked based on availability check
     const isDateBlocked = useMemo(() => {
-        if (!hasChecked || loading) return false;
-
-        // If there is a special event message, consider it blocked immediately
-        if (availability.specialEventMessage) {
-            return true;
-        }
+        // Don't block if we're on a different step or haven't checked yet
+        if (currentStep !== 'form' || !hasChecked || loading) return false;
 
         // If we have availability data, check it
         // Only consider it blocked if we have an explicit message OR slots count is 0
@@ -309,7 +308,7 @@ function CoachingBooking({ client }) {
             return true;
         }
         return false;
-    }, [availability.coaching, availability.specialEventMessage, hasChecked, loading]);
+    }, [availability.coaching, hasChecked, loading, currentStep]);
 
     const blockMessage = useMemo(() => {
         if (!isDateBlocked) return null;
@@ -342,7 +341,50 @@ function CoachingBooking({ client }) {
     };
 
     // ... (rest of functions)
+    const getSpecialEventConflict = (slot) => {
+        if (!availability.specialEventsOnDate || availability.specialEventsOnDate.length === 0) return null;
+
+        // Slot duration in ms
+        const durationMs = duration * 60000;
+        const slotStart = new Date(slot.start_time);
+        const slotEnd = new Date(slotStart.getTime() + durationMs);
+
+        for (const event of availability.specialEventsOnDate) {
+            const [startH, startM, startS] = event.start_time.split(':').map(Number);
+            const [endH, endM, endS] = event.end_time.split(':').map(Number);
+
+            // Construct event start/end times relative to the slot date
+            const eventStart = new Date(slotStart);
+            eventStart.setHours(startH, startM, startS, 0);
+
+            let eventEnd = new Date(slotStart);
+            eventEnd.setHours(endH, endM, endS, 0);
+
+            // Handle event crossing midnight: increment day for end time if it's earlier than start
+            if (eventEnd < eventStart) {
+                eventEnd.setDate(eventEnd.getDate() + 1);
+            }
+
+            // Check strict overlap + abutment (users want to block slots ending at event start):
+            // Block if the requested slot's interval [slotStart, slotEnd) 
+            // touches or overlaps with the event's interval [eventStart, eventEnd).
+            if (slotStart < eventEnd && slotEnd >= eventStart) {
+                const isDurationConflict = slotStart < eventStart;
+                const maxDuration = isDurationConflict ? Math.floor((eventStart - slotStart) / 60000) : 0;
+
+                return {
+                    event,
+                    isDurationConflict,
+                    eventStartTime: eventStart,
+                    maxDuration
+                };
+            }
+        }
+        return null;
+    };
+
     const isSlotDisabled = (slot) => {
+        if (getSpecialEventConflict(slot)) return true;
         const startTime = new Date(slot.start_time);
         const requestedEndTime = new Date(startTime.getTime() + duration * 60000);
         const maxAvailableEndTime = slot.availability_end_time
@@ -387,6 +429,7 @@ function CoachingBooking({ client }) {
             if (previousCoach) setSelectedCoach(previousCoach);
             dispatch(clearAvailability());
             setSelectedSlot(null);
+            setHasChecked(false); // Reset hasChecked to prevent blockMessage from showing
             setCurrentStep('form');
         }
     };
@@ -819,7 +862,11 @@ function CoachingBooking({ client }) {
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
                                 {availability.coaching.map((slot, index) => {
                                     const disabled = isSlotDisabled(slot);
-                                    const suggestedDuration = disabled ? getSuggestedDuration(slot) : null;
+                                    const conflict = getSpecialEventConflict(slot);
+                                    const specialEvent = conflict?.event;
+                                    const isDurationConflict = conflict?.isDurationConflict;
+                                    const eventStartTime = conflict?.eventStartTime;
+                                    const suggestedDuration = disabled && !specialEvent ? getSuggestedDuration(slot) : null;
                                     // Check if this slot is selected (compare by start_time since that's unique)
                                     const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
 
@@ -833,7 +880,6 @@ function CoachingBooking({ client }) {
                                                     : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                                 }`}
                                             onClick={() => !disabled && handleSlotSelect(slot)}
-                                            title={disabled ? `This slot would exceed availability with ${duration} minutes. Try ${suggestedDuration} or less.` : ''}
                                         >
                                             {disabled && (
                                                 <div className="absolute top-1 right-1">
@@ -853,18 +899,51 @@ function CoachingBooking({ client }) {
                                             </div>
                                             {disabled && (
                                                 <div className="mt-2 text-xs text-danger font-medium">
-                                                    Max: {suggestedDuration}
+                                                    {specialEvent ? (
+                                                        isDurationConflict ? (
+                                                            <>
+                                                                Exceeds availability
+                                                                <div className="text-danger/80 mt-1">
+                                                                    Max: {conflict.maxDuration} mins
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            `Event: ${specialEvent.title}`
+                                                        )
+                                                    ) : (
+                                                        `Max: ${suggestedDuration}`
+                                                    )}
                                                 </div>
                                             )}
                                             {/* Tooltip on hover */}
                                             {disabled && (
-                                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                                                    <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg max-w-xs">
-                                                        <div className="font-semibold mb-1">⚠️ Duration too long</div>
-                                                        <div className="mb-1">
-                                                            Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                                        </div>
-                                                        <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} or less</div>
+                                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                                    <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg w-max max-w-xs sm:max-w-md text-center">
+                                                        {specialEvent ? (
+                                                            isDurationConflict ? (
+                                                                <>
+                                                                    <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
+                                                                    <div className="mb-1">
+                                                                        Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                                                    </div>
+                                                                    <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="font-semibold mb-1">⚠️ Unavailable</div>
+                                                                    <div className="mb-1">Special Event: {specialEvent.title}</div>
+                                                                    <div className="text-yellow-300 font-medium">Please select a different time</div>
+                                                                </>
+                                                            )
+                                                        ) : (
+                                                            <>
+                                                                <div className="font-semibold mb-1">⚠️ Duration too long</div>
+                                                                <div className="mb-1">
+                                                                    Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                </div>
+                                                                <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} or less</div>
+                                                            </>
+                                                        )}
                                                         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
                                                             <div className="border-4 border-transparent border-t-gray-900"></div>
                                                         </div>
