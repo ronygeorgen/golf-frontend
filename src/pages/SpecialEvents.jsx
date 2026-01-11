@@ -49,14 +49,14 @@ function SpecialEvents() {
             onConfirm: async () => {
                 closePopup();
                 setRegistering({ ...registering, [eventId]: true });
-                        try {
-                            await axios.post(endpoints.specialEvents.register(eventId));
-                            showSuccess('Successfully registered for the event!');
-                            fetchEvents(); // Refresh to update registration status
-                        } catch (error) {
-                            console.error('Error registering:', error);
-                            showError(error.response?.data?.error || 'Failed to register for event');
-                        } finally {
+                try {
+                    await axios.post(endpoints.specialEvents.register(eventId));
+                    showSuccess('Successfully registered for the event!');
+                    fetchEvents(); // Refresh to update registration status
+                } catch (error) {
+                    console.error('Error registering:', error);
+                    showError(error.response?.data?.error || 'Failed to register for event');
+                } finally {
                     setRegistering({ ...registering, [eventId]: false });
                 }
             },
@@ -90,11 +90,11 @@ function SpecialEvents() {
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
     };
 
@@ -112,145 +112,150 @@ function SpecialEvents() {
 
     return (
         <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-text-primary mb-2">Special Events</h1>
-                    <p className="text-text-secondary">Discover and register for upcoming special events</p>
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-text-primary mb-2">Special Events</h1>
+                <p className="text-text-secondary">Discover and register for upcoming special events</p>
+            </div>
+
+            {events.length === 0 ? (
+                <div className="bg-surface rounded-card shadow-card border border-border p-12 text-center">
+                    <Calendar className="w-16 h-16 text-text-secondary mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-text-primary mb-2">No Upcoming Events</h3>
+                    <p className="text-text-secondary">Check back later for new events!</p>
                 </div>
+            ) : (
+                <div className="grid gap-6">
+                    {events.map((event) => {
+                        const isRegistered = event.user_registered;
+                        const isShowedUp = event.user_registration_status === 'showed_up';
+                        const isFull = event.is_full;
+                        const canRegister = !isRegistered && !isFull && event.available_spots > 0;
 
-                {events.length === 0 ? (
-                    <div className="bg-surface rounded-card shadow-card border border-border p-12 text-center">
-                        <Calendar className="w-16 h-16 text-text-secondary mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-text-primary mb-2">No Upcoming Events</h3>
-                        <p className="text-text-secondary">Check back later for new events!</p>
-                    </div>
-                ) : (
-                    <div className="grid gap-6">
-                        {events.map((event) => {
-                            const isRegistered = event.user_registered;
-                            const isShowedUp = event.user_registration_status === 'showed_up';
-                            const isFull = event.is_full;
-                            const canRegister = !isRegistered && !isFull && event.available_spots > 0;
-
-                            return (
-                                <div
-                                    key={event.id}
-                                    className="bg-surface rounded-card shadow-card border border-border p-6 hover:shadow-lg transition-shadow"
-                                >
-                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div>
-                                                    <h2 className="text-2xl font-bold text-text-primary mb-2">
-                                                        {event.title}
-                                                    </h2>
-                                                </div>
-                                                {isShowedUp && (
-                                                    <Badge variant="success" className="flex items-center gap-1">
-                                                        <CheckCircle className="w-4 h-4" />
-                                                        Attended
-                                                    </Badge>
-                                                )}
-                                                {isRegistered && !isShowedUp && (
-                                                    <Badge variant="success" className="flex items-center gap-1">
-                                                        <CheckCircle className="w-4 h-4" />
-                                                        Registered
-                                                    </Badge>
-                                                )}
+                        return (
+                            <div
+                                key={event.id}
+                                className="bg-surface rounded-card shadow-card border border-border p-6 hover:shadow-lg transition-shadow"
+                            >
+                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div>
+                                                <h2 className="text-2xl font-bold text-text-primary mb-2">
+                                                    {event.title}
+                                                    {event.is_private && (
+                                                        <Badge variant="warning" className="ml-2 text-xs uppercase tracking-wider">
+                                                            Private
+                                                        </Badge>
+                                                    )}
+                                                </h2>
                                             </div>
-
-                                            {event.description && (
-                                                <p className="text-text-secondary mb-4">{event.description}</p>
+                                            {isShowedUp && (
+                                                <Badge variant="success" className="flex items-center gap-1">
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Attended
+                                                </Badge>
                                             )}
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                <div className="flex items-center gap-2 text-text-secondary">
-                                                    <Calendar className="w-5 h-5" />
-                                                    <span className="font-medium">Date:</span>
-                                                    <span>{formatDate(event.next_occurrence_date || event.date)}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-text-secondary">
-                                                    <Clock className="w-5 h-5" />
-                                                    <span className="font-medium">Time:</span>
-                                                    <span>
-                                                        {utcTimeToLocal(event.start_time)} - {utcTimeToLocal(event.end_time)}
-                                                    </span>
-                                                </div>
-                                                {event.show_price && event.price && (
-                                                    <div className="flex items-center gap-2 text-text-secondary">
-                                                        <span className="font-medium">Price:</span>
-                                                        <span className="font-semibold text-text-primary">
-                                                            ${parseFloat(event.price).toFixed(2)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                <div className="flex items-center gap-2 text-text-secondary">
-                                                    <Users className="w-5 h-5" />
-                                                    <span className="font-medium">Capacity:</span>
-                                                    <span>
-                                                        {event.registered_count || 0} / {event.max_capacity} registered
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-text-secondary">Available Spots:</span>
-                                                    <Badge variant={event.available_spots > 0 ? 'success' : 'danger'}>
-                                                        {event.available_spots} remaining
-                                                    </Badge>
-                                                </div>
-                                            </div>
+                                            {isRegistered && !isShowedUp && (
+                                                <Badge variant="success" className="flex items-center gap-1">
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Registered
+                                                </Badge>
+                                            )}
                                         </div>
 
-                                        {!isShowedUp && (
-                                            <div className="flex flex-col gap-2 md:min-w-[180px]">
-                                                {isRegistered ? (
-                                                    <Button
-                                                        variant="danger"
-                                                        onClick={() => handleCancelRegistration(event.id)}
-                                                        disabled={registering[event.id]}
-                                                        loading={registering[event.id]}
-                                                        className="w-full py-1.5 text-xs flex items-center justify-center gap-1"
-                                                    >
-                                                        {registering[event.id] ? (
-                                                            'Cancelling...'
-                                                        ) : (
-                                                            <>
-                                                                <XCircle className="w-3 h-3" />
-                                                                <span>Cancel Registration</span>
-                                                            </>
-                                                        )}
-                                                    </Button>
-                                                ) : isFull ? (
-                                                    <Button variant="secondary" disabled className="w-full py-2 text-sm">
-                                                        Event Full
-                                                    </Button>
-                                                ) : canRegister ? (
-                                                    <Button
-                                                        onClick={() => handleRegister(event.id)}
-                                                        disabled={registering[event.id]}
-                                                        loading={registering[event.id]}
-                                                        className="w-full py-1.5 text-xs flex items-center justify-center gap-1"
-                                                    >
-                                                        {registering[event.id] ? (
-                                                            'Registering...'
-                                                        ) : (
-                                                            <>
-                                                                <CheckCircle className="w-3 h-3" />
-                                                                <span>Register Now</span>
-                                                            </>
-                                                        )}
-                                                    </Button>
-                                                ) : (
-                                                    <Button variant="secondary" disabled className="w-full py-2 text-sm">
-                                                        Registration Closed
-                                                    </Button>
-                                                )}
-                                            </div>
+                                        {event.description && (
+                                            <p className="text-text-secondary mb-4">{event.description}</p>
                                         )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            <div className="flex items-center gap-2 text-text-secondary">
+                                                <Calendar className="w-5 h-5" />
+                                                <span className="font-medium">Date:</span>
+                                                <span>{formatDate(event.next_occurrence_date || event.date)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-text-secondary">
+                                                <Clock className="w-5 h-5" />
+                                                <span className="font-medium">Time:</span>
+                                                <span>
+                                                    {utcTimeToLocal(event.start_time)} - {utcTimeToLocal(event.end_time)}
+                                                </span>
+                                            </div>
+                                            {event.show_price && event.price && (
+                                                <div className="flex items-center gap-2 text-text-secondary">
+                                                    <span className="font-medium">Price:</span>
+                                                    <span className="font-semibold text-text-primary">
+                                                        ${parseFloat(event.price).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2 text-text-secondary">
+                                                <Users className="w-5 h-5" />
+                                                <span className="font-medium">Capacity:</span>
+                                                <span>
+                                                    {event.registered_count || 0} / {event.max_capacity} registered
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-text-secondary">Available Spots:</span>
+                                                <Badge variant={event.available_spots > 0 ? 'success' : 'danger'}>
+                                                    {event.available_spots} remaining
+                                                </Badge>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    {!isShowedUp && (
+                                        <div className="flex flex-col gap-2 md:min-w-[180px]">
+                                            {isRegistered ? (
+                                                <Button
+                                                    variant="danger"
+                                                    onClick={() => handleCancelRegistration(event.id)}
+                                                    disabled={registering[event.id]}
+                                                    loading={registering[event.id]}
+                                                    className="w-full py-1.5 text-xs flex items-center justify-center gap-1"
+                                                >
+                                                    {registering[event.id] ? (
+                                                        'Cancelling...'
+                                                    ) : (
+                                                        <>
+                                                            <XCircle className="w-3 h-3" />
+                                                            <span>Cancel Registration</span>
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            ) : isFull ? (
+                                                <Button variant="secondary" disabled className="w-full py-2 text-sm">
+                                                    Event Full
+                                                </Button>
+                                            ) : canRegister ? (
+                                                <Button
+                                                    onClick={() => handleRegister(event.id)}
+                                                    disabled={registering[event.id]}
+                                                    loading={registering[event.id]}
+                                                    className="w-full py-1.5 text-xs flex items-center justify-center gap-1"
+                                                >
+                                                    {registering[event.id] ? (
+                                                        'Registering...'
+                                                    ) : (
+                                                        <>
+                                                            <CheckCircle className="w-3 h-3" />
+                                                            <span>Register Now</span>
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            ) : (
+                                                <Button variant="secondary" disabled className="w-full py-2 text-sm">
+                                                    Registration Closed
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {toast && (
                 <Toast
