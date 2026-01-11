@@ -19,7 +19,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
     const [view, setView] = useState('month'); // Default to month view
     const [date, setDate] = useState(new Date());
-    const [calendarType, setCalendarType] = useState(coachId ? 'coaching' : 'simulator'); // 'simulator', 'coaching', or 'special_event'
+    const [calendarType, setCalendarType] = useState('all'); // 'all', 'simulator', 'coaching', or 'special_event'
 
     // Special Events State
     const [specialEvents, setSpecialEvents] = useState([]);
@@ -54,15 +54,17 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             endDate = moment(date).endOf('month').toDate();
         }
 
-        if (calendarType === 'special_event') {
+        if (calendarType === 'special_event' || calendarType === 'all') {
             if (canViewSpecialEvents) {
                 fetchSpecialEvents(startDate, endDate);
             }
-        } else {
+        }
+
+        if (calendarType !== 'special_event') {
             dispatch(getCalendarBookings({
                 startDate,
                 endDate,
-                bookingType: calendarType,
+                bookingType: calendarType === 'all' ? null : calendarType,
                 coachId: coachId
             }));
         }
@@ -99,7 +101,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             backgroundColor = '#9333EA'; // purple-600 for TPI assessment
         } else {
             // For simulator calendar, use primary-light; for coaching calendar, use primary
-            if (calendarType === 'coaching') {
+            if (event.type === 'coaching') {
                 backgroundColor = '#0F2A1D'; // primary
             } else {
                 backgroundColor = '#1B3D2C'; // primary-light
@@ -239,7 +241,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
     // Transform events for calendar - convert UTC to local time
     const transformedEvents = events
-        .filter(booking => booking.booking_type === calendarType)
+        .filter(booking => calendarType === 'all' || booking.booking_type === calendarType)
         .map(booking => {
             const startTime = moment.utc(booking.start_time).local().toDate();
             const endTime = moment.utc(booking.end_time).local().toDate();
@@ -283,8 +285,13 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         };
     });
 
-    const displayedEvents = calendarType === 'special_event' ? transformedSpecialEvents : transformedEvents;
-    const loading = calendarType === 'special_event' ? specialEventsLoading : bookingsLoading;
+    const displayedEvents = calendarType === 'all'
+        ? [...transformedEvents, ...transformedSpecialEvents]
+        : (calendarType === 'special_event' ? transformedSpecialEvents : transformedEvents);
+
+    const loading = calendarType === 'all'
+        ? (bookingsLoading || (canViewSpecialEvents && specialEventsLoading))
+        : (calendarType === 'special_event' ? specialEventsLoading : bookingsLoading);
 
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
@@ -322,6 +329,23 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
                             <div className="flex items-center justify-between gap-2 sm:gap-4 bg-background rounded-2xl p-1.5 sm:p-2 shadow-inner">
                                 {/* Simulator and Coaching Buttons - always show unless in staff view where sim might be hidden */}
+                                <button
+                                    onClick={() => setCalendarType('all')}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'all'
+                                        ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                        : 'text-text-secondary hover:bg-surface'
+                                        }`}
+                                    title="All Bookings and Events"
+                                >
+                                    <div className="flex -space-x-1">
+                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary-light border border-white"></span>
+                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary border border-white"></span>
+                                        {canViewSpecialEvents && <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500 border border-white"></span>}
+                                    </div>
+                                    <span className="text-xs sm:text-sm font-medium">All Sessions</span>
+                                </button>
+
+                                {/* Simulator and Coaching Buttons - always show unless in staff view where sim might be hidden */}
                                 {!coachId && (
                                     <button
                                         onClick={() => setCalendarType('simulator')}
@@ -339,7 +363,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 <button
                                     onClick={() => setCalendarType('coaching')}
                                     className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'coaching'
-                                        ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                        ? 'bg-primary border-2 border-primary-light/30 text-white shadow-md scale-[1.02]'
                                         : 'text-text-secondary hover:bg-surface'
                                         }`}
                                     title="Coaching Calendar"
@@ -358,7 +382,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                         title="Special Events Calendar"
                                     >
                                         <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500 flex-shrink-0"></span>
-                                        <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Special Events</span>
+                                        <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Events</span>
                                     </button>
                                 )}
                             </div>
@@ -411,9 +435,10 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             >
                                 <div className="w-full h-full bg-background animate-pulse rounded-lg"></div>
                                 <span className="absolute text-primary font-medium">
-                                    {calendarType === 'simulator' ? 'Loading Simulator Bookings...' :
-                                        calendarType === 'coaching' ? 'Loading Coaching Sessions...' :
-                                            'Loading Special Events...'}
+                                    {calendarType === 'all' ? 'Loading all events...' :
+                                        calendarType === 'simulator' ? 'Loading Simulator Bookings...' :
+                                            calendarType === 'coaching' ? 'Loading Coaching Sessions...' :
+                                                'Loading Special Events...'}
                                 </span>
                             </div>
                         )}
@@ -429,10 +454,24 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             </div>
                         ) : (
                             <>
-                                <div className="group relative flex items-center">
-                                    <div className={`w-4 h-4 rounded-full ${calendarType === 'simulator' ? 'bg-primary-light' : 'bg-primary'}`}></div>
-                                    <div className="ml-2 text-sm text-text-secondary">{calendarType === 'simulator' ? 'Simulator Bookings' : 'Coaching Sessions'}</div>
-                                </div>
+                                {(calendarType === 'all' || calendarType === 'simulator') && (
+                                    <div className="group relative flex items-center">
+                                        <div className="w-4 h-4 rounded-full bg-primary-light"></div>
+                                        <div className="ml-2 text-sm text-text-secondary">Simulator Bookings</div>
+                                    </div>
+                                )}
+                                {(calendarType === 'all' || calendarType === 'coaching') && (
+                                    <div className="group relative flex items-center">
+                                        <div className="w-4 h-4 rounded-full bg-primary"></div>
+                                        <div className="ml-2 text-sm text-text-secondary">Coaching Sessions</div>
+                                    </div>
+                                )}
+                                {calendarType === 'all' && (
+                                    <div className="group relative flex items-center">
+                                        <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                                        <div className="ml-2 text-sm text-text-secondary">Special Event</div>
+                                    </div>
+                                )}
                                 <div className="group relative flex items-center">
                                     <div className="w-4 h-4 rounded-full bg-purple-600"></div>
                                     <div className="ml-2 text-sm text-text-secondary">TPI Assessment</div>

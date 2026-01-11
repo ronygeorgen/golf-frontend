@@ -21,9 +21,9 @@ function StaffManagement() {
     const { list: staff, loading } = useAppSelector((state) => state.admin.staff);
     const { user } = useAppSelector((state) => state.auth);
     const modalRef = useRef(null);
-    
+
     const isSuperadmin = user?.role === 'superadmin';
-    
+
     const [showForm, setShowForm] = useState(false);
     const [editingStaff, setEditingStaff] = useState(null);
     const [formData, setFormData] = useState({
@@ -119,11 +119,11 @@ function StaffManagement() {
                 showSuccess(editingStaff ? 'Staff member updated successfully!' : 'Staff member created successfully!');
                 setShowForm(false);
                 setEditingStaff(null);
-                setFormData({ 
-                    first_name: '', 
-                    last_name: '', 
-                    email: '', 
-                    phone: '', 
+                setFormData({
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    phone: '',
                     role: isSuperadmin ? 'admin' : 'staff',
                     date_of_birth: '',
                     ghl_location_id: ''
@@ -132,7 +132,7 @@ function StaffManagement() {
             } else if (editingStaff ? updateStaff.rejected.match(result) : createStaff.rejected.match(result)) {
                 // Handle error - parse error message from payload
                 let errorMessage = 'An error occurred. Please try again.';
-                
+
                 if (result.payload) {
                     // Handle different error response formats
                     if (typeof result.payload === 'string') {
@@ -149,8 +149,8 @@ function StaffManagement() {
                                 errorMessages.push(value);
                             }
                         }
-                        errorMessage = errorMessages.length > 0 
-                            ? errorMessages.join('. ') 
+                        errorMessage = errorMessages.length > 0
+                            ? errorMessages.join('. ')
                             : result.payload.error || result.payload.detail || result.payload.message || errorMessage;
                     }
                 }
@@ -205,10 +205,10 @@ function StaffManagement() {
 
     return (
         <>
-        <div>
+            <div>
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                        <Button 
+                        <Button
                             onClick={() => {
                                 setFormData({
                                     first_name: '',
@@ -223,7 +223,7 @@ function StaffManagement() {
                             }}
                             variant="primary"
                         >
-                            {isSuperadmin ? 'Add Admin' : 'Add Staff Member'}
+                            {isSuperadmin ? 'Add Admin' : (user?.role === 'admin' ? 'Add Admin/Staff' : 'Add Staff Member')}
                         </Button>
                     </div>
                 </div>
@@ -238,7 +238,9 @@ function StaffManagement() {
                         <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
                                 <h2 className="text-2xl font-bold text-text-primary mb-6">
-                                    {editingStaff ? (isSuperadmin ? 'Edit Admin' : 'Edit Staff') : (isSuperadmin ? 'Add Admin' : 'Add Staff')}
+                                    {editingStaff ?
+                                        (isSuperadmin ? 'Edit Admin' : (user?.role === 'admin' ? 'Edit Admin/Staff' : 'Edit Staff')) :
+                                        (isSuperadmin ? 'Add Admin' : (user?.role === 'admin' ? 'Add Admin/Staff' : 'Add Staff'))}
                                 </h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -249,7 +251,7 @@ function StaffManagement() {
                                             <input
                                                 type="text"
                                                 value={formData.first_name}
-                                                onChange={(e) => setFormData({...formData, first_name: e.target.value})}
+                                                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                                                 required
                                             />
                                         </div>
@@ -260,7 +262,7 @@ function StaffManagement() {
                                             <input
                                                 type="text"
                                                 value={formData.last_name}
-                                                onChange={(e) => setFormData({...formData, last_name: e.target.value})}
+                                                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                                                 required
                                             />
                                         </div>
@@ -272,7 +274,7 @@ function StaffManagement() {
                                         <input
                                             type="email"
                                             value={formData.email}
-                                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -283,22 +285,22 @@ function StaffManagement() {
                                         <input
                                             type="tel"
                                             value={formData.phone}
-                                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                             required
                                         />
                                     </div>
                                     {!isSuperadmin && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-2">
-                                            Role
-                                        </label>
-                                        <select
-                                            value={formData.role}
-                                            onChange={(e) => setFormData({...formData, role: e.target.value})}
-                                        >
-                                            <option value="staff">Staff</option>
-                                        </select>
-                                    </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Role
+                                            </label>
+                                            <select
+                                                value={formData.role}
+                                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                            >
+                                                <option value="staff">Staff</option>
+                                            </select>
+                                        </div>
                                     )}
                                     {isSuperadmin && !editingStaff && (
                                         <div>
@@ -312,7 +314,7 @@ function StaffManagement() {
                                             ) : (
                                                 <select
                                                     value={formData.ghl_location_id}
-                                                    onChange={(e) => setFormData({...formData, ghl_location_id: e.target.value})}
+                                                    onChange={(e) => setFormData({ ...formData, ghl_location_id: e.target.value })}
                                                     className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
                                                     required
                                                 >
@@ -333,33 +335,33 @@ function StaffManagement() {
                                         <input
                                             type="date"
                                             value={formData.date_of_birth}
-                                            onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
+                                            onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
                                             max={new Date().toISOString().split('T')[0]}
                                         />
                                     </div>
                                     <div className="flex gap-4 pt-4">
-                                        <Button 
-                                            type="submit" 
+                                        <Button
+                                            type="submit"
                                             disabled={submitLoading}
                                             variant="primary"
                                             className="flex-1"
                                         >
                                             {submitLoading
                                                 ? (editingStaff ? 'Updating...' : 'Creating...')
-                                                : `${editingStaff ? 'Update' : 'Create'} ${isSuperadmin ? 'Admin' : 'Staff'}`}
+                                                : `${editingStaff ? 'Update' : 'Create'} ${isSuperadmin ? 'Admin' : (user?.role === 'admin' ? 'Admin/Staff' : 'Staff')}`}
                                         </Button>
-                                        <Button 
-                                            type="button" 
+                                        <Button
+                                            type="button"
                                             variant="secondary"
                                             className="flex-1"
                                             onClick={() => {
                                                 setShowForm(false);
                                                 setEditingStaff(null);
-                                                setFormData({ 
-                                                    first_name: '', 
-                                                    last_name: '', 
-                                                    email: '', 
-                                                    phone: '', 
+                                                setFormData({
+                                                    first_name: '',
+                                                    last_name: '',
+                                                    email: '',
+                                                    phone: '',
                                                     role: isSuperadmin ? 'admin' : 'staff',
                                                     date_of_birth: '',
                                                     ghl_location_id: ''
@@ -426,7 +428,7 @@ function StaffManagement() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
                                                         <div className="relative group">
-                                                            <button 
+                                                            <button
                                                                 className="p-2 text-primary hover:text-primary-light hover:bg-primary-light/10 rounded-button transition-colors"
                                                                 onClick={() => handleEdit(staffMember)}
                                                                 aria-label="Edit staff member"
@@ -443,7 +445,7 @@ function StaffManagement() {
                                                             </div>
                                                         </div>
                                                         <div className="relative group">
-                                                            <button 
+                                                            <button
                                                                 className="p-2 text-danger hover:text-danger-light hover:bg-danger/10 rounded-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 onClick={() => handleDelete(staffMember.id)}
                                                                 disabled={deletingId === staffMember.id}
@@ -452,7 +454,7 @@ function StaffManagement() {
                                                                 {deletingId === staffMember.id ? (
                                                                     <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin"></div>
                                                                 ) : (
-                                                                <Trash2 className="w-4 h-4" />
+                                                                    <Trash2 className="w-4 h-4" />
                                                                 )}
                                                             </button>
                                                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
@@ -465,7 +467,7 @@ function StaffManagement() {
                                                             </div>
                                                         </div>
                                                         <div className="relative group">
-                                                            <button 
+                                                            <button
                                                                 className="p-2 text-status-personal-text hover:text-status-personal-text/80 hover:bg-status-personal-bg/20 rounded-button transition-colors"
                                                                 onClick={() => navigate(`/admin/staff/${staffMember.id}/availability`)}
                                                                 aria-label="Add and view availability"
@@ -482,7 +484,7 @@ function StaffManagement() {
                                                             </div>
                                                         </div>
                                                         <div className="relative group">
-                                                            <button 
+                                                            <button
                                                                 className="p-2 text-status-confirmed-text hover:text-status-confirmed-text/80 hover:bg-status-confirmed-bg/20 rounded-button transition-colors"
                                                                 onClick={() => navigate(`/admin/staff/${staffMember.id}/coaching-sessions`)}
                                                                 aria-label={`View ${staffMember.first_name}'s coaching sessions`}
@@ -499,7 +501,7 @@ function StaffManagement() {
                                                             </div>
                                                         </div>
                                                         <div className="relative group">
-                                                            <button 
+                                                            <button
                                                                 className="p-2 text-primary hover:text-primary-light hover:bg-primary-light/10 rounded-button transition-colors"
                                                                 onClick={() => navigate(`/admin/staff/${staffMember.id}/referrals`)}
                                                                 aria-label="View staff referrals"
@@ -526,7 +528,7 @@ function StaffManagement() {
                     </div>
                 )}
             </div>
-        <PopupMessage
+            <PopupMessage
                 open={popup.open}
                 type={popup.type}
                 title={popup.title}

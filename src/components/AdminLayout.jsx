@@ -3,14 +3,14 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
 import { endpoints } from '../api/endpoints';
-import { 
-    LayoutDashboard, 
-    Users, 
-    Gamepad2, 
-    Package, 
-    Calendar, 
-    CalendarDays, 
-    LogOut, 
+import {
+    LayoutDashboard,
+    Users,
+    Gamepad2,
+    Package,
+    Calendar,
+    CalendarDays,
+    LogOut,
     User,
     ShieldCheck,
     Link2,
@@ -73,7 +73,7 @@ function AdminLayout() {
             icon: Settings,
             items: [
                 { path: '/admin/users', label: 'Manage Users', icon: UserCog },
-                { path: '/admin/staff', label: 'Manage Staff', icon: Users },
+                { path: '/admin/staff', label: user?.role === 'admin' ? 'Manage Admin/Staff' : 'Manage Staff', icon: Users },
                 { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
                 { path: '/admin/packages', label: 'Manage Coaching/Combo Packages', icon: Package },
                 { path: '/admin/simulator-packages', label: 'Manage Simulator Only Packages', icon: Clock },
@@ -118,20 +118,20 @@ function AdminLayout() {
 
     const getPageTitle = () => {
         const path = location.pathname;
-        
+
         // Check manage items
         const manageItem = navigationItems.manage.items.find(item => isActive(item.path));
         if (manageItem) return manageItem.label;
-        
+
         // Check bookings items
         const bookingItem = navigationItems.bookings.items.find(item => isActive(item.path));
         if (bookingItem) return bookingItem.label;
-        
+
         // Check standalone items
         if (isActive(navigationItems.dashboard.path)) return 'Dashboard';
         if (isActive(navigationItems.overrides.path)) return 'Admin Overrides';
         if (isActive('/admin/ghl-locations')) return 'GHL Location Management';
-        
+
         return 'Admin Dashboard';
     };
 
@@ -154,9 +154,9 @@ function AdminLayout() {
                                 onClick={() => navigate('/admin')}
                                 className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity"
                             >
-                                <img 
-                                    src={logo} 
-                                    alt="Hole 9 Golf Logo" 
+                                <img
+                                    src={logo}
+                                    alt="Hole 9 Golf Logo"
                                     className="h-10 sm:h-8 md:h-10 w-auto object-contain"
                                 />
                                 <h1 className="text-lg sm:text-xl font-bold text-primary hidden sm:block">
@@ -170,11 +170,10 @@ function AdminLayout() {
                             {/* Dashboard */}
                             <button
                                 onClick={() => handleNavClick(navigationItems.dashboard.path)}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                                    isActive(navigationItems.dashboard.path)
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive(navigationItems.dashboard.path)
                                         ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
                                         : 'text-text-primary hover:bg-background'
-                                }`}
+                                    }`}
                             >
                                 <navigationItems.dashboard.icon className="w-4 h-4" />
                                 <span className="text-sm font-medium">{navigationItems.dashboard.label}</span>
@@ -187,11 +186,10 @@ function AdminLayout() {
                                         setManageMenuOpen(!manageMenuOpen);
                                         setBookingsMenuOpen(false);
                                     }}
-                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                                        isGroupActive(navigationItems.manage.items)
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isGroupActive(navigationItems.manage.items)
                                             ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
                                             : 'text-text-primary hover:bg-background'
-                                    }`}
+                                        }`}
                                 >
                                     <navigationItems.manage.icon className="w-4 h-4" />
                                     <span className="text-sm font-medium">{navigationItems.manage.label}</span>
@@ -207,11 +205,10 @@ function AdminLayout() {
                                                 <button
                                                     key={item.path}
                                                     onClick={() => handleNavClick(item.path)}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        active
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${active
                                                             ? 'bg-primary-light/10 text-primary font-semibold'
                                                             : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
                                                         <item.icon className="w-4 h-4" />
@@ -231,11 +228,10 @@ function AdminLayout() {
                                         setBookingsMenuOpen(!bookingsMenuOpen);
                                         setManageMenuOpen(false);
                                     }}
-                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                                        isGroupActive(navigationItems.bookings.items)
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isGroupActive(navigationItems.bookings.items)
                                             ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
                                             : 'text-text-primary hover:bg-background'
-                                    }`}
+                                        }`}
                                 >
                                     <navigationItems.bookings.icon className="w-4 h-4" />
                                     <span className="text-sm font-medium">{navigationItems.bookings.label}</span>
@@ -251,11 +247,10 @@ function AdminLayout() {
                                                 <button
                                                     key={item.path}
                                                     onClick={() => handleNavClick(item.path)}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${
-                                                        active
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${active
                                                             ? 'bg-primary-light/10 text-primary font-semibold'
                                                             : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <item.icon className="w-4 h-4" />
                                                     <span>{item.label}</span>
@@ -269,11 +264,10 @@ function AdminLayout() {
                             {/* Admin Overrides */}
                             <button
                                 onClick={() => handleNavClick(navigationItems.overrides.path)}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                                    isActive(navigationItems.overrides.path)
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive(navigationItems.overrides.path)
                                         ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
                                         : 'text-text-primary hover:bg-background'
-                                }`}
+                                    }`}
                             >
                                 <navigationItems.overrides.icon className="w-4 h-4" />
                                 <span className="text-sm font-medium">{navigationItems.overrides.label}</span>
@@ -285,11 +279,10 @@ function AdminLayout() {
                             <nav className="md:hidden flex items-center flex-1 justify-center">
                                 <button
                                     onClick={() => handleNavClick(navigationItems.dashboard.path)}
-                                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-                                        isActive(navigationItems.dashboard.path)
+                                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${isActive(navigationItems.dashboard.path)
                                             ? 'bg-gradient-to-r from-primary-light/20 to-primary-light/10 text-primary shadow-md font-semibold'
                                             : 'text-text-primary hover:bg-background'
-                                    }`}
+                                        }`}
                                 >
                                     <navigationItems.dashboard.icon className="w-5 h-5" />
                                     <span className="text-sm font-medium">{navigationItems.dashboard.label}</span>
@@ -355,11 +348,10 @@ function AdminLayout() {
                                                         <button
                                                             key={item.path}
                                                             onClick={() => handleNavClick(item.path)}
-                                                            className={`w-full flex items-center space-x-3 px-4 py-2 pl-8 text-sm transition-colors ${
-                                                                active
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 pl-8 text-sm transition-colors ${active
                                                                     ? 'bg-primary-light/10 text-primary font-semibold'
                                                                     : 'text-text-primary hover:bg-background'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <item.icon className="w-4 h-4" />
                                                             <span>{item.label}</span>
@@ -377,11 +369,10 @@ function AdminLayout() {
                                                         <button
                                                             key={item.path}
                                                             onClick={() => handleNavClick(item.path)}
-                                                            className={`w-full flex items-center space-x-3 px-4 py-2 pl-8 text-sm transition-colors ${
-                                                                active
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 pl-8 text-sm transition-colors ${active
                                                                     ? 'bg-primary-light/10 text-primary font-semibold'
                                                                     : 'text-text-primary hover:bg-background'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <item.icon className="w-4 h-4" />
                                                             <span>{item.label}</span>
@@ -392,11 +383,10 @@ function AdminLayout() {
                                                 {/* Admin Overrides */}
                                                 <button
                                                     onClick={() => handleNavClick(navigationItems.overrides.path)}
-                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors mt-2 ${
-                                                        isActive(navigationItems.overrides.path)
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors mt-2 ${isActive(navigationItems.overrides.path)
                                                             ? 'bg-primary-light/10 text-primary font-semibold'
                                                             : 'text-text-primary hover:bg-background'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <navigationItems.overrides.icon className="w-4 h-4" />
                                                     <span>{navigationItems.overrides.label}</span>
