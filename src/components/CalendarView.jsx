@@ -269,15 +269,22 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
     // Transform Special Events
     const transformedSpecialEvents = specialEvents.map(event => {
-        // Construct full datetime string in UTC then convert to local
-        const startDateTimeStr = `${event.date}T${event.start_time}`;
-        const endDateTimeStr = `${event.date}T${event.end_time}`;
+        // We treat Special Event times as local to the facility/client (no UTC shift)
+        // This ensures they stay on the day the admin intended.
+        const start = moment(`${event.date}T${event.start_time}`).toDate();
+        let end = moment(`${event.date}T${event.end_time}`).toDate();
+
+        // If end_time is before or same as start_time, it likely crosses midnight to the next day
+        if (moment(end).isSameOrBefore(start)) {
+            end = moment(end).add(1, 'day').toDate();
+        }
 
         return {
             id: `special-${event.display_id}`,
             title: `Special: ${event.title}`,
-            start: moment.utc(startDateTimeStr).local().toDate(),
-            end: moment.utc(endDateTimeStr).local().toDate(),
+            start,
+            end,
+            allDay: false, // Ensure it shows in the time grid, not the all-day section
             type: 'special_event',
             is_special_event: true,
             original_event: event,
