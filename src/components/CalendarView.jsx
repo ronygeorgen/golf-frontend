@@ -410,7 +410,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 }}
                             >
                                 <div className="w-full h-full bg-background animate-pulse rounded-lg"></div>
-                                <span className="absolute text-primary font-medium">Loading Events...</span>
+                                <span className="absolute text-primary font-medium">
+                                    {calendarType === 'simulator' ? 'Loading Simulator Bookings...' :
+                                        calendarType === 'coaching' ? 'Loading Coaching Sessions...' :
+                                            'Loading Special Events...'}
+                                </span>
                             </div>
                         )}
                     </div>
