@@ -176,6 +176,7 @@ export const endpoints = {
         removeRegistration: (id) => `/special-events/events/${id}/remove_registration/`,
         myRegistrations: '/special-events/registrations/',
         eventsOnDate: '/special-events/events/events_on_date/',
+        calendarEvents: '/special-events/events/calendar-events/',
     },
 };
 

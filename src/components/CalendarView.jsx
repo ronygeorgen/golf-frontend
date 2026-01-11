@@ -6,17 +6,27 @@ import { getCalendarBookings } from '../store/slices/bookingSlice';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import axios from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 const localizer = momentLocalizer(moment);
 
 function CalendarView({ isUserView = false, coachId = null, staffName = null }) {
     const dispatch = useAppDispatch();
-    const { calendarEvents: events, loading } = useAppSelector((state) => state.booking);
+    const { calendarEvents: events, loading: bookingsLoading } = useAppSelector((state) => state.booking);
+    const { user } = useAppSelector((state) => state.auth);
     const { popup, openPopup, closePopup } = usePopup();
 
     const [view, setView] = useState('month'); // Default to month view
     const [date, setDate] = useState(new Date());
-    const [calendarType, setCalendarType] = useState(coachId ? 'coaching' : 'simulator'); // 'simulator' or 'coaching'
+    const [calendarType, setCalendarType] = useState(coachId ? 'coaching' : 'simulator'); // 'simulator', 'coaching', or 'special_event'
+
+    // Special Events State
+    const [specialEvents, setSpecialEvents] = useState([]);
+    const [specialEventsLoading, setSpecialEventsLoading] = useState(false);
+
+    const canViewSpecialEvents = user && (user.role === 'admin' || user.role === 'staff' || user.is_superuser);
+
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -34,12 +44,6 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             startDate = moment(date).startOf('month').toDate();
             endDate = moment(date).endOf('month').toDate();
         }
-        // Week view commented out - only month view is needed for now
-        // else if (view === 'week') {
-        //     // For week view, get start and end of the week
-        //     startDate = moment(date).startOf('week').toDate();
-        //     endDate = moment(date).endOf('week').toDate();
-        // } 
         else if (view === 'day') {
             // For day view, get start and end of the day
             startDate = moment(date).startOf('day').toDate();
@@ -50,22 +54,48 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             endDate = moment(date).endOf('month').toDate();
         }
 
-        dispatch(getCalendarBookings({
-            startDate,
-            endDate,
-            bookingType: calendarType,
-            coachId: coachId
-        }));
-    }, [dispatch, date, calendarType, coachId, view]); // Add 'view' to dependencies
+        if (calendarType === 'special_event') {
+            if (canViewSpecialEvents) {
+                fetchSpecialEvents(startDate, endDate);
+            }
+        } else {
+            dispatch(getCalendarBookings({
+                startDate,
+                endDate,
+                bookingType: calendarType,
+                coachId: coachId
+            }));
+        }
 
+    }, [dispatch, date, calendarType, coachId, view]); // Removed showSpecialEvents
 
+    const fetchSpecialEvents = async (startDate, endDate) => {
+        setSpecialEventsLoading(true);
+        try {
+            const startDateStr = moment(startDate).format('YYYY-MM-DD');
+            const endDateStr = moment(endDate).format('YYYY-MM-DD');
+
+            const response = await axios.get(endpoints.specialEvents.calendarEvents, {
+                params: {
+                    start_date: startDateStr,
+                    end_date: endDateStr
+                }
+            });
+            setSpecialEvents(response.data);
+        } catch (error) {
+            console.error("Failed to fetch special events", error);
+        } finally {
+            setSpecialEventsLoading(false);
+        }
+    };
 
     const eventStyleGetter = (event) => {
         // Use design system colors
         let backgroundColor = '#1B3D2C'; // primary-light for simulator
 
-        // Check if it's a TPI assessment booking first (purple color)
-        if (event.is_tpi_assessment) {
+        if (event.is_special_event) {
+            backgroundColor = '#F59E0B'; // Amber-500 for special events
+        } else if (event.is_tpi_assessment) {
             backgroundColor = '#9333EA'; // purple-600 for TPI assessment
         } else {
             // For simulator calendar, use primary-light; for coaching calendar, use primary
@@ -82,8 +112,6 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             backgroundColor = '#374151'; // no_show text color (gray)
         }
 
-
-
         const baseStyle = {
             backgroundColor,
             borderRadius: '5px',
@@ -93,14 +121,35 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             display: 'block'
         };
 
-
-
         return {
             style: baseStyle
         };
     };
 
     const handleSelectEvent = (event) => {
+        if (event.is_special_event) {
+            const details = (
+                <div className="space-y-1 text-sm leading-5">
+                    <p><span className="font-semibold">Title:</span> {event.original_event.title}</p>
+                    <p><span className="font-semibold">Type:</span> {event.original_event.event_type.replace('_', ' ')}</p>
+                    <p>
+                        <span className="font-semibold">Time:</span>{' '}
+                        {moment(event.start).format('MMM Do YYYY, h:mm a')} - {moment(event.end).format('h:mm a')}
+                    </p>
+                    <p><span className="font-semibold">Capacity:</span> {event.original_event.registered_count || 0} / {event.original_event.max_capacity}</p>
+                    {event.original_event.is_private && <p className="text-amber-600 font-semibold">Private Event</p>}
+                </div>
+            );
+
+            openPopup({
+                type: 'info',
+                title: 'Special Event Details',
+                message: details,
+                confirmText: 'Close',
+            });
+            return;
+        }
+
         const details = (
             <div className="space-y-1 text-sm leading-5">
                 {event.client && (
@@ -167,7 +216,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const handleSelectSlot = (slotInfo) => {
         if (view === 'month') {
             // Get all events for the selected day
-            const dayEvents = calendarEvents.filter(event => {
+            const dayEvents = displayedEvents.filter(event => {
                 const eventDate = moment(event.start).format('YYYY-MM-DD');
                 const slotDate = moment(slotInfo.start).format('YYYY-MM-DD');
                 return eventDate === slotDate;
@@ -183,41 +232,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     // Option 1: Switch to day view
                     setDate(slotInfo.start);
                     setView('day');
-
-                    // Option 2: Show modal with all bookings (commented out - using day view instead)
-                    // const eventsList = (
-                    //     <div className="space-y-2 max-h-96 overflow-y-auto">
-                    //         <p className="font-semibold text-sm mb-2">
-                    //             {dayEvents.length} bookings on {moment(slotInfo.start).format('MMM Do YYYY')}
-                    //         </p>
-                    //         {dayEvents.map((event, idx) => (
-                    //             <div key={idx} className="border-b border-border pb-2">
-                    //                 <p className="font-medium">{event.title}</p>
-                    //                 <p className="text-xs text-text-secondary">
-                    //                     {moment(event.start).format('h:mm a')} - {moment(event.end).format('h:mm a')}
-                    //                 </p>
-                    //             </div>
-                    //         ))}
-                    //     </div>
-                    // );
-                    // openPopup({
-                    //     type: 'info',
-                    //     title: `Bookings for ${moment(slotInfo.start).format('MMM Do YYYY')}`,
-                    //     message: eventsList,
-                    //     confirmText: 'Close',
-                    // });
                 }
             }
         }
     };
 
     // Transform events for calendar - convert UTC to local time
-    // Backend already filters by booking_type, but we keep this filter as safety measure
     const transformedEvents = events
         .filter(booking => booking.booking_type === calendarType)
         .map(booking => {
-            // Parse UTC times from backend (ISO 8601 format) and convert to local time
-            // Backend sends UTC times, moment.utc() parses them and .local() converts to user's timezone
             const startTime = moment.utc(booking.start_time).local().toDate();
             const endTime = moment.utc(booking.end_time).local().toDate();
 
@@ -242,10 +265,26 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             };
         });
 
-    // Use transformed events directly
-    const calendarEvents = transformedEvents;
+    // Transform Special Events
+    const transformedSpecialEvents = specialEvents.map(event => {
+        // Construct full datetime string in UTC then convert to local
+        const startDateTimeStr = `${event.date}T${event.start_time}`;
+        const endDateTimeStr = `${event.date}T${event.end_time}`;
 
+        return {
+            id: `special-${event.display_id}`,
+            title: `Special: ${event.title}`,
+            start: moment.utc(startDateTimeStr).local().toDate(),
+            end: moment.utc(endDateTimeStr).local().toDate(),
+            type: 'special_event',
+            is_special_event: true,
+            original_event: event,
+            status: 'confirmed', // Placeholder
+        };
+    });
 
+    const displayedEvents = calendarType === 'special_event' ? transformedSpecialEvents : transformedEvents;
+    const loading = calendarType === 'special_event' ? specialEventsLoading : bookingsLoading;
 
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
@@ -280,35 +319,50 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-4 md:mb-0">
                             {staffName ? `${staffName}'s Coaching Sessions Calendar` : isUserView ? 'My Bookings Calendar' : 'Bookings Calendar'}
                         </h1>
-                        {!coachId && (
-                            <div className="flex flex-col gap-4 w-full md:w-auto">
-                                {/* Calendar Type Toggle */}
-                                <div className="flex items-center justify-between gap-2 sm:gap-4 bg-background rounded-2xl p-1.5 sm:p-2 shadow-inner">
+                        <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
+                            <div className="flex items-center justify-between gap-2 sm:gap-4 bg-background rounded-2xl p-1.5 sm:p-2 shadow-inner">
+                                {/* Simulator and Coaching Buttons - always show unless in staff view where sim might be hidden */}
+                                {!coachId && (
                                     <button
                                         onClick={() => setCalendarType('simulator')}
                                         className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'simulator'
                                             ? 'bg-primary-light text-white shadow-md scale-[1.02]'
                                             : 'text-text-secondary hover:bg-surface'
                                             }`}
-                                        title="Normal Simulator Calendar"
+                                        title="Simulator Calendar"
                                     >
                                         <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary-light flex-shrink-0"></span>
                                         <span className="text-xs sm:text-sm font-medium">Simulators</span>
                                     </button>
+                                )}
+
+                                <button
+                                    onClick={() => setCalendarType('coaching')}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'coaching'
+                                        ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                        : 'text-text-secondary hover:bg-surface'
+                                        }`}
+                                    title="Coaching Calendar"
+                                >
+                                    <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary flex-shrink-0"></span>
+                                    <span className="text-xs sm:text-sm font-medium">Coaching</span>
+                                </button>
+
+                                {canViewSpecialEvents && (
                                     <button
-                                        onClick={() => setCalendarType('coaching')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'coaching'
-                                            ? 'bg-primary text-white shadow-md scale-[1.02]'
+                                        onClick={() => setCalendarType('special_event')}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'special_event'
+                                            ? 'bg-amber-500 text-white shadow-md scale-[1.02]'
                                             : 'text-text-secondary hover:bg-surface'
                                             }`}
-                                        title="Coaching Simulator Calendar"
+                                        title="Special Events Calendar"
                                     >
-                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary flex-shrink-0"></span>
-                                        <span className="text-xs sm:text-sm font-medium">Coaching</span>
+                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500 flex-shrink-0"></span>
+                                        <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Special Events</span>
                                     </button>
-                                </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
@@ -316,7 +370,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     <div style={{ height: '600px', position: 'relative' }}>
                         <Calendar
                             localizer={localizer}
-                            events={loading ? [] : calendarEvents}
+                            events={loading ? [] : displayedEvents}
                             startAccessor="start"
                             endAccessor="end"
                             style={{ height: '100%' }}
@@ -356,6 +410,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 }}
                             >
                                 <div className="w-full h-full bg-background animate-pulse rounded-lg"></div>
+                                <span className="absolute text-primary font-medium">Loading Events...</span>
                             </div>
                         )}
                     </div>
@@ -363,19 +418,31 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mt-6">
                     <div className="flex flex-wrap gap-4 md:gap-6">
-                        {[
-                            { color: calendarType === 'simulator' ? 'bg-primary-light' : 'bg-primary', label: calendarType === 'simulator' ? 'Simulator Bookings' : 'Coaching Sessions' },
-                            { color: 'bg-purple-600', label: 'TPI Assessment' },
-                            { color: 'bg-danger', label: 'Cancelled' },
-                            { color: 'bg-status-no_show-text', label: 'Completed' },
-                        ].map((item, idx) => (
-                            <div key={idx} className="group relative flex items-center">
-                                <div className={`w-4 h-4 rounded-full ${item.color}`}></div>
-                                <div className="opacity-0 group-hover:opacity-100 transition duration-200 absolute top-full mt-2 px-2 py-1 rounded bg-text-primary text-white text-xs whitespace-nowrap">
-                                    {item.label}
-                                </div>
+                        {calendarType === 'special_event' ? (
+                            <div className="group relative flex items-center">
+                                <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                                <div className="ml-2 text-sm text-text-secondary">Special Event</div>
                             </div>
-                        ))}
+                        ) : (
+                            <>
+                                <div className="group relative flex items-center">
+                                    <div className={`w-4 h-4 rounded-full ${calendarType === 'simulator' ? 'bg-primary-light' : 'bg-primary'}`}></div>
+                                    <div className="ml-2 text-sm text-text-secondary">{calendarType === 'simulator' ? 'Simulator Bookings' : 'Coaching Sessions'}</div>
+                                </div>
+                                <div className="group relative flex items-center">
+                                    <div className="w-4 h-4 rounded-full bg-purple-600"></div>
+                                    <div className="ml-2 text-sm text-text-secondary">TPI Assessment</div>
+                                </div>
+                                <div className="group relative flex items-center">
+                                    <div className="w-4 h-4 rounded-full bg-danger"></div>
+                                    <div className="ml-2 text-sm text-text-secondary">Cancelled</div>
+                                </div>
+                                <div className="group relative flex items-center">
+                                    <div className="w-4 h-4 rounded-full bg-status-no_show-text"></div>
+                                    <div className="ml-2 text-sm text-text-secondary">Completed</div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
