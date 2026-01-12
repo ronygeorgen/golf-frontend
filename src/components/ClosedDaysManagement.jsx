@@ -24,12 +24,12 @@ function ClosedDaysManagement() {
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const modalRef = useRef(null);
-    
+
     const [closedDays, setClosedDays] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingClosedDay, setEditingClosedDay] = useState(null);
-    
+
     const emptyForm = {
         title: '',
         description: '',
@@ -82,8 +82,8 @@ function ClosedDaysManagement() {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        
+        if (e && e.preventDefault) e.preventDefault();
+
         // If full day closure, don't send time fields
         const submitData = {
             ...formData,
@@ -100,12 +100,16 @@ function ClosedDaysManagement() {
             submitData.end_time = null;
         }
 
+        await processSubmission(submitData);
+    };
+
+    const processSubmission = async (data) => {
         setSubmitLoading(true);
         try {
             if (editingClosedDay) {
-                await axios.patch(endpoints.admin.closedDays.update(editingClosedDay.id), submitData);
+                await axios.patch(endpoints.admin.closedDays.update(editingClosedDay.id), data);
             } else {
-                await axios.post(endpoints.admin.closedDays.create, submitData);
+                await axios.post(endpoints.admin.closedDays.create, data);
             }
             setShowForm(false);
             setEditingClosedDay(null);
@@ -113,26 +117,34 @@ function ClosedDaysManagement() {
             setFullDayClosure(true);
             await fetchClosedDays();
             showSuccess(editingClosedDay ? 'Closed day updated successfully' : 'Closed day created successfully');
+            closePopup(); // Ensure any open popups are closed
         } catch (error) {
             console.error('Error saving closed day:', error);
             // Check for detailed conflict message
-            const conflictMessage = error.response?.data?.start_date?.[0] || 
-                                  error.response?.data?.end_date?.[0] ||
-                                  error.response?.data?.error ||
-                                  error.response?.data?.date?.[0] ||
-                                  error.response?.data?.start_time?.[0] ||
-                                  error.response?.data?.end_time?.[0] ||
-                                  'Failed to save closed day';
-            
-            // Show error in a popup if it's a detailed conflict message (contains newlines)
-            if (conflictMessage.includes('\n') || conflictMessage.includes('•')) {
+            const conflictMessage = error.response?.data?.start_date?.[0] ||
+                error.response?.data?.end_date?.[0] ||
+                error.response?.data?.error ||
+                error.response?.data?.date?.[0] ||
+                error.response?.data?.start_time?.[0] ||
+                error.response?.data?.end_time?.[0] ||
+                'Failed to save closed day';
+
+            const hasConflicts = error.response?.data?.conflicts === true;
+
+            // Show error in a popup if it's a detailed conflict message (contains newlines) or a conflict flag
+            if (hasConflicts || conflictMessage.includes('\n') || conflictMessage.includes('•')) {
                 openPopup({
-                    type: 'error',
-                    title: 'Cannot Create Closed Day',
+                    type: hasConflicts ? 'warning' : 'error',
+                    title: hasConflicts ? 'Conflicts Detected' : 'Cannot Create Closed Day',
                     message: conflictMessage,
-                    showCancel: false,
-                    confirmText: 'OK',
-                    onConfirm: closePopup,
+                    showCancel: hasConflicts,
+                    confirmText: hasConflicts ? 'Force Override' : 'OK',
+                    cancelText: 'Cancel',
+                    onConfirm: hasConflicts ? () => {
+                        // Retry with force_override
+                        closePopup();
+                        processSubmission({ ...data, force_override: true });
+                    } : closePopup,
                 });
             } else {
                 showError(conflictMessage);
