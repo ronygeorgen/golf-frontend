@@ -608,7 +608,6 @@ function SimulatorBooking({ client }) {
                                 value={date}
                                 onChange={(e) => setDate(e.target.value)}
                                 min={new Date().toISOString().split('T')[0]}
-                                max={new Date(new Date().setDate(new Date().getDate() + 31)).toISOString().split('T')[0]}
                                 onKeyDown={(e) => e.preventDefault()}
                                 onKeyPress={(e) => e.preventDefault()} // Block old-school keypress
                                 onPaste={(e) => e.preventDefault()} // Block pasting
