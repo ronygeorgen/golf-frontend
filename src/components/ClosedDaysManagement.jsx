@@ -485,7 +485,7 @@ function ClosedDaysManagement() {
                 </div>
             )}
 
-            <PopupMessage {...popup} />
+            <PopupMessage {...popup} onClose={closePopup} />
             {toast && <Toast {...toast} onClose={hideToast} />}
         </div>
     );
