@@ -923,45 +923,50 @@ function CoachingBooking({ client }) {
                                     return (
                                         <div
                                             key={index}
-                                            className={`p - 4 border - 2 rounded - card transition duration - 200 relative group ${disabled
-                                                ? 'border-border bg-background cursor-not-allowed opacity-60'
+                                            className={`p-4 border-2 rounded-card transition duration-200 relative group ${disabled
+                                                ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
                                                 : isSelected
                                                     ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
                                                     : 'border-border hover:border-primary hover:bg-background cursor-pointer'
-                                                } `}
+                                                }`}
                                             onClick={() => !disabled && handleSlotSelect(slot)}
                                         >
-                                            {disabled && (
-                                                <div className="absolute top-1 right-1">
-                                                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                    </svg>
-                                                </div>
-                                            )}
-                                            <div className={`text - lg font - semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'} `}>
+                                            <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                                     hour: '2-digit',
                                                     minute: '2-digit'
                                                 })}
                                             </div>
-                                            <div className="text-sm text-text-secondary">
-                                                {slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available
+                                            <div className={`text-sm ${disabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
+                                                {duration} minutes
+                                            </div>
+                                            <div className="text-xs text-gray-400 mt-1">
+                                                Coach & Bay assigned at confirmation
                                             </div>
                                             {disabled && (
-                                                <div className="mt-2 text-xs text-danger font-medium">
+                                                <div className="mt-2 pt-2 border-t border-danger/30">
                                                     {specialEvent ? (
-                                                        isDurationConflict ? (
-                                                            <>
-                                                                Exceeds availability
-                                                                <div className="text-danger/80 mt-1">
-                                                                    Max: {conflict.maxDuration} mins
-                                                                </div>
-                                                            </>
-                                                        ) : (
-                                                            `Event: ${specialEvent.title} `
-                                                        )
+                                                        <div className="text-xs text-danger font-medium">
+                                                            {isDurationConflict ? (
+                                                                <>
+                                                                    Exceeds availability
+                                                                    <div className="text-danger/80 mt-1">
+                                                                        Max: {conflict.maxDuration} mins
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                `Event: ${specialEvent.title}`
+                                                            )}
+                                                        </div>
                                                     ) : (
-                                                        `Max: ${suggestedDuration} `
+                                                        <>
+                                                            <div className="text-xs text-danger font-medium">
+                                                                Exceeds availability
+                                                            </div>
+                                                            <div className="text-xs text-danger/80 mt-1">
+                                                                Max: {suggestedDuration} mins
+                                                            </div>
+                                                        </>
                                                     )}
                                                 </div>
                                             )}
@@ -991,7 +996,7 @@ function CoachingBooking({ client }) {
                                                                 <div className="mb-1">
                                                                     Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                                                 </div>
-                                                                <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} or less</div>
+                                                                <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} mins or less</div>
                                                             </>
                                                         )}
                                                         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
