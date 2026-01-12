@@ -788,20 +788,24 @@ function CoachingBooking({ client }) {
                                                             </p>
                                                         )}
                                                     </div>
-                                                    <Button
-                                                        type="button"
-                                                        onClick={handlePurchasePackage}
-                                                        disabled={purchaseSubmitting}
-                                                        variant="accent"
-                                                    >
-                                                        {purchaseSubmitting ? 'Adding…' : hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
-                                                    </Button>
+                                                    {!client && (
+                                                        <Button
+                                                            type="button"
+                                                            onClick={handlePurchasePackage}
+                                                            disabled={purchaseSubmitting}
+                                                            variant="accent"
+                                                        >
+                                                            {purchaseSubmitting ? 'Adding…' : hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
+                                                        </Button>
+                                                    )}
                                                 </div>
                                                 {!hasSessions && (
                                                     <p className="text-sm text-danger">
-                                                        {packageType === 'organization'
-                                                            ? 'No group packages available. Add another package bundle before booking.'
-                                                            : 'You are out of sessions. Add another package bundle before booking.'
+                                                        {client
+                                                            ? 'Cannot access packages while booking for a client. Please reset booking flow first.'
+                                                            : (packageType === 'organization'
+                                                                ? 'No group packages available. Add another package bundle before booking.'
+                                                                : 'You are out of sessions. Add another package bundle before booking.')
                                                         }
                                                     </p>
                                                 )}
