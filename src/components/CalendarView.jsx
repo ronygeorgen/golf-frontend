@@ -515,7 +515,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 client: booking.client_details,
                 simulator: booking.simulator_details,
                 coach: booking.coach_details,
-                package: booking.coaching_package_details,
+                package: booking.package_details,
                 total_price: booking.total_price,
                 status: booking.status,
                 duration_minutes: booking.duration_minutes,
