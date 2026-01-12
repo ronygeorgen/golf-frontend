@@ -46,9 +46,11 @@ function CoachingBooking({ client }) {
     const isFirstMount = useRef(true);
     const previousPackageRef = useRef(null);
 
-    const selectedPackageData = selectedPackage
-        ? packages.find((pkg) => pkg.id === selectedPackage)
-        : null;
+    const selectedPackageData = useMemo(() => {
+        if (!selectedPackage) return null;
+        return packages.find((pkg) => pkg.id === selectedPackage) ||
+            purchases.find((p) => p.package === selectedPackage)?.package_details;
+    }, [selectedPackage, packages, purchases]);
 
     // Filter packages to only show those the user has purchases for (with sessions remaining)
     // This prevents staff from seeing packages they referred to clients
@@ -57,10 +59,10 @@ function CoachingBooking({ client }) {
             return [];
         }
 
-        // Get unique package IDs from purchases where user has sessions remaining
-        const packageIdsWithSessions = new Set();
+        // Collect packages from various sources
+        const packageMap = new Map();
 
-        // Personal/gifted purchases
+        // 1. Add packages from personal/gifted purchases
         purchases
             .filter((purchase) =>
                 purchase.purchase_type !== 'organization' &&
@@ -68,10 +70,16 @@ function CoachingBooking({ client }) {
                 purchase.package_status === 'active'
             )
             .forEach((purchase) => {
-                packageIdsWithSessions.add(purchase.package);
+                const pkgId = purchase.package;
+                // Prefer the full package object from main list if available, 
+                // otherwise use package_details from purchase
+                const pkgData = packages.find(p => p.id === pkgId) || purchase.package_details;
+                if (pkgData) {
+                    packageMap.set(pkgId, pkgData);
+                }
             });
 
-        // Organization packages (only if not booking for a client)
+        // 2. Add organization packages (only if not booking for a client)
         if (!client && organizationPackages && organizationPackages.length > 0) {
             organizationPackages
                 .filter((orgPkg) =>
@@ -79,12 +87,15 @@ function CoachingBooking({ client }) {
                     orgPkg.package_status === 'active'
                 )
                 .forEach((orgPkg) => {
-                    packageIdsWithSessions.add(orgPkg.package);
+                    const pkgId = orgPkg.package;
+                    const pkgData = packages.find(p => p.id === pkgId) || orgPkg.package_details;
+                    if (pkgData) {
+                        packageMap.set(pkgId, pkgData);
+                    }
                 });
         }
 
-        // Filter packages to only include those the user has purchases for
-        return packages.filter((pkg) => packageIdsWithSessions.has(pkg.id));
+        return Array.from(packageMap.values());
     }, [packages, purchases, organizationPackages, client]);
 
     // Calculate sessions remaining for personal/gifted packages (exclude organization)
