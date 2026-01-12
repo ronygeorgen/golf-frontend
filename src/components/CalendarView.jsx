@@ -9,12 +9,13 @@ import usePopup from '../hooks/usePopup';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { utcTimeToLocal } from '../utils/timezone';
+import Button from './ui/Button';
 
 const localizer = momentLocalizer(moment);
 
 function CalendarView({ isUserView = false, coachId = null, staffName = null }) {
     const dispatch = useAppDispatch();
-    const { calendarEvents: events, loading: bookingsLoading } = useAppSelector((state) => state.booking);
+    const { calendarEvents: events, loading: bookingsLoading } = useAppSelector((state) => state.admin?.bookings?.list ? { calendarEvents: [], ...state.booking } : state.booking); // Handle potential state structure mismatch if needed, but existing code uses state.booking
     const { user } = useAppSelector((state) => state.auth);
     const { popup, openPopup, closePopup } = usePopup();
 
@@ -26,7 +27,27 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [specialEvents, setSpecialEvents] = useState([]);
     const [specialEventsLoading, setSpecialEventsLoading] = useState(false);
 
+    // Reschedule State
+    const [rescheduleState, setRescheduleState] = useState({
+        open: false,
+        booking: null,
+        date: '',
+        selectedSlot: null,
+        loading: false,
+        error: null
+    });
+    const [availableSlots, setAvailableSlots] = useState([]);
+    const [slotsLoading, setSlotsLoading] = useState(false);
+
     const canViewSpecialEvents = user && (user.role === 'admin' || user.role === 'staff' || user.is_superuser);
+
+    // Check if user can manage bookings (Admin, Staff, or the Client of the booking)
+    const canManageBooking = (booking) => {
+        if (!user) return false;
+        if (user.role === 'admin' || user.role === 'staff' || user.is_superuser) return true;
+        // Check if user is the client of the booking
+        return booking.client?.id === user.id;
+    };
 
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
@@ -70,7 +91,182 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             }));
         }
 
-    }, [dispatch, date, calendarType, coachId, view]); // Removed showSpecialEvents
+    }, [dispatch, date, calendarType, coachId, view]);
+
+    // Fetch slots when reschedule date changes
+    useEffect(() => {
+        if (rescheduleState.open && rescheduleState.booking && rescheduleState.date) {
+            fetchAvailableSlots(rescheduleState.date, rescheduleState.booking);
+        }
+    }, [rescheduleState.date, rescheduleState.booking, rescheduleState.open]);
+
+    const fetchAvailableSlots = async (dateStr, booking) => {
+        setSlotsLoading(true);
+        setAvailableSlots([]);
+        try {
+            let response;
+            if (booking.type === 'simulator') {
+                response = await axios.get(endpoints.bookings.checkSimulatorAvailability, {
+                    params: {
+                        date: dateStr,
+                        duration: booking.duration_minutes || 60,
+                        simulator_count: 1 // Assuming 1 for reschedule for now
+                    }
+                });
+            } else {
+                // Coaching
+                response = await axios.get(endpoints.bookings.checkCoachingAvailability, {
+                    params: {
+                        date: dateStr,
+                        package_id: booking.package?.id,
+                        coach_id: booking.coach?.id, // Keep same coach
+                        duration: booking.duration_minutes
+                    }
+                });
+            }
+            if (response.data && response.data.available_slots) {
+                setAvailableSlots(response.data.available_slots);
+            }
+        } catch (error) {
+            console.error("Failed to fetch slots", error);
+            // Optionally set error in state
+        } finally {
+            setSlotsLoading(false);
+        }
+    };
+
+    const handleRescheduleConfirm = async () => {
+        if (!rescheduleState.selectedSlot || !rescheduleState.booking) return;
+
+        const bookingId = rescheduleState.booking.id;
+        const slot = rescheduleState.selectedSlot;
+
+        // Prepare payload
+        const payload = {
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            duration_minutes: slot.duration_minutes || rescheduleState.booking.duration_minutes
+        };
+
+        setRescheduleState(prev => ({ ...prev, loading: true, error: null }));
+
+        try {
+            await axios.post(endpoints.bookings.reschedule(bookingId), payload);
+
+            // Success
+            setRescheduleState({
+                open: false,
+                booking: null,
+                date: '',
+                selectedSlot: null,
+                loading: false,
+                error: null
+            });
+
+            openPopup({
+                type: 'success',
+                title: 'Rescheduled',
+                message: 'Booking has been successfully rescheduled.',
+            });
+
+            // Refresh calendar
+            dispatch(getCalendarBookings({
+                startDate: moment(date).startOf('month').toDate(),
+                endDate: moment(date).endOf('month').toDate(),
+                bookingType: calendarType === 'all' ? null : calendarType,
+                coachId: coachId
+            }));
+
+        } catch (error) {
+            console.error("Reschedule failed", error);
+            const errorMsg = error.response?.data?.error || 'Failed to reschedule booking.';
+            const isLockError = error.response?.data?.lock_applies;
+
+            // Handle 24h lock override for admins
+            if (isLockError && (user.role === 'admin' || user.is_superuser)) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Force Reschedule?',
+                    message: `${errorMsg}\n\nDo you want to force reschedule this booking?`,
+                    confirmText: 'Yes, Force Reschedule',
+                    showCancel: true,
+                    onConfirm: async () => {
+                        try {
+                            await axios.post(endpoints.bookings.reschedule(bookingId), { ...payload, force_override: true });
+                            setRescheduleState({ open: false, booking: null, date: '', selectedSlot: null, loading: false, error: null });
+                            openPopup({ type: 'success', title: 'Rescheduled', message: 'Booking rescheduled with override.' });
+                            // Refresh calendar
+                            dispatch(getCalendarBookings({
+                                startDate: moment(date).startOf('month').toDate(),
+                                endDate: moment(date).endOf('month').toDate(),
+                                bookingType: calendarType === 'all' ? null : calendarType,
+                                coachId: coachId
+                            }));
+                        } catch (err) {
+                            openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force reschedule.' });
+                        }
+                    }
+                });
+            } else {
+                setRescheduleState(prev => ({ ...prev, loading: false, error: errorMsg }));
+            }
+            setRescheduleState(prev => ({ ...prev, loading: false }));
+        }
+    };
+
+    const handleCancelBooking = async (bookingId) => {
+        // Confirmation is handled in handleSelectEvent's "Cancel" button action
+        // This function performs the actual API call
+        try {
+            await axios.post(endpoints.bookings.cancel(bookingId));
+            openPopup({
+                type: 'success',
+                title: 'Cancelled',
+                message: 'Booking has been cancelled.',
+            });
+            // Refresh
+            dispatch(getCalendarBookings({
+                startDate: moment(date).startOf('month').toDate(),
+                endDate: moment(date).endOf('month').toDate(),
+                bookingType: calendarType === 'all' ? null : calendarType,
+                coachId: coachId
+            }));
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Failed to cancel booking.';
+            const isLockError = error.response?.data?.lock_applies;
+
+            if (isLockError && (user.role === 'admin' || user.is_superuser)) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Force Cancel?',
+                    message: `${errorMsg}\n\nDo you want to force cancel this booking?`,
+                    confirmText: 'Yes, Force Cancel',
+                    showCancel: true,
+                    onConfirm: async () => {
+                        try {
+                            await axios.post(endpoints.bookings.cancel(bookingId), { force_override: true });
+                            openPopup({ type: 'success', title: 'Cancelled', message: 'Booking cancelled with override.' });
+                            // Refresh
+                            dispatch(getCalendarBookings({
+                                startDate: moment(date).startOf('month').toDate(),
+                                endDate: moment(date).endOf('month').toDate(),
+                                bookingType: calendarType === 'all' ? null : calendarType,
+                                coachId: coachId
+                            }));
+                        } catch (err) {
+                            openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force cancel.' });
+                        }
+                    }
+                });
+            } else {
+                openPopup({
+                    type: 'error',
+                    title: 'Cancellation Failed',
+                    message: errorMsg
+                });
+            }
+        }
+    };
 
     const fetchSpecialEvents = async (startDate, endDate) => {
         setSpecialEventsLoading(true);
@@ -196,7 +392,51 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         openPopup({
             type: 'info',
             title: isUserView ? 'My Booking Details' : 'Booking Details',
-            message: details,
+            message: (
+                <div className="flex flex-col gap-4">
+                    {details}
+                    {canManageBooking(event) && event.status !== 'cancelled' && event.status !== 'completed' && (
+                        <div className="flex gap-2 justify-end pt-2 border-t border-border mt-2">
+                            {(user.role === 'admin' || user.role === 'staff' || user.is_superuser) && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        closePopup(); // Close details popup
+                                        setRescheduleState({
+                                            open: true,
+                                            booking: event,
+                                            date: moment(event.start).format('YYYY-MM-DD'),
+                                            selectedSlot: null,
+                                            loading: false,
+                                            error: null
+                                        });
+                                    }}
+                                    className="text-sm px-3 py-1"
+                                >
+                                    Change Time
+                                </Button>
+                            )}
+                            <Button
+                                variant="danger"
+                                onClick={() => {
+                                    closePopup();
+                                    openPopup({
+                                        type: 'warning',
+                                        title: 'Cancel Booking?',
+                                        message: 'Are you sure you want to cancel this booking? Credits will be refunded to the client.',
+                                        confirmText: 'Yes, Cancel',
+                                        showCancel: true,
+                                        onConfirm: () => handleCancelBooking(event.id)
+                                    });
+                                }}
+                                className="text-sm px-3 py-1"
+                            >
+                                Cancel Booking
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            ),
             confirmText: 'Close',
         });
     };
@@ -264,6 +504,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 package: booking.coaching_package_details,
                 total_price: booking.total_price,
                 status: booking.status,
+                duration_minutes: booking.duration_minutes,
                 is_tpi_assessment: booking.is_tpi_assessment || false
             };
         });
@@ -273,15 +514,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const transformedSpecialEvents = specialEvents.map(event => {
         // Parse date manually to avoid UTC shift (like formatDate in SpecialEvents.jsx)
         const [year, month, day] = event.date.split('-').map(Number);
-        
+
         // Convert UTC time to local time using the event date
         const startTimeLocal = utcTimeToLocal(event.start_time);
         const endTimeLocal = utcTimeToLocal(event.end_time);
-        
+
         // Parse local time components
         const [startHours, startMinutes] = startTimeLocal.split(':').map(Number);
         const [endHours, endMinutes] = endTimeLocal.split(':').map(Number);
-        
+
         // Create date objects in local timezone using the parsed date and converted time
         const start = new Date(year, month - 1, day, startHours, startMinutes);
         let end = new Date(year, month - 1, day, endHours, endMinutes);
@@ -519,6 +760,77 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
                 onClose={closePopup}
             />
+            {/* Reschedule Modal */}
+            {rescheduleState.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={() => setRescheduleState(prev => ({ ...prev, open: false }))} />
+                    <div className="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold mb-4 text-text-primary">Reschedule Booking</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1">Select New Date</label>
+                                <input
+                                    type="date"
+                                    value={rescheduleState.date}
+                                    min={moment().format('YYYY-MM-DD')}
+                                    onChange={(e) => setRescheduleState(prev => ({ ...prev, date: e.target.value, selectedSlot: null }))}
+                                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text-primary"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1">Available Time Slots</label>
+                                {slotsLoading ? (
+                                    <div className="py-8 flex justify-center text-text-secondary">Loading slots...</div>
+                                ) : availableSlots.length === 0 ? (
+                                    <div className="py-4 text-text-secondary italic">No available slots for this date.</div>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-1">
+                                        {availableSlots.map((slot) => {
+                                            const isSelected = rescheduleState.selectedSlot?.start_time === slot.start_time;
+                                            return (
+                                                <button
+                                                    key={slot.start_time}
+                                                    onClick={() => setRescheduleState(prev => ({ ...prev, selectedSlot: slot }))}
+                                                    className={`px-2 py-2 text-sm rounded-lg border transition-all ${isSelected
+                                                        ? 'bg-primary text-white border-primary'
+                                                        : 'bg-background text-text-primary border-border hover:border-primary'
+                                                        }`}
+                                                >
+                                                    {moment(slot.start_time).format('h:mm a')}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {rescheduleState.error && (
+                                <div className="p-3 bg-red-50 text-danger text-sm rounded-lg">
+                                    {rescheduleState.error}
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setRescheduleState(prev => ({ ...prev, open: false }))}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    disabled={!rescheduleState.selectedSlot || rescheduleState.loading}
+                                    onClick={handleRescheduleConfirm}
+                                >
+                                    {rescheduleState.loading ? 'Updating...' : 'Confirm Change'}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
