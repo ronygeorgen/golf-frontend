@@ -129,7 +129,8 @@ function ClosedDaysManagement() {
                 error.response?.data?.end_time?.[0] ||
                 'Failed to save closed day';
 
-            const hasConflicts = error.response?.data?.conflicts === true;
+            const hasConflicts = error.response?.data?.conflicts === true ||
+                (Array.isArray(error.response?.data?.conflicts) && (error.response?.data?.conflicts[0] === true || error.response?.data?.conflicts[0] === 'True'));
 
             // Show error in a popup if it's a detailed conflict message (contains newlines) or a conflict flag
             if (hasConflicts || conflictMessage.includes('\n') || conflictMessage.includes('•')) {
