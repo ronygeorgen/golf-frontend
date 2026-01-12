@@ -143,7 +143,7 @@ export const rescheduleBooking = createAsyncThunk(
 
 export const getCalendarBookings = createAsyncThunk(
     'booking/getCalendarBookings',
-    async ({ startDate, endDate, bookingType, coachId }, { rejectWithValue }) => {
+    async ({ startDate, endDate, bookingType, coachId, status }, { rejectWithValue }) => {
         try {
             const params = {
                 start_date: startDate.toISOString(),
@@ -154,6 +154,9 @@ export const getCalendarBookings = createAsyncThunk(
             }
             if (coachId) {
                 params.coach_id = coachId;
+            }
+            if (status) {
+                params.status = status;
             }
             const response = await apiClient.get(endpoints.bookings.calendarEvents, {
                 params: params,

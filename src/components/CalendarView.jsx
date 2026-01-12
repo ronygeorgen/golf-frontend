@@ -22,6 +22,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [view, setView] = useState('month'); // Default to month view
     const [date, setDate] = useState(new Date());
     const [calendarType, setCalendarType] = useState('all'); // 'all', 'simulator', 'coaching', or 'special_event'
+    const [showCancelledOnly, setShowCancelledOnly] = useState(false); // New state to toggle cancelled bookings
 
     // Special Events State
     const [specialEvents, setSpecialEvents] = useState([]);
@@ -87,11 +88,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 startDate,
                 endDate,
                 bookingType: calendarType === 'all' ? null : calendarType,
-                coachId: coachId
+                coachId: coachId,
+                status: showCancelledOnly ? 'cancelled' : null
             }));
         }
 
-    }, [dispatch, date, calendarType, coachId, view]);
+    }, [dispatch, date, calendarType, coachId, view, showCancelledOnly]);
 
     // Fetch slots when reschedule date changes
     useEffect(() => {
@@ -188,7 +190,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 startDate: moment(date).startOf('month').toDate(),
                 endDate: moment(date).endOf('month').toDate(),
                 bookingType: calendarType === 'all' ? null : calendarType,
-                coachId: coachId
+                coachId: coachId,
+                status: showCancelledOnly ? 'cancelled' : null
             }));
 
         } catch (error) {
@@ -214,7 +217,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 startDate: moment(date).startOf('month').toDate(),
                                 endDate: moment(date).endOf('month').toDate(),
                                 bookingType: calendarType === 'all' ? null : calendarType,
-                                coachId: coachId
+                                coachId: coachId,
+                                status: showCancelledOnly ? 'cancelled' : null
                             }));
                         } catch (err) {
                             openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force reschedule.' });
@@ -243,7 +247,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 startDate: moment(date).startOf('month').toDate(),
                 endDate: moment(date).endOf('month').toDate(),
                 bookingType: calendarType === 'all' ? null : calendarType,
-                coachId: coachId
+                coachId: coachId,
+                status: showCancelledOnly ? 'cancelled' : null
             }));
         } catch (error) {
             const errorMsg = error.response?.data?.error || 'Failed to cancel booking.';
@@ -265,7 +270,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 startDate: moment(date).startOf('month').toDate(),
                                 endDate: moment(date).endOf('month').toDate(),
                                 bookingType: calendarType === 'all' ? null : calendarType,
-                                coachId: coachId
+                                coachId: coachId,
+                                status: showCancelledOnly ? 'cancelled' : null
                             }));
                         } catch (err) {
                             openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force cancel.' });
@@ -497,6 +503,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     // Transform events for calendar - convert UTC to local time
     const transformedEvents = events
         .filter(booking => calendarType === 'all' || booking.booking_type === calendarType)
+        .filter(booking => {
+            // If showCancelledOnly is true, only show cancelled
+            // If showCancelledOnly is false, show everything EXCEPT cancelled
+            if (showCancelledOnly) {
+                return booking.status === 'cancelled';
+            } else {
+                return booking.status !== 'cancelled';
+            }
+        })
         .map(booking => {
             const startTime = moment.utc(booking.start_time).local().toDate();
             const endTime = moment.utc(booking.end_time).local().toDate();
@@ -560,7 +575,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     });
 
     const displayedEvents = calendarType === 'all'
-        ? [...transformedEvents, ...transformedSpecialEvents]
+        ? (showCancelledOnly ? transformedEvents : [...transformedEvents, ...transformedSpecialEvents])
         : (calendarType === 'special_event' ? transformedSpecialEvents : transformedEvents);
 
     const loading = calendarType === 'all'
@@ -601,64 +616,80 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             {staffName ? `${staffName}'s Coaching Sessions Calendar` : isUserView ? 'My Bookings Calendar' : 'Bookings Calendar'}
                         </h1>
                         <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
-                            <div className="flex items-center justify-between gap-2 sm:gap-4 bg-background rounded-2xl p-1.5 sm:p-2 shadow-inner">
-                                {/* Simulator and Coaching Buttons - always show unless in staff view where sim might be hidden */}
-                                <button
-                                    onClick={() => setCalendarType('all')}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'all'
-                                        ? 'bg-primary text-white shadow-md scale-[1.02]'
-                                        : 'text-text-secondary hover:bg-surface'
-                                        }`}
-                                    title="All Bookings and Events"
-                                >
-                                    <div className="flex -space-x-1">
-                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary-light border border-white"></span>
-                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary border border-white"></span>
-                                        {canViewSpecialEvents && <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500 border border-white"></span>}
-                                    </div>
-                                    <span className="text-xs sm:text-sm font-medium">All Sessions</span>
-                                </button>
-
-                                {/* Simulator and Coaching Buttons - always show unless in staff view where sim might be hidden */}
-                                {!coachId && (
+                            <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 bg-background/40 backdrop-blur-md rounded-2xl p-1.5 shadow-sm border border-border/40">
+                                {/* Type Toggles */}
+                                <div className="flex items-center gap-1 p-1 bg-surface/30 rounded-xl border border-border/20">
                                     <button
-                                        onClick={() => setCalendarType('simulator')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'simulator'
-                                            ? 'bg-primary-light text-white shadow-md scale-[1.02]'
+                                        onClick={() => {
+                                            setCalendarType('all');
+                                            setShowCancelledOnly(false);
+                                        }}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'all' && !showCancelledOnly
+                                            ? 'bg-primary text-white shadow-sm'
                                             : 'text-text-secondary hover:bg-surface'
                                             }`}
-                                        title="Simulator Calendar"
+                                        title="All active bookings"
                                     >
-                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary-light flex-shrink-0"></span>
-                                        <span className="text-xs sm:text-sm font-medium">Simulators</span>
+                                        <span className="text-xs font-semibold">Active</span>
                                     </button>
-                                )}
 
-                                <button
-                                    onClick={() => setCalendarType('coaching')}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'coaching'
-                                        ? 'bg-primary border-2 border-primary-light/30 text-white shadow-md scale-[1.02]'
-                                        : 'text-text-secondary hover:bg-surface'
-                                        }`}
-                                    title="Coaching Calendar"
-                                >
-                                    <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary flex-shrink-0"></span>
-                                    <span className="text-xs sm:text-sm font-medium">Coaching</span>
-                                </button>
+                                    {!coachId && (
+                                        <button
+                                            onClick={() => setCalendarType('simulator')}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'simulator'
+                                                ? 'bg-primary-light text-white shadow-sm'
+                                                : 'text-text-secondary hover:bg-surface'
+                                                }`}
+                                            title="Simulator Only"
+                                        >
+                                            <span className="text-xs font-semibold">Simulators</span>
+                                        </button>
+                                    )}
 
-                                {canViewSpecialEvents && (
                                     <button
-                                        onClick={() => setCalendarType('special_event')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-all duration-200 group ${calendarType === 'special_event'
-                                            ? 'bg-amber-500 text-white shadow-md scale-[1.02]'
+                                        onClick={() => setCalendarType('coaching')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'coaching'
+                                            ? 'bg-primary text-white shadow-sm'
                                             : 'text-text-secondary hover:bg-surface'
                                             }`}
-                                        title="Special Events Calendar"
+                                        title="Coaching Only"
                                     >
-                                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500 flex-shrink-0"></span>
-                                        <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Events</span>
+                                        <span className="text-xs font-semibold">Coaching</span>
                                     </button>
-                                )}
+
+                                    {canViewSpecialEvents && (
+                                        <button
+                                            onClick={() => setCalendarType('special_event')}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'special_event'
+                                                ? 'bg-amber-500 text-white shadow-sm'
+                                                : 'text-text-secondary hover:bg-surface'
+                                                }`}
+                                            title="Events Only"
+                                        >
+                                            <span className="text-xs font-semibold">Events</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Cancelled Toggle */}
+                                <div className="flex h-full items-center pl-1 border-l border-border/50 ml-1">
+                                    <button
+                                        onClick={() => {
+                                            setShowCancelledOnly(!showCancelledOnly);
+                                            // Reset calendarType to all if exploring cancelled for better overview
+                                            if (!showCancelledOnly && calendarType === 'special_event') {
+                                                setCalendarType('all');
+                                            }
+                                        }}
+                                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg transition-all duration-300 ${showCancelledOnly
+                                            ? 'bg-danger text-white shadow-sm scale-105'
+                                            : 'bg-danger/10 text-danger hover:bg-danger/20'
+                                            }`}
+                                    >
+                                        <span className={`w-2 h-2 rounded-full ${showCancelledOnly ? 'bg-white' : 'bg-danger'} animate-pulse`}></span>
+                                        <span className="text-xs font-bold uppercase tracking-wider">Cancelled</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -709,10 +740,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             >
                                 <div className="w-full h-full bg-background animate-pulse rounded-lg"></div>
                                 <span className="absolute text-primary font-medium">
-                                    {calendarType === 'all' ? 'Loading all events...' :
-                                        calendarType === 'simulator' ? 'Loading Simulator Bookings...' :
-                                            calendarType === 'coaching' ? 'Loading Coaching Sessions...' :
-                                                'Loading Special Events...'}
+                                    {showCancelledOnly ? 'Loading Cancelled ' : 'Loading '}
+                                    {calendarType === 'all' ? 'All Events...' :
+                                        calendarType === 'simulator' ? 'Simulator Bookings...' :
+                                            calendarType === 'coaching' ? 'Coaching Sessions...' :
+                                                'Special Events...'}
                                 </span>
                             </div>
                         )}
