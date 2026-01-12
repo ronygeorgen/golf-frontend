@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
+import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours, checkSpecialEventsOnDate, checkClosedDate } from '../store/slices/bookingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
@@ -122,6 +122,38 @@ function SimulatorBooking({ client }) {
     // Clear slots when date or duration changes (only if we're on form step)
     const prevDateRef = useRef(date);
     const prevDurationRef = useRef(duration);
+
+    // Track closed day status
+    const [isClosedDay, setIsClosedDay] = useState(false);
+    const [checkingClosedDay, setCheckingClosedDay] = useState(false);
+
+    useEffect(() => {
+        const checkClosedStatus = async () => {
+            if (!date) {
+                setIsClosedDay(false);
+                return;
+            }
+
+            setCheckingClosedDay(true);
+            try {
+                const result = await dispatch(checkClosedDate(date)).unwrap();
+                if (result.is_closed) {
+                    setIsClosedDay(true);
+                    showError(`This date is closed: ${result.closure_title || 'Closed for maintenance/holiday'}`);
+                } else {
+                    setIsClosedDay(false);
+                }
+            } catch (error) {
+                // Determine if we should treat error as closed or not, usually not closed if check fails unless 400 bad request
+                console.error('Failed to check closed date:', error);
+                setIsClosedDay(false);
+            } finally {
+                setCheckingClosedDay(false);
+            }
+        };
+
+        checkClosedStatus();
+    }, [date, dispatch, showError]);
 
     useEffect(() => {
         // Only clear if date or duration actually changed (not on initial mount)
@@ -721,7 +753,7 @@ function SimulatorBooking({ client }) {
 
                         <Button
                             onClick={checkAvailability}
-                            disabled={loading || fetchingMaxSimulators || !!availability.specialEventMessage}
+                            disabled={loading || fetchingMaxSimulators || !!availability.specialEventMessage || isClosedDay || checkingClosedDay}
                             variant="primary"
                             className="w-full py-3"
                         >

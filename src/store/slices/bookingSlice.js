@@ -260,6 +260,20 @@ export const checkSpecialEventsOnDate = createAsyncThunk(
     }
 );
 
+export const checkClosedDate = createAsyncThunk(
+    'booking/checkClosedDate',
+    async (date, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.admin.closedDays.checkDate, {
+                params: { date }
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 export const getSimulatorCredits = createAsyncThunk(
     'booking/getSimulatorCredits',
     async ({ user_id } = {}, { rejectWithValue }) => {

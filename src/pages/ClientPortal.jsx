@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking, checkCoachingAvailability, checkSimulatorAvailability, clearAvailability } from '../store/slices/bookingSlice';
+import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking, checkCoachingAvailability, checkSimulatorAvailability, clearAvailability, checkClosedDate } from '../store/slices/bookingSlice';
 import { useNavigate } from 'react-router-dom';
 import { BookingCardSkeleton, PackagesSkeleton } from '../components/skeletons/SkeletonLoader';
 import PopupMessage from '../components/PopupMessage';
@@ -240,6 +240,14 @@ function ClientPortal() {
         dispatch(clearAvailability());
 
         try {
+            // First check if the date is closed
+            const closedDateResult = await dispatch(checkClosedDate(rescheduleDate)).unwrap();
+            if (closedDateResult.is_closed) {
+                setRescheduleError(`This date is closed: ${closedDateResult.closure_title || 'Closed for maintenance/holiday'}`);
+                setRescheduleCheckingAvailability(false);
+                return;
+            }
+
             if (rescheduleTarget.booking_type === 'coaching') {
                 const result = await dispatch(checkCoachingAvailability({
                     date: rescheduleDate,

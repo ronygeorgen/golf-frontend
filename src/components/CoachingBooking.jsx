@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { checkCoachingAvailability, createBooking, clearAvailability, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
+import {
+    checkCoachingAvailability,
+    createBooking,
+    clearAvailability,
+    checkSpecialEventsOnDate,
+    checkClosedDate
+} from '../store/slices/bookingSlice';
 import { getActiveCoachingPackages, getMyPackagePurchases, getOrganizationPackages, getUserPurchases } from '../store/slices/coachingSlice';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -173,13 +179,47 @@ function CoachingBooking({ client }) {
     const isAutoCheck = useRef(false);
     const [hasChecked, setHasChecked] = useState(false);
 
+    // Track closed day status
+    const [isClosedDay, setIsClosedDay] = useState(false);
+    const [checkingClosedDay, setCheckingClosedDay] = useState(false);
+
+    useEffect(() => {
+        const checkClosedStatus = async () => {
+            if (!date) {
+                setIsClosedDay(false);
+                return;
+            }
+
+            setCheckingClosedDay(true);
+            try {
+                const result = await dispatch(checkClosedDate(date)).unwrap();
+                if (result.is_closed) {
+                    setIsClosedDay(true);
+                    setToast({
+                        show: true,
+                        message: `This date is closed: ${result.closure_title || 'Closed for maintenance/holiday'}`
+                    });
+                } else {
+                    setIsClosedDay(false);
+                }
+            } catch (error) {
+                console.error('Failed to check closed date:', error);
+                setIsClosedDay(false);
+            } finally {
+                setCheckingClosedDay(false);
+            }
+        };
+
+        checkClosedStatus();
+    }, [date, dispatch]);
+
     // Auto-check availability for validation (debounced)
     useEffect(() => {
         setHasChecked(false);
         // Clear previous availability to prevent stale state from blocking the UI
         dispatch(clearAvailability());
 
-        if (!date || !selectedPackage || !hasSessions) return;
+        if (!date || !selectedPackage || !hasSessions || isClosedDay) return;
 
         const timer = setTimeout(async () => {
             isAutoCheck.current = true;
@@ -197,7 +237,7 @@ function CoachingBooking({ client }) {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [date, selectedPackage, selectedCoach, duration, dispatch, hasSessions]);
+    }, [date, selectedPackage, selectedCoach, duration, dispatch, hasSessions, isClosedDay]);
 
     // Move to slots step when slots are fetched - ONLY for manual checks
     useEffect(() => {
@@ -412,9 +452,9 @@ function CoachingBooking({ client }) {
             const hours = Math.floor(maxSuggested / 60);
             const minutes = maxSuggested % 60;
             if (minutes > 0) {
-                return `${hours}h ${minutes}min`;
+                return `${hours}h ${minutes} min`;
             }
-            return `${hours} hour${hours > 1 ? 's' : ''}`;
+            return `${hours} hour${hours > 1 ? 's' : ''} `;
         }
         return `${maxSuggested} minutes`;
     };
@@ -480,7 +520,7 @@ function CoachingBooking({ client }) {
                     (Array.isArray(result.payload) ? result.payload.join(' ') :
                         (typeof result.payload === 'object' ?
                             Object.entries(result.payload)
-                                .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                                .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value} `)
                                 .join('\n') :
                             String(result.payload)));
             }
@@ -488,7 +528,7 @@ function CoachingBooking({ client }) {
             openPopup({
                 type: 'error',
                 title: 'Booking failed',
-                message: `Error creating booking: ${errorMessage}`,
+                message: `Error creating booking: ${errorMessage} `,
             });
         }
     };
@@ -725,7 +765,7 @@ function CoachingBooking({ client }) {
                                                         <p className="text-sm text-text-secondary">
                                                             {packageType === 'organization' ? 'Available sessions (group)' : 'Sessions remaining'}
                                                         </p>
-                                                        <p className={`text-2xl font-bold ${hasSessions ? 'text-status-confirmed-text' : 'text-danger'}`}>
+                                                        <p className={`text - 2xl font - bold ${hasSessions ? 'text-status-confirmed-text' : 'text-danger'} `}>
                                                             {packageType === 'organization'
                                                                 ? (organizationPackagesLoading ? 'Checking…' : organizationSessionsRemaining)
                                                                 : (purchasesLoading ? 'Checking…' : personalSessionsRemaining)
@@ -791,7 +831,7 @@ function CoachingBooking({ client }) {
 
                                     <Button
                                         onClick={checkAvailability}
-                                        disabled={loading || bookingLoading || (selectedPackage && !hasSessions) || isDateBlocked}
+                                        disabled={loading || bookingLoading || (selectedPackage && !hasSessions) || isDateBlocked || isClosedDay || checkingClosedDay}
                                         variant="primary"
                                         className="w-full py-3"
                                     >
@@ -838,7 +878,7 @@ function CoachingBooking({ client }) {
                                     </span>
                                     <span className="text-text-secondary/50">|</span>
                                     <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
-                                        {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
+                                        {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''} `.trim() : `${duration} min`}
                                     </span>
                                     {selectedCoach && (
                                         <>
@@ -872,12 +912,12 @@ function CoachingBooking({ client }) {
                                     return (
                                         <div
                                             key={index}
-                                            className={`p-4 border-2 rounded-card transition duration-200 relative group ${disabled
+                                            className={`p - 4 border - 2 rounded - card transition duration - 200 relative group ${disabled
                                                 ? 'border-border bg-background cursor-not-allowed opacity-60'
                                                 : isSelected
                                                     ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
                                                     : 'border-border hover:border-primary hover:bg-background cursor-pointer'
-                                                }`}
+                                                } `}
                                             onClick={() => !disabled && handleSlotSelect(slot)}
                                         >
                                             {disabled && (
@@ -887,7 +927,7 @@ function CoachingBooking({ client }) {
                                                     </svg>
                                                 </div>
                                             )}
-                                            <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
+                                            <div className={`text - lg font - semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'} `}>
                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                                     hour: '2-digit',
                                                     minute: '2-digit'
@@ -907,10 +947,10 @@ function CoachingBooking({ client }) {
                                                                 </div>
                                                             </>
                                                         ) : (
-                                                            `Event: ${specialEvent.title}`
+                                                            `Event: ${specialEvent.title} `
                                                         )
                                                     ) : (
-                                                        `Max: ${suggestedDuration}`
+                                                        `Max: ${suggestedDuration} `
                                                     )}
                                                 </div>
                                             )}

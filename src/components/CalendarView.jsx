@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getCalendarBookings } from '../store/slices/bookingSlice';
+import { getCalendarBookings, checkClosedDate } from '../store/slices/bookingSlice';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -103,9 +103,23 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const fetchAvailableSlots = async (dateStr, booking) => {
         setSlotsLoading(true);
         setAvailableSlots([]);
+        // Clear any previous errors in the reschedule modal state
+        setRescheduleState(prev => ({ ...prev, error: null }));
+
         try {
+            // First check if the date is closed
+            const closedDateResult = await dispatch(checkClosedDate(dateStr)).unwrap();
+            if (closedDateResult.is_closed) {
+                setRescheduleState(prev => ({
+                    ...prev,
+                    error: `This date is closed: ${closedDateResult.closure_title || 'Closed for maintenance/holiday'}`
+                }));
+                setSlotsLoading(false);
+                return;
+            }
+
             let response;
-            if (booking.type === 'simulator') {
+            if (booking.type === 'simulator' || booking.booking_type === 'simulator') {
                 response = await axios.get(endpoints.bookings.checkSimulatorAvailability, {
                     params: {
                         date: dateStr,
