@@ -15,6 +15,13 @@ import Button from './ui/Button';
 import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
 
 function CoachingBooking({ client }) {
+    const { user: reduxUser } = useAppSelector((state) => state.auth);
+    const user = reduxUser || JSON.parse(localStorage.getItem('user')) || {};
+
+    // Align role detection with ProtectedRoute logic in App.jsx
+    const userRole = (user.role || '').toLowerCase();
+    const isAdminOrStaff = (user?.id || user?.username || user?.email) && (userRole !== 'client' || user.is_superuser === true);
+
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
@@ -675,15 +682,24 @@ function CoachingBooking({ client }) {
                                 {availablePackages.length === 0 ? (
                                     <div className="border border-border rounded-button p-6 text-center bg-background">
                                         <p className="text-text-secondary mb-4">
-                                            You don't have any packages with available sessions.
+                                            {isAdminOrStaff && !client
+                                                ? 'Administrative users cannot book coaching sessions for themselves. Please use the Member List to book for clients.'
+                                                : "You don't have any packages with available sessions."}
                                         </p>
-                                        <Button
-                                            onClick={() => navigate('/packages')}
-                                            variant="primary"
-                                            className="w-full"
-                                        >
-                                            Add Package
-                                        </Button>
+                                        {!isAdminOrStaff && (
+                                            <Button
+                                                onClick={() => navigate('/packages')}
+                                                variant="primary"
+                                                className="w-full"
+                                            >
+                                                Add Package
+                                            </Button>
+                                        )}
+                                        {isAdminOrStaff && client && (
+                                            <p className="text-sm text-danger mt-2 font-medium">
+                                                Cannot access packages while booking for a client. Please reset booking flow first.
+                                            </p>
+                                        )}
                                     </div>
                                 ) : (
                                     <select
@@ -788,7 +804,7 @@ function CoachingBooking({ client }) {
                                                             </p>
                                                         )}
                                                     </div>
-                                                    {!client && (
+                                                    {!isAdminOrStaff && !client && (
                                                         <Button
                                                             type="button"
                                                             onClick={handlePurchasePackage}
