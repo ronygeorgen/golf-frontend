@@ -429,10 +429,11 @@ function CoachingBooking({ client }) {
                 eventEnd.setUTCDate(eventEnd.getUTCDate() + 1);
             }
 
-            // Check strict overlap + abutment (users want to block slots ending at event start):
+            // Check for overlap:
             // Block if the requested slot's interval [slotStart, slotEnd) 
-            // touches or overlaps with the event's interval [eventStart, eventEnd).
-            if (slotStart < eventEnd && slotEnd >= eventStart) {
+            // overlaps with the event's interval [eventStart, eventEnd).
+            // A slot ending exactly at the event start time is NOT a conflict.
+            if (slotStart < eventEnd && slotEnd > eventStart) {
                 const isDurationConflict = slotStart < eventStart;
                 const maxDuration = isDurationConflict ? Math.floor((eventStart - slotStart) / 60000) : 0;
 
