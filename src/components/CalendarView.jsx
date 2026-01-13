@@ -314,7 +314,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         if (event.is_special_event) {
             backgroundColor = '#F59E0B'; // Amber-500 for special events
         } else if (event.is_tpi_assessment) {
-            backgroundColor = '#FFD700'; // Gold for TPI assessment
+            backgroundColor = '#000000'; // Black for TPI assessment
         } else if (event.type === 'simulator') {
             backgroundColor = '#10B981'; // Emerald-500 for simulator
         } else if (event.type === 'coaching') {
@@ -839,7 +839,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     </div>
                                 )}
                                 <div className="group relative flex items-center">
-                                    <div className="w-4 h-4 rounded-full bg-[#FFD700]"></div>
+                                    <div className="w-4 h-4 rounded-full bg-[#000000]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">TPI Assessment</div>
                                 </div>
                                 <div className="group relative flex items-center">
