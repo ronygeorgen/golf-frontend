@@ -408,19 +408,25 @@ function CoachingBooking({ client }) {
         const slotEnd = new Date(slotStart.getTime() + durationMs);
 
         for (const event of availability.specialEventsOnDate) {
+            if (!event.start_time || !event.end_time) continue;
+
             const [startH, startM, startS] = event.start_time.split(':').map(Number);
             const [endH, endM, endS] = event.end_time.split(':').map(Number);
 
-            // Construct event start/end times relative to the slot date
-            const eventStart = new Date(slotStart);
-            eventStart.setHours(startH, startM, startS, 0);
+            // Use event.date if available, otherwise fallback to the current booking date
+            const dateToUse = event.date || date;
+            if (!dateToUse) continue;
 
-            let eventEnd = new Date(slotStart);
-            eventEnd.setHours(endH, endM, endS, 0);
+            const [year, month, day] = dateToUse.split('-').map(Number);
 
-            // Handle event crossing midnight: increment day for end time if it's earlier than start
-            if (eventEnd < eventStart) {
-                eventEnd.setDate(eventEnd.getDate() + 1);
+            // Construct event start/end times in UTC
+            const eventStart = new Date(Date.UTC(year, month - 1, day, startH, startM, startS || 0));
+
+            let eventEnd = new Date(Date.UTC(year, month - 1, day, endH, endM, endS || 0));
+
+            // Handle event crossing midnight: increment day for end time if it's earlier than or equal to start
+            if (eventEnd <= eventStart) {
+                eventEnd.setUTCDate(eventEnd.getUTCDate() + 1);
             }
 
             // Check strict overlap + abutment (users want to block slots ending at event start):
