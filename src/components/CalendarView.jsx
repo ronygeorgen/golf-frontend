@@ -319,17 +319,20 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             backgroundColor = '#10B981'; // Emerald-500 for simulator
         } else if (event.type === 'coaching') {
             // Assign highly distinct colors for each staff member
+            // Diverse, high-contrast colors for staff (avoiding Green, Amber, Purple, and Red)
             const coachColors = [
-                '#2563EB', // Blue-600
-                '#0D9488', // Teal-600
-                '#4F46E5', // Indigo-600
-                '#0891B2', // Cyan-600
-                '#16A34A', // Green-600
-                '#7C3AED', // Violet-600
-                '#0284C7', // Sky-600
-                '#334155', // Slate-700
-                '#65A30D', // Lime-600
-                '#C026D3', // Fuchsia-600
+                '#2563EB', // Bright Blue
+                '#0891B2', // Cyan
+                '#4F46E5', // Indigo
+                '#D946EF', // Fuchsia
+                '#65A30D', // Lime
+                '#0369A1', // Sky Blue
+                '#7C3AED', // Violet
+                '#0D9488', // Teal
+                '#334155', // Slate
+                '#713F12', // Brown
+                '#115E59', // Dark Teal
+                '#4338CA', // Blue-Indigo
             ];
 
             const coachId = event.coach?.id || 0;
@@ -609,8 +612,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     });
 
     const coachColors = [
-        '#2563EB', '#0D9488', '#4F46E5', '#0891B2', '#16A34A',
-        '#7C3AED', '#0284C7', '#334155', '#65A30D', '#C026D3'
+        '#2563EB', '#0891B2', '#4F46E5', '#D946EF', '#65A30D',
+        '#0369A1', '#7C3AED', '#0D9488', '#334155', '#713F12',
+        '#115E59', '#4338CA'
     ];
 
     return (
