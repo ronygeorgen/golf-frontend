@@ -309,35 +309,48 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     };
 
     const eventStyleGetter = (event) => {
-        // Use design system colors
-        let backgroundColor = '#1B3D2C'; // primary-light for simulator
+        let backgroundColor = '#475569'; // Default Slate-600
 
         if (event.is_special_event) {
             backgroundColor = '#F59E0B'; // Amber-500 for special events
         } else if (event.is_tpi_assessment) {
-            backgroundColor = '#9333EA'; // purple-600 for TPI assessment
-        } else {
-            // For simulator calendar, use primary-light; for coaching calendar, use primary
-            if (event.type === 'coaching') {
-                backgroundColor = '#0F2A1D'; // primary
-            } else {
-                backgroundColor = '#1B3D2C'; // primary-light
-            }
+            backgroundColor = '#9333EA'; // Purple-600 for TPI assessment
+        } else if (event.type === 'simulator') {
+            backgroundColor = '#10B981'; // Emerald-500 for simulator
+        } else if (event.type === 'coaching') {
+            // Assign unique colors based on coach ID
+            const coachColors = [
+                '#0F172A', // Slate-900
+                '#1E293B', // Slate-800
+                '#334155', // Slate-700
+                '#1E40AF', // Blue-800
+                '#3730A3', // Indigo-800
+                '#5B21B6', // Violet-800
+                '#6B21A8', // Purple-800
+                '#86198F', // Fuchsia-800
+                '#9D174D', // Pink-800
+                '#991B1B', // Red-800
+            ];
+
+            const coachId = event.coach?.id || 0;
+            backgroundColor = coachColors[coachId % coachColors.length];
         }
 
         if (event.status === 'cancelled') {
-            backgroundColor = '#DC2626'; // danger
+            backgroundColor = '#DC2626'; // Red-600
         } else if (event.status === 'completed') {
-            backgroundColor = '#374151'; // no_show text color (gray)
+            backgroundColor = '#6B7280'; // Gray-500
         }
 
         const baseStyle = {
             backgroundColor,
-            borderRadius: '5px',
-            opacity: 0.8,
+            borderRadius: '6px',
+            opacity: 0.9,
             color: 'white',
-            border: '0px',
-            display: 'block'
+            border: '1px solid rgba(255,255,255,0.1)',
+            display: 'block',
+            fontSize: '0.85rem',
+            fontWeight: '500'
         };
 
         return {
@@ -762,32 +775,32 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             <>
                                 {(calendarType === 'all' || calendarType === 'simulator') && (
                                     <div className="group relative flex items-center">
-                                        <div className="w-4 h-4 rounded-full bg-primary-light"></div>
-                                        <div className="ml-2 text-sm text-text-secondary">Simulator Bookings</div>
+                                        <div className="w-4 h-4 rounded-full bg-[#10B981]"></div>
+                                        <div className="ml-2 text-sm text-text-secondary">Simulator</div>
                                     </div>
                                 )}
                                 {(calendarType === 'all' || calendarType === 'coaching') && (
                                     <div className="group relative flex items-center">
-                                        <div className="w-4 h-4 rounded-full bg-primary"></div>
-                                        <div className="ml-2 text-sm text-text-secondary">Coaching Sessions</div>
+                                        <div className="w-4 h-4 rounded-full bg-[#1E293B]"></div>
+                                        <div className="ml-2 text-sm text-text-secondary">Coaching (By Coach)</div>
                                     </div>
                                 )}
                                 {calendarType === 'all' && (
                                     <div className="group relative flex items-center">
-                                        <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                                        <div className="w-4 h-4 rounded-full bg-[#F59E0B]"></div>
                                         <div className="ml-2 text-sm text-text-secondary">Special Event</div>
                                     </div>
                                 )}
                                 <div className="group relative flex items-center">
-                                    <div className="w-4 h-4 rounded-full bg-purple-600"></div>
+                                    <div className="w-4 h-4 rounded-full bg-[#9333EA]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">TPI Assessment</div>
                                 </div>
                                 <div className="group relative flex items-center">
-                                    <div className="w-4 h-4 rounded-full bg-danger"></div>
+                                    <div className="w-4 h-4 rounded-full bg-[#DC2626]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">Cancelled</div>
                                 </div>
                                 <div className="group relative flex items-center">
-                                    <div className="w-4 h-4 rounded-full bg-status-no_show-text"></div>
+                                    <div className="w-4 h-4 rounded-full bg-[#6B7280]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">Completed</div>
                                 </div>
                             </>
