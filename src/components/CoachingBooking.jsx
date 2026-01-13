@@ -686,7 +686,7 @@ function CoachingBooking({ client }) {
                                                 ? 'Administrative users cannot book coaching sessions for themselves. Please use the Member List to book for clients.'
                                                 : "You don't have any packages with available sessions."}
                                         </p>
-                                        {!isAdminOrStaff && (
+                                        {!client && (
                                             <Button
                                                 onClick={() => navigate('/packages')}
                                                 variant="primary"
@@ -804,7 +804,7 @@ function CoachingBooking({ client }) {
                                                             </p>
                                                         )}
                                                     </div>
-                                                    {!isAdminOrStaff && !client && (
+                                                    {!client && (
                                                         <Button
                                                             type="button"
                                                             onClick={handlePurchasePackage}
