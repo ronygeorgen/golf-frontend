@@ -321,15 +321,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             // Assign unique colors based on coach ID
             const coachColors = [
                 '#0F172A', // Slate-900
+                '#1E3A8A', // Blue-900
+                '#164E63', // Cyan-900
+                '#134E4A', // Teal-900
+                '#312E81', // Indigo-900
+                '#4C1D95', // Violet-900
+                '#581C87', // Purple-900
+                '#0C4A6E', // Sky-900
                 '#1E293B', // Slate-800
-                '#334155', // Slate-700
-                '#1E40AF', // Blue-800
-                '#3730A3', // Indigo-800
-                '#5B21B6', // Violet-800
-                '#6B21A8', // Purple-800
-                '#86198F', // Fuchsia-800
-                '#9D174D', // Pink-800
-                '#991B1B', // Red-800
+                '#2D3748', // cool-gray
             ];
 
             const coachId = event.coach?.id || 0;
