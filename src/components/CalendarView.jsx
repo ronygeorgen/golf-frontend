@@ -318,18 +318,18 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         } else if (event.type === 'simulator') {
             backgroundColor = '#10B981'; // Emerald-500 for simulator
         } else if (event.type === 'coaching') {
-            // Assign unique colors based on coach ID
+            // Assign highly distinct colors for each staff member
             const coachColors = [
-                '#0F172A', // Slate-900
-                '#1E3A8A', // Blue-900
-                '#164E63', // Cyan-900
-                '#134E4A', // Teal-900
-                '#312E81', // Indigo-900
-                '#4C1D95', // Violet-900
-                '#581C87', // Purple-900
-                '#0C4A6E', // Sky-900
-                '#1E293B', // Slate-800
-                '#2D3748', // cool-gray
+                '#2563EB', // Blue-600
+                '#0D9488', // Teal-600
+                '#4F46E5', // Indigo-600
+                '#0891B2', // Cyan-600
+                '#16A34A', // Green-600
+                '#7C3AED', // Violet-600
+                '#0284C7', // Sky-600
+                '#334155', // Slate-700
+                '#65A30D', // Lime-600
+                '#C026D3', // Fuchsia-600
             ];
 
             const coachId = event.coach?.id || 0;
@@ -595,6 +595,24 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         ? (bookingsLoading || (canViewSpecialEvents && specialEventsLoading))
         : (calendarType === 'special_event' ? specialEventsLoading : bookingsLoading);
 
+    // Extract unique coaches (with names and IDs) for the legend hover
+    const coachList = [];
+    const seenCoachIds = new Set();
+
+    events.forEach(booking => {
+        if (booking.booking_type === 'coaching' && booking.coach_details?.id) {
+            if (!seenCoachIds.has(booking.coach_details.id)) {
+                seenCoachIds.add(booking.coach_details.id);
+                coachList.push(booking.coach_details);
+            }
+        }
+    });
+
+    const coachColors = [
+        '#2563EB', '#0D9488', '#4F46E5', '#0891B2', '#16A34A',
+        '#7C3AED', '#0284C7', '#334155', '#65A30D', '#C026D3'
+    ];
+
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
             <style>{`
@@ -780,9 +798,34 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     </div>
                                 )}
                                 {(calendarType === 'all' || calendarType === 'coaching') && (
-                                    <div className="group relative flex items-center">
-                                        <div className="w-4 h-4 rounded-full bg-[#1E293B]"></div>
-                                        <div className="ml-2 text-sm text-text-secondary">Coaching (By Coach)</div>
+                                    <div className="group relative flex items-center cursor-help">
+                                        <div className="w-4 h-4 rounded-full bg-[#334155]"></div>
+                                        <div className="ml-2 text-sm text-text-secondary">Coaching (Hover for Staff)</div>
+
+                                        {/* Dynamic Staff Color Tooltip */}
+                                        <div className="absolute bottom-full left-0 mb-3 hidden group-hover:block z-[100] bg-surface-light border border-border rounded-xl shadow-2xl p-4 min-w-[240px] backdrop-blur-md bg-opacity-95">
+                                            <div className="text-xs font-bold text-text-muted mb-3 uppercase tracking-widest border-b border-border pb-2">
+                                                Staff Color Guide
+                                            </div>
+                                            <div className="space-y-3">
+                                                {coachList.length > 0 ? coachList.map(coach => (
+                                                    <div key={coach.id} className="flex items-center group/item transition-transform hover:translate-x-1">
+                                                        <div
+                                                            className="w-4 h-4 rounded-full mr-3 shadow-inner border border-white/10"
+                                                            style={{ backgroundColor: coachColors[coach.id % coachColors.length] }}
+                                                        ></div>
+                                                        <div className="text-sm font-medium text-text-primary">
+                                                            {coach.first_name} {coach.last_name}
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="text-sm text-text-muted italic py-2">No active coaching sessions found for selected view</div>
+                                                )}
+                                            </div>
+                                            <div className="mt-3 pt-2 border-t border-border text-[10px] text-text-muted">
+                                                Colors are unique per staff member
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                                 {calendarType === 'all' && (
