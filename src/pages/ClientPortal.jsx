@@ -574,6 +574,11 @@ function ClientPortal() {
                                                                         <span className="font-medium">Package:</span> {booking.package_details.title}
                                                                     </p>
                                                                 )}
+                                                                {booking.booking_type === 'coaching' && booking.simulator_details && (
+                                                                    <p className="text-sm text-text-secondary">
+                                                                        <span className="font-medium">Bay:</span> {booking.simulator_details.bay_number} - {booking.simulator_details.name}
+                                                                    </p>
+                                                                )}
                                                                 {booking.booking_type === 'coaching' && booking.package_purchase_details && booking.purchase_type_label && (
                                                                     <p className="text-sm">
                                                                         <Badge status={

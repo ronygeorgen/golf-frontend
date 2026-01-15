@@ -123,13 +123,18 @@ function StaffCoachingSessions() {
                                                         <span className="font-medium">Package:</span> {booking.package_details.title}
                                                     </p>
                                                 )}
+                                                {booking.simulator_details && (
+                                                    <p className="text-sm text-text-secondary">
+                                                        <span className="font-medium">Assigned Bay:</span> Bay {booking.simulator_details.bay_number} - {booking.simulator_details.name}
+                                                    </p>
+                                                )}
                                                 {booking.package_purchase_details && booking.purchase_type_label && (
                                                     <p className="text-sm">
                                                         <Badge status={
                                                             booking.purchase_type_label === 'Personal' ? 'personal' :
-                                                            booking.purchase_type_label === 'Gifted' ? 'pending' :
-                                                            booking.purchase_type_label === 'Organization' ? 'confirmed' :
-                                                            'pending'
+                                                                booking.purchase_type_label === 'Gifted' ? 'pending' :
+                                                                    booking.purchase_type_label === 'Organization' ? 'confirmed' :
+                                                                        'pending'
                                                         }>
                                                             {booking.purchase_type_label}
                                                         </Badge>
@@ -140,9 +145,9 @@ function StaffCoachingSessions() {
                                         <div className="flex flex-col items-end gap-2">
                                             <Badge status={
                                                 booking.status === 'confirmed' ? 'confirmed' :
-                                                booking.status === 'pending' ? 'pending' :
-                                                booking.status === 'completed' ? 'completed' :
-                                                'no_show'
+                                                    booking.status === 'pending' ? 'pending' :
+                                                        booking.status === 'completed' ? 'completed' :
+                                                            'no_show'
                                             }>
                                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                             </Badge>

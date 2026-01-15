@@ -408,9 +408,16 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         <span className="font-semibold">Simulator:</span> Bay {event.simulator?.bay_number || 'N/A'}
                     </p>
                 ) : (
-                    <p>
-                        <span className="font-semibold">Coach:</span> {event.coach?.first_name || 'Any'} {event.coach?.last_name || ''}
-                    </p>
+                    <>
+                        <p>
+                            <span className="font-semibold">Coach:</span> {event.coach?.first_name || 'Any'} {event.coach?.last_name || ''}
+                        </p>
+                        {event.simulator && (
+                            <p>
+                                <span className="font-semibold">Assigned Bay:</span> Bay {event.simulator.bay_number} - {event.simulator.name}
+                            </p>
+                        )}
+                    </>
                 )}
                 {event.package && (
                     <p>
