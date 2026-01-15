@@ -539,11 +539,49 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             const startTime = moment.utc(booking.start_time).local().toDate();
             const endTime = moment.utc(booking.end_time).local().toDate();
 
+            // Enhanced Title Logic
+            let title;
+            const clientFullName = booking.client_details
+                ? `${booking.client_details.first_name} ${booking.client_details.last_name || ''}`.trim()
+                : 'N/A';
+
+            const coachFullName = booking.coach_details
+                ? `${booking.coach_details.first_name} ${booking.coach_details.last_name || ''}`.trim()
+                : 'Any Coach';
+
+            const simBayInfo = booking.simulator_details
+                ? `Bay ${booking.simulator_details.bay_number} - ${booking.simulator_details.name}`
+                : null;
+
+            if (booking.booking_type === 'simulator') {
+                if (isUserView) {
+                    // For Simulator bookings in user view, show the specific bay name
+                    title = simBayInfo || `Simulator - Bay ${booking.simulator_details?.bay_number || '?'}`;
+                } else {
+                    // Admin view
+                    title = `Simulator - ${clientFullName}`;
+                }
+            } else {
+                // Coaching Booking
+                const baySuffix = simBayInfo ? ` (${simBayInfo})` : '';
+
+                if (isUserView) {
+                    if (coachId) {
+                        // Staff viewing their own calendar -> Show Client Name
+                        title = `Coaching - ${clientFullName}${baySuffix}`;
+                    } else {
+                        // Client viewing their own calendar -> Show Coach Name
+                        title = `Coaching - ${coachFullName}${baySuffix}`;
+                    }
+                } else {
+                    // Admin View -> Show Client Name
+                    title = `Coaching - ${clientFullName}${baySuffix}`;
+                }
+            }
+
             return {
                 id: booking.id,
-                title: isUserView
-                    ? `${booking.booking_type === 'simulator' ? 'Simulator' : 'Coaching'} - ${booking.booking_type === 'simulator' ? `Bay ${booking.simulator_details?.bay_number || ''}` : booking.coach_details ? `${booking.coach_details.first_name} ${booking.coach_details.last_name}` : 'Any Coach'}`
-                    : `${booking.booking_type === 'simulator' ? 'Simulator' : 'Coaching'} - ${booking.client_details?.first_name || 'N/A'}`,
+                title: title,
                 start: startTime,
                 end: endTime,
                 resourceId: booking.booking_type === 'simulator' ?
