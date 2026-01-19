@@ -30,21 +30,21 @@ function StaffAvailability() {
     const { id } = useParams();
     const { popup, openPopup, closePopup } = usePopup();
     const { list: staff, loading, selectedStaff, availability, dayAvailability } = useAppSelector((state) => state.admin.staff);
-    
+
     // Filter state
     const [filter, setFilter] = useState('all');
-    
+
     // Add form state
     const [showAddForm, setShowAddForm] = useState(false);
     const [availabilityType, setAvailabilityType] = useState(null); // 'weekly' or 'day_specific'
-    const [newAvailability, setNewAvailability] = useState({ 
-        day_of_week: '', 
+    const [newAvailability, setNewAvailability] = useState({
+        day_of_week: '',
         date: '',
-        start_time: '09:00', 
-        end_time: '17:00' 
+        start_time: '09:00',
+        end_time: '17:00'
     });
     const [addingAvailability, setAddingAvailability] = useState(false);
-    
+
     // Dropdown ref for add button
     const addDropdownRef = useRef(null);
     const [showAddDropdown, setShowAddDropdown] = useState(false);
@@ -96,17 +96,17 @@ function StaffAvailability() {
         setShowAddForm(true);
         setShowAddDropdown(false);
         // Reset form
-        setNewAvailability({ 
-            day_of_week: '', 
+        setNewAvailability({
+            day_of_week: '',
             date: '',
-            start_time: '09:00', 
-            end_time: '17:00' 
+            start_time: '09:00',
+            end_time: '17:00'
         });
     };
 
     const handleAddAvailability = async () => {
         if (!selectedStaff) return;
-        
+
         if (availabilityType === 'weekly') {
             if (newAvailability.day_of_week === '') {
                 openPopup({
@@ -118,13 +118,13 @@ function StaffAvailability() {
             }
 
             const availabilityArray = Array.isArray(availability) ? availability : [];
-            
+
             // Check if this day and start_time already exists
-            const exists = availabilityArray.some(avail => 
-                avail.day_of_week === parseInt(newAvailability.day_of_week) && 
+            const exists = availabilityArray.some(avail =>
+                avail.day_of_week === parseInt(newAvailability.day_of_week) &&
                 avail.start_time === localTimeToUTC(newAvailability.start_time)
             );
-            
+
             if (exists) {
                 openPopup({
                     type: 'warning',
@@ -146,17 +146,17 @@ function StaffAvailability() {
 
             setAddingAvailability(true);
             try {
-                await dispatch(updateStaffAvailability({ 
-                    staffId: selectedStaff.id, 
-                    availabilityData: updatedAvailability 
+                await dispatch(updateStaffAvailability({
+                    staffId: selectedStaff.id,
+                    availabilityData: updatedAvailability
                 }));
 
                 // Reset form
-                setNewAvailability({ 
-                    day_of_week: '', 
+                setNewAvailability({
+                    day_of_week: '',
                     date: '',
-                    start_time: '09:00', 
-                    end_time: '17:00' 
+                    start_time: '09:00',
+                    end_time: '17:00'
                 });
                 setShowAddForm(false);
                 setAvailabilityType(null);
@@ -174,13 +174,13 @@ function StaffAvailability() {
             }
 
             const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
-            
+
             // Check if this date and start_time already exists
-            const exists = dayAvailabilityArray.some(avail => 
-                avail.date === newAvailability.date && 
+            const exists = dayAvailabilityArray.some(avail =>
+                avail.date === newAvailability.date &&
                 avail.start_time === localTimeToUTC(newAvailability.start_time)
             );
-            
+
             if (exists) {
                 openPopup({
                     type: 'warning',
@@ -202,17 +202,17 @@ function StaffAvailability() {
 
             setAddingAvailability(true);
             try {
-                await dispatch(updateStaffDayAvailability({ 
-                    staffId: selectedStaff.id, 
-                    availabilityData: updatedDayAvailability 
+                await dispatch(updateStaffDayAvailability({
+                    staffId: selectedStaff.id,
+                    availabilityData: updatedDayAvailability
                 }));
 
                 // Reset form
-                setNewAvailability({ 
-                    day_of_week: '', 
+                setNewAvailability({
+                    day_of_week: '',
                     date: '',
-                    start_time: '09:00', 
-                    end_time: '17:00' 
+                    start_time: '09:00',
+                    end_time: '17:00'
                 });
                 setShowAddForm(false);
                 setAvailabilityType(null);
@@ -224,45 +224,45 @@ function StaffAvailability() {
 
     const handleUpdateAvailability = async (availabilityId, field, value, isDaySpecific = false) => {
         if (!selectedStaff) return;
-        
+
         if (isDaySpecific) {
             const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
-            const updatedValue = (field === 'start_time' || field === 'end_time') 
-                ? localTimeToUTC(value) 
+            const updatedValue = (field === 'start_time' || field === 'end_time')
+                ? localTimeToUTC(value)
                 : value;
-            
-            const updatedDayAvailability = dayAvailabilityArray.map(avail => 
+
+            const updatedDayAvailability = dayAvailabilityArray.map(avail =>
                 avail.id === availabilityId
                     ? { ...avail, [field]: updatedValue }
                     : avail
             );
-            
-            await dispatch(updateStaffDayAvailability({ 
-                staffId: selectedStaff.id, 
-                availabilityData: updatedDayAvailability 
+
+            await dispatch(updateStaffDayAvailability({
+                staffId: selectedStaff.id,
+                availabilityData: updatedDayAvailability
             }));
         } else {
             const availabilityArray = Array.isArray(availability) ? availability : [];
-            const updatedValue = (field === 'start_time' || field === 'end_time') 
-                ? localTimeToUTC(value) 
+            const updatedValue = (field === 'start_time' || field === 'end_time')
+                ? localTimeToUTC(value)
                 : field === 'day_of_week' ? parseInt(value) : value;
-            
-            const updatedAvailability = availabilityArray.map(avail => 
+
+            const updatedAvailability = availabilityArray.map(avail =>
                 avail.id === availabilityId
                     ? { ...avail, [field]: updatedValue }
                     : avail
             );
-            
-            await dispatch(updateStaffAvailability({ 
-                staffId: selectedStaff.id, 
-                availabilityData: updatedAvailability 
+
+            await dispatch(updateStaffAvailability({
+                staffId: selectedStaff.id,
+                availabilityData: updatedAvailability
             }));
         }
     };
 
     const handleDeleteAvailability = async (availabilityId, isDaySpecific = false) => {
         if (!selectedStaff) return;
-        
+
         const typeLabel = isDaySpecific ? 'day-specific' : 'weekly recurring';
         openPopup({
             type: 'warning',
@@ -275,18 +275,16 @@ function StaffAvailability() {
                 if (isDaySpecific) {
                     const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
                     const updatedDayAvailability = dayAvailabilityArray.filter(avail => avail.id !== availabilityId);
-                    
-                    await dispatch(updateStaffDayAvailability({ 
-                        staffId: selectedStaff.id, 
-                        availabilityData: updatedDayAvailability 
+
+                    await dispatch(updateStaffDayAvailability({
+                        staffId: selectedStaff.id,
+                        availabilityData: updatedDayAvailability
                     }));
                 } else {
-                    const availabilityArray = Array.isArray(availability) ? availability : [];
-                    const updatedAvailability = availabilityArray.filter(avail => avail.id !== availabilityId);
-                    
-                    await dispatch(updateStaffAvailability({ 
-                        staffId: selectedStaff.id, 
-                        availabilityData: updatedAvailability 
+                    // Send explicit delete command using the new backend logic
+                    await dispatch(updateStaffAvailability({
+                        staffId: selectedStaff.id,
+                        availabilityData: [{ id: availabilityId, deleted: true }]
                     }));
                 }
             },
@@ -296,7 +294,7 @@ function StaffAvailability() {
     // Combine and format all availability
     const availabilityArray = Array.isArray(availability) ? availability : [];
     const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
-    
+
     // Format weekly availability with type indicator
     const weeklyFormatted = availabilityArray.map(avail => ({
         ...avail,
@@ -304,7 +302,7 @@ function StaffAvailability() {
         displayKey: `weekly-${avail.id}`,
         sortKey: `${avail.day_of_week}-${avail.start_time}`
     }));
-    
+
     // Format day-specific availability with type indicator
     const daySpecificFormatted = dayAvailabilityArray.map(avail => ({
         ...avail,
@@ -312,15 +310,15 @@ function StaffAvailability() {
         displayKey: `day-${avail.id}`,
         sortKey: `${avail.date}-${avail.start_time}`
     }));
-    
+
     // Combine all availability
     const allAvailability = [...weeklyFormatted, ...daySpecificFormatted];
-    
+
     // Filter based on selected filter
-    const filteredAvailability = filter === 'all' 
-        ? allAvailability 
+    const filteredAvailability = filter === 'all'
+        ? allAvailability
         : allAvailability.filter(avail => avail.type === filter);
-    
+
     // Sort combined list
     const sortedAvailability = [...filteredAvailability].sort((a, b) => {
         if (a.type !== b.type) {
@@ -334,11 +332,11 @@ function StaffAvailability() {
     // Format date for display
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
     };
 
@@ -361,7 +359,7 @@ function StaffAvailability() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Select Staff Member:
                         </label>
-                        <select 
+                        <select
                             onChange={(e) => {
                                 const staffId = parseInt(e.target.value);
                                 if (staffId) {
@@ -403,7 +401,7 @@ function StaffAvailability() {
                                     </option>
                                 ))}
                             </select>
-                            
+
                             {/* Add Button with Dropdown */}
                             <div className="relative" ref={addDropdownRef}>
                                 <button
@@ -414,7 +412,7 @@ function StaffAvailability() {
                                     <span className="whitespace-nowrap">Add Availability</span>
                                     <ChevronDown className={`w-4 h-4 transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
                                 </button>
-                                
+
                                 {showAddDropdown && (
                                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                                         <div className="py-1">
@@ -565,11 +563,10 @@ function StaffAvailability() {
                                     {sortedAvailability.map((avail) => (
                                         <tr key={avail.displayKey} className="hover:bg-gray-50">
                                             <td className="px-4 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                    avail.type === 'weekly' 
-                                                        ? 'bg-blue-100 text-blue-800' 
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${avail.type === 'weekly'
+                                                        ? 'bg-blue-100 text-blue-800'
                                                         : 'bg-green-100 text-green-800'
-                                                }`}>
+                                                    }`}>
                                                     {avail.type === 'weekly' ? 'Weekly' : 'Day-Specific'}
                                                 </span>
                                             </td>
@@ -606,11 +603,10 @@ function StaffAvailability() {
                                                     type="time"
                                                     value={utcTimeToLocal(avail.start_time) || '09:00'}
                                                     onChange={(e) => handleUpdateAvailability(avail.id, 'start_time', e.target.value, avail.type === 'day_specific')}
-                                                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${
-                                                        avail.type === 'weekly' 
-                                                            ? 'focus:ring-blue-500' 
+                                                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${avail.type === 'weekly'
+                                                            ? 'focus:ring-blue-500'
                                                             : 'focus:ring-green-500'
-                                                    }`}
+                                                        }`}
                                                 />
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
@@ -618,11 +614,10 @@ function StaffAvailability() {
                                                     type="time"
                                                     value={utcTimeToLocal(avail.end_time) || '17:00'}
                                                     onChange={(e) => handleUpdateAvailability(avail.id, 'end_time', e.target.value, avail.type === 'day_specific')}
-                                                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${
-                                                        avail.type === 'weekly' 
-                                                            ? 'focus:ring-blue-500' 
+                                                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${avail.type === 'weekly'
+                                                            ? 'focus:ring-blue-500'
                                                             : 'focus:ring-green-500'
-                                                    }`}
+                                                        }`}
                                                 />
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
