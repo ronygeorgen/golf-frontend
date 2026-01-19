@@ -18,14 +18,24 @@ function GuestCoachingBooking() {
     const [searchParams] = useSearchParams();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
-    
+
     const phone = searchParams.get('phone');
     const [packages, setPackages] = useState([]);
     const [purchases, setPurchases] = useState([]);
     const [loadingPackages, setLoadingPackages] = useState(true);
     const [locationId, setLocationId] = useState(null);
-    
+
     const DEFAULT_DURATION = 60;
+
+    // Calculate min date (Tomorrow -> 24h ahead restriction)
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() + 1);
+    const minDateString = minDate.toISOString().split('T')[0];
+
+    // Calculate max date (30 days from today)
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    const maxDateString = maxDate.toISOString().split('T')[0];
     const [date, setDate] = useState('');
     const [duration, setDuration] = useState(DEFAULT_DURATION);
     const [selectedPackage, setSelectedPackage] = useState(null);
@@ -35,44 +45,44 @@ function GuestCoachingBooking() {
     const [checkingAvailability, setCheckingAvailability] = useState(false);
     const [coaches, setCoaches] = useState([]);
     const [availability, setAvailability] = useState({ slots: [], loading: false });
-    
+
     // Step management: 'form' -> 'slots' -> 'summary'
     const [currentStep, setCurrentStep] = useState('form');
-    
+
     // Store previous data for back navigation
     const [previousDate, setPreviousDate] = useState('');
     const [previousPackage, setPreviousPackage] = useState(null);
     const [previousCoach, setPreviousCoach] = useState(null);
-    
+
     const selectedPackageData = selectedPackage
         ? packages.find((pkg) => pkg.id === selectedPackage)
         : null;
-    
+
     // Filter packages to only show TPI packages with sessions remaining
     const availablePackages = useMemo(() => {
         if (!purchases || purchases.length === 0) {
             return [];
         }
-        
+
         const packageIdsWithSessions = new Set();
         purchases
-            .filter((purchase) => 
+            .filter((purchase) =>
                 purchase.sessions_remaining > 0 &&
                 purchase.package_status === 'active'
             )
             .forEach((purchase) => {
                 packageIdsWithSessions.add(purchase.package);
             });
-        
+
         return packages.filter((pkg) => packageIdsWithSessions.has(pkg.id));
     }, [packages, purchases]);
-    
+
     const sessionsRemaining = selectedPackage
         ? purchases
             .filter((purchase) => purchase.package === selectedPackage)
             .reduce((total, purchase) => total + (purchase.sessions_remaining || 0), 0)
         : 0;
-    
+
     const hasSessions = selectedPackage ? sessionsRemaining > 0 : false;
     const packageSessionDuration = selectedPackageData?.session_duration_minutes || DEFAULT_DURATION;
 
@@ -84,15 +94,15 @@ function GuestCoachingBooking() {
                 navigate('/guest');
                 return;
             }
-            
+
             try {
                 setLoadingPackages(true);
-                
+
                 // Fetch guest packages by phone
                 const packagesResponse = await apiClient.get(endpoints.coaching.guestPackages, {
                     params: { phone }
                 });
-                
+
                 if (packagesResponse.data) {
                     setPackages(packagesResponse.data.packages || []);
                     setPurchases(packagesResponse.data.purchases || []);
@@ -105,7 +115,7 @@ function GuestCoachingBooking() {
                 setLoadingPackages(false);
             }
         };
-        
+
         fetchGuestData();
     }, [phone, navigate, showError]);
 
@@ -117,8 +127,8 @@ function GuestCoachingBooking() {
             // Clean up URL
             const newSearchParams = new URLSearchParams(searchParams);
             newSearchParams.delete('message');
-            const newUrl = newSearchParams.toString() 
-                ? `${window.location.pathname}?${newSearchParams.toString()}` 
+            const newUrl = newSearchParams.toString()
+                ? `${window.location.pathname}?${newSearchParams.toString()}`
                 : window.location.pathname;
             window.history.replaceState({}, document.title, newUrl);
         }
@@ -156,7 +166,7 @@ function GuestCoachingBooking() {
             });
             return;
         }
-        
+
         if (!hasSessions) {
             openPopup({
                 type: 'warning',
@@ -169,11 +179,11 @@ function GuestCoachingBooking() {
         setPreviousDate(date);
         setPreviousPackage(selectedPackage);
         setPreviousCoach(selectedCoach);
-        
+
         setSelectedSlot(null);
         setAvailability({ slots: [], loading: true });
         setCheckingAvailability(true);
-        
+
         try {
             const params = {
                 date,
@@ -185,17 +195,17 @@ function GuestCoachingBooking() {
             if (selectedCoach) {
                 params.coach_id = selectedCoach;
             }
-            
+
             const response = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
                 params: params
             });
-            
+
             if (response.data) {
                 setAvailability({
                     slots: response.data.available_slots || [],
                     loading: false
                 });
-                
+
                 if (!response.data.available_slots || response.data.available_slots.length === 0) {
                     openPopup({
                         type: 'info',
@@ -220,26 +230,26 @@ function GuestCoachingBooking() {
         if (isSlotDisabled(slot)) {
             return; // Don't allow selection of disabled slots
         }
-        
+
         // Check if this slot is already selected - if so, unselect it
         const isCurrentlySelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
         if (isCurrentlySelected) {
             setSelectedSlot(null);
             return;
         }
-        
+
         // When user clicks a slot, calculate end_time based on selected duration
         // The slot.start_time is already in UTC from backend
         const startTime = new Date(slot.start_time);
         const endTime = new Date(startTime.getTime() + packageSessionDuration * 60000); // Add duration in milliseconds
-        
+
         setSelectedSlot({
             ...slot,
             start_time: startTime.toISOString(),
             end_time: endTime.toISOString(),
             duration_minutes: packageSessionDuration
         });
-        
+
         // Move to summary step
         setCurrentStep('summary');
     };
@@ -249,12 +259,12 @@ function GuestCoachingBooking() {
         // The backend returns availability_end_time which is when the coach's availability actually ends
         const startTime = new Date(slot.start_time);
         const requestedEndTime = new Date(startTime.getTime() + packageSessionDuration * 60000);
-        
+
         // Use availability_end_time if available, otherwise fall back to slot.end_time
-        const maxAvailableEndTime = slot.availability_end_time 
+        const maxAvailableEndTime = slot.availability_end_time
             ? new Date(slot.availability_end_time)
             : new Date(slot.end_time);
-        
+
         // Check if requested end time exceeds the availability window
         // Add a small buffer (1 minute) to account for rounding
         return requestedEndTime > maxAvailableEndTime;
@@ -264,19 +274,19 @@ function GuestCoachingBooking() {
         // Calculate the maximum duration that would fit in this slot
         const startTime = new Date(slot.start_time);
         // Use availability_end_time if available, otherwise fall back to slot.end_time
-        const maxAvailableEndTime = slot.availability_end_time 
+        const maxAvailableEndTime = slot.availability_end_time
             ? new Date(slot.availability_end_time)
             : new Date(slot.end_time);
         const maxDurationMinutes = Math.floor((maxAvailableEndTime - startTime) / 60000);
-        
+
         // Suggest durations that would fit (from available options)
         const availableDurations = [30, 60, 90, 120, 180];
         const suggestedDurations = availableDurations.filter(d => d <= maxDurationMinutes);
-        
+
         if (suggestedDurations.length === 0) {
             return 'No duration available';
         }
-        
+
         const maxSuggested = Math.max(...suggestedDurations);
         if (maxSuggested >= 60) {
             const hours = Math.floor(maxSuggested / 60);
@@ -341,7 +351,7 @@ function GuestCoachingBooking() {
             };
 
             const response = await apiClient.post(endpoints.bookings.guestCreate, bookingData);
-            
+
             if (response.data) {
                 showSuccess('Booking created successfully! Please login to view your bookings.');
                 setTimeout(() => {
@@ -475,7 +485,8 @@ function GuestCoachingBooking() {
                                                     type="date"
                                                     value={date}
                                                     onChange={(e) => setDate(e.target.value)}
-                                                    min={new Date().toISOString().split('T')[0]}
+                                                    min={minDateString}
+                                                    max={maxDateString}
                                                     className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
                                                     required
                                                 />
@@ -527,17 +538,16 @@ function GuestCoachingBooking() {
                                         const suggestedDuration = disabled ? getSuggestedDuration(slot) : null;
                                         // Check if this slot is selected (compare by start_time since that's unique)
                                         const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
-                                        
+
                                         return (
                                             <div
                                                 key={index}
-                                                className={`p-4 border-2 rounded-card transition duration-200 relative group ${
-                                                    disabled
-                                                        ? 'border-border bg-background cursor-not-allowed opacity-60'
-                                                        : isSelected
-                                                            ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
-                                                            : 'border-border hover:border-primary hover:bg-background cursor-pointer'
-                                                }`}
+                                                className={`p-4 border-2 rounded-card transition duration-200 relative group ${disabled
+                                                    ? 'border-border bg-background cursor-not-allowed opacity-60'
+                                                    : isSelected
+                                                        ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
+                                                        : 'border-border hover:border-primary hover:bg-background cursor-pointer'
+                                                    }`}
                                                 onClick={() => !disabled && handleSlotSelect(slot)}
                                                 title={disabled ? `This slot would exceed availability with ${packageSessionDuration} minutes. Try ${suggestedDuration} or less.` : ''}
                                             >
@@ -549,8 +559,8 @@ function GuestCoachingBooking() {
                                                     </div>
                                                 )}
                                                 <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
-                                                    {new Date(slot.start_time).toLocaleTimeString('en-US', { 
-                                                        hour: '2-digit', 
+                                                    {new Date(slot.start_time).toLocaleTimeString('en-US', {
+                                                        hour: '2-digit',
                                                         minute: '2-digit'
                                                     })}
                                                 </div>

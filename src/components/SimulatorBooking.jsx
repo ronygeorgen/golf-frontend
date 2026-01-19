@@ -47,6 +47,23 @@ function SimulatorBooking({ client }) {
 
     const calculatedPrice = calculatePrice();
 
+    // Check if user is staff or admin
+    const isStaffOrAdmin = user?.role === 'staff' || user?.role === 'admin' || user?.is_superuser;
+
+    // Calculate min date
+    // specific rule: clients/guests cannot book today (must book 24h ahead -> tomorrow)
+    // Staff/Admins can book today
+    const minDate = new Date();
+    if (!isStaffOrAdmin) {
+        minDate.setDate(minDate.getDate() + 1);
+    }
+    const minDateString = minDate.toISOString().split('T')[0];
+
+    // Calculate max date (30 days from today)
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    const maxDateString = maxDate.toISOString().split('T')[0];
+
     useEffect(() => {
         const params = { use_organization: true };
         if (client) {
@@ -646,7 +663,8 @@ function SimulatorBooking({ client }) {
                                 type="date"
                                 value={date}
                                 onChange={(e) => setDate(e.target.value)}
-                                min={new Date().toISOString().split('T')[0]}
+                                min={minDateString}
+                                max={maxDateString}
                                 onKeyDown={(e) => e.preventDefault()}
                                 onKeyPress={(e) => e.preventDefault()} // Block old-school keypress
                                 onPaste={(e) => e.preventDefault()} // Block pasting

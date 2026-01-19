@@ -130,6 +130,20 @@ function CoachingBooking({ client }) {
     const hasSessions = selectedPackage ? (packageType === 'organization' ? organizationSessionsRemaining > 0 : personalSessionsRemaining > 0) : false;
     const packageSessionDuration = selectedPackageData?.session_duration_minutes || DEFAULT_DURATION;
 
+    // Calculate min date
+    // specific rule: clients/guests cannot book today (must book 24h ahead -> tomorrow)
+    // Staff/Admins can book today
+    const minDate = new Date();
+    if (!isAdminOrStaff) {
+        minDate.setDate(minDate.getDate() + 1);
+    }
+    const minDateString = minDate.toISOString().split('T')[0];
+
+    // Calculate max date (30 days from today)
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    const maxDateString = maxDate.toISOString().split('T')[0];
+
     useEffect(() => {
         // Load active coaching packages
         dispatch(getActiveCoachingPackages());
@@ -673,7 +687,8 @@ function CoachingBooking({ client }) {
                                     type="date"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
-                                    min={new Date().toISOString().split('T')[0]}
+                                    min={minDateString}
+                                    max={maxDateString}
                                     onKeyDown={(e) => e.preventDefault()}
                                     onKeyPress={(e) => e.preventDefault()}
                                     onPaste={(e) => e.preventDefault()}

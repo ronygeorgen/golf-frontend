@@ -445,6 +445,23 @@ function ClientPortal() {
         }
     };
 
+    // Check if user is staff or admin
+    const isStaffOrAdmin = user?.role === 'staff' || user?.role === 'admin' || user?.is_superuser;
+
+    // Calculate min date
+    // specific rule: clients/guests cannot book today (must book 24h ahead -> tomorrow)
+    // Staff/Admins can book today
+    const minDate = new Date();
+    if (!isStaffOrAdmin) {
+        minDate.setDate(minDate.getDate() + 1);
+    }
+    const minDateString = minDate.toISOString().split('T')[0];
+
+    // Calculate max date (30 days from today)
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    const maxDateString = maxDate.toISOString().split('T')[0];
+
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
             <div className="w-full">
@@ -835,7 +852,8 @@ function ClientPortal() {
                                     type="date"
                                     value={rescheduleDate}
                                     onChange={(e) => setRescheduleDate(e.target.value)}
-                                    min={new Date().toISOString().split('T')[0]}
+                                    min={minDateString}
+                                    max={maxDateString}
                                     required
                                     className="w-full"
                                 />
