@@ -11,7 +11,7 @@ import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { localTimeToUTC, utcTimeToLocal } from '../utils/timezone';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, PauseCircle } from 'lucide-react';
 
 const EVENT_TYPES = [
     { value: 'one_time', label: 'One Time' },
@@ -26,13 +26,21 @@ function SpecialEventsManagement() {
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const modalRef = useRef(null);
-    
+
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingEvent, setEditingEvent] = useState(null);
     const [viewType, setViewType] = useState('upcoming'); // 'upcoming' or 'conducted'
-    
+
+    // Pause Modal State
+    const [showPauseModal, setShowPauseModal] = useState(false);
+    const [pauseEventData, setPauseEventData] = useState(null);
+    const [futureOccurrences, setFutureOccurrences] = useState([]);
+    const [selectedPauseDates, setSelectedPauseDates] = useState([]);
+    const [pauseModalStep, setPauseModalStep] = useState(1); // 1: select, 2: confirm
+    const [occurrencesLoading, setOccurrencesLoading] = useState(false);
+
     const emptyForm = {
         title: '',
         description: '',
@@ -89,10 +97,66 @@ function SpecialEventsManagement() {
         }
     };
 
+    const handlePauseClick = async (event) => {
+        setPauseEventData(event);
+        setShowPauseModal(true);
+        setPauseModalStep(1);
+        setSelectedPauseDates([]);
+        setOccurrencesLoading(true);
+
+        try {
+            const response = await axios.get(endpoints.specialEvents.futureOccurrences(event.id));
+            setFutureOccurrences(response.data);
+        } catch (error) {
+            console.error('Error fetching occurrences:', error);
+            showError('Failed to load future occurrences');
+        } finally {
+            setOccurrencesLoading(false);
+        }
+    };
+
+    const handlePauseSubmit = async (extend) => {
+        if (!pauseEventData || selectedPauseDates.length === 0) return;
+
+        setSubmitLoading(true);
+        try {
+            await axios.post(endpoints.specialEvents.pauseOccurrences(pauseEventData.id), {
+                dates: selectedPauseDates,
+                extend: extend
+            });
+
+            showSuccess(`Event paused for ${selectedPauseDates.length} occurrence(s)${extend ? ' and extended' : ''}`);
+            setShowPauseModal(false);
+            setPauseEventData(null);
+            setSelectedPauseDates([]);
+            fetchEvents();
+        } catch (error) {
+            console.error('Error pausing event:', error);
+            showError('Failed to pause event');
+        } finally {
+            setSubmitLoading(false);
+        }
+    };
+
+    const togglePauseDate = (date) => {
+        if (selectedPauseDates.includes(date)) {
+            setSelectedPauseDates(selectedPauseDates.filter(d => d !== date));
+        } else {
+            setSelectedPauseDates([...selectedPauseDates, date]);
+        }
+    };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedPauseDates(futureOccurrences);
+        } else {
+            setSelectedPauseDates([]);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         const submitData = {
             ...formData,
             start_time: localTimeToUTC(formData.start_time),
@@ -165,7 +229,7 @@ function SpecialEventsManagement() {
     };
 
     const handleViewRegistrations = (eventId, occurrenceDate) => {
-        const url = occurrenceDate 
+        const url = occurrenceDate
             ? `/admin/special-events/${eventId}/registrations?occurrence_date=${occurrenceDate}`
             : `/admin/special-events/${eventId}/registrations`;
         navigate(url);
@@ -184,21 +248,19 @@ function SpecialEventsManagement() {
                     <div className="flex items-center gap-2 bg-background border border-border rounded-lg p-1">
                         <button
                             onClick={() => setViewType('upcoming')}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                viewType === 'upcoming'
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewType === 'upcoming'
                                     ? 'bg-primary text-white shadow-sm'
                                     : 'text-text-secondary hover:text-text-primary'
-                            }`}
+                                }`}
                         >
                             Upcoming Events
                         </button>
                         <button
                             onClick={() => setViewType('conducted')}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                viewType === 'conducted'
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewType === 'conducted'
                                     ? 'bg-primary text-white shadow-sm'
                                     : 'text-text-secondary hover:text-text-primary'
-                            }`}
+                                }`}
                         >
                             Conducted Events
                         </button>
@@ -275,6 +337,15 @@ function SpecialEventsManagement() {
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
+                                                {(event.event_type === 'weekly' || event.event_type === 'monthly') && (
+                                                    <button
+                                                        onClick={() => handlePauseClick(event)}
+                                                        className="p-1 text-warning hover:bg-warning-light/20 rounded"
+                                                        title="Pause Occurrences"
+                                                    >
+                                                        <PauseCircle className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => handleDelete(event)}
                                                     className="p-1 text-danger hover:bg-red-50 rounded"
@@ -344,8 +415,8 @@ function SpecialEventsManagement() {
                                         onChange={(e) => {
                                             const newEventType = e.target.value;
                                             // Clear recurring_end_date when switching to one_time
-                                            setFormData({ 
-                                                ...formData, 
+                                            setFormData({
+                                                ...formData,
                                                 event_type: newEventType,
                                                 recurring_end_date: newEventType === 'one_time' ? '' : formData.recurring_end_date
                                             });
@@ -455,14 +526,12 @@ function SpecialEventsManagement() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                                        formData.is_active ? 'bg-primary' : 'bg-gray-300'
-                                                    }`}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.is_active ? 'bg-primary' : 'bg-gray-300'
+                                                        }`}
                                                 >
                                                     <span
-                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                                                            formData.is_active ? 'translate-x-6' : 'translate-x-1'
-                                                        }`}
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
                                                     />
                                                 </button>
                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -476,14 +545,12 @@ function SpecialEventsManagement() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, show_price: !formData.show_price })}
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                                        formData.show_price ? 'bg-primary' : 'bg-gray-300'
-                                                    }`}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.show_price ? 'bg-primary' : 'bg-gray-300'
+                                                        }`}
                                                 >
                                                     <span
-                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                                                            formData.show_price ? 'translate-x-6' : 'translate-x-1'
-                                                        }`}
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${formData.show_price ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
                                                     />
                                                 </button>
                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -499,14 +566,12 @@ function SpecialEventsManagement() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, is_private: !formData.is_private })}
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                                        formData.is_private ? 'bg-primary' : 'bg-gray-300'
-                                                    }`}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.is_private ? 'bg-primary' : 'bg-gray-300'
+                                                        }`}
                                                 >
                                                     <span
-                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                                                            formData.is_private ? 'translate-x-6' : 'translate-x-1'
-                                                        }`}
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${formData.is_private ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
                                                     />
                                                 </button>
                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -518,7 +583,7 @@ function SpecialEventsManagement() {
                                             Private events are only visible to admins. Clients cannot see or register for private events.
                                         </p>
                                     </div>
-                                    
+
                                     {/* Auto Enroll - Only show for weekly and monthly recurring events */}
                                     {(formData.event_type === 'weekly' || formData.event_type === 'monthly') && (
                                         <div className="flex flex-col gap-1">
@@ -528,14 +593,12 @@ function SpecialEventsManagement() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setFormData({ ...formData, is_auto_enroll: !formData.is_auto_enroll })}
-                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                                            formData.is_auto_enroll ? 'bg-primary' : 'bg-gray-300'
-                                                        }`}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.is_auto_enroll ? 'bg-primary' : 'bg-gray-300'
+                                                            }`}
                                                     >
                                                         <span
-                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                                                                formData.is_auto_enroll ? 'translate-x-6' : 'translate-x-1'
-                                                            }`}
+                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${formData.is_auto_enroll ? 'translate-x-6' : 'translate-x-1'
+                                                                }`}
                                                         />
                                                     </button>
                                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -573,6 +636,113 @@ function SpecialEventsManagement() {
                 </div>
             )}
 
+            {/* Pause Occurrences Modal */}
+            {showPauseModal && pauseEventData && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-surface rounded-card shadow-card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <h2 className="text-xl font-bold text-text-primary mb-4">
+                            {pauseModalStep === 1 ? 'Pause Event Occurrences' : 'Confirm Extension'}
+                        </h2>
+
+                        {pauseModalStep === 1 ? (
+                            <>
+                                <p className="text-sm text-text-secondary mb-4">
+                                    Select the occurrences you want to pause for "<strong>{pauseEventData.title}</strong>".
+                                </p>
+
+                                {occurrencesLoading ? (
+                                    <div className="text-center py-8 text-text-secondary">Loading occurrences...</div>
+                                ) : futureOccurrences.length === 0 ? (
+                                    <div className="text-center py-8 text-text-secondary">No future occurrences found.</div>
+                                ) : (
+                                    <div className="border border-border rounded-md overflow-hidden mb-4">
+                                        <div className="bg-background px-3 py-2 border-b border-border flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedPauseDates.length === futureOccurrences.length && futureOccurrences.length > 0}
+                                                onChange={handleSelectAll}
+                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium text-text-primary">Select All</span>
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto divide-y divide-border">
+                                            {futureOccurrences.map((date) => (
+                                                <div key={date} className="flex items-center gap-2 px-3 py-2 hover:bg-background/50">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedPauseDates.includes(date)}
+                                                        onChange={() => togglePauseDate(date)}
+                                                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm text-text-primary">{date}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end space-x-3 mt-6">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                            setShowPauseModal(false);
+                                            setPauseEventData(null);
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={() => setPauseModalStep(2)}
+                                        disabled={selectedPauseDates.length === 0}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="mb-6">
+                                    <p className="text-text-primary mb-2">
+                                        You are about to pause <strong>{selectedPauseDates.length}</strong> occurrence(s).
+                                    </p>
+                                    <p className="text-text-primary font-medium mb-4">
+                                        Do you want to extend the paused event?
+                                    </p>
+                                    <p className="text-sm text-text-secondary bg-background p-3 rounded-md">
+                                        If you choose <strong>Yes</strong>, the recurring end date will be pushed forward by {selectedPauseDates.length} {pauseEventData.event_type === 'weekly' ? 'week(s)' : 'month(s)'}.
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 mt-6">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => handlePauseSubmit(false)} // No = Just Pause
+                                        className="w-full sm:w-auto"
+                                        loading={submitLoading}
+                                    >
+                                        No, Just Pause
+                                    </Button>
+                                    <Button
+                                        onClick={() => handlePauseSubmit(true)} // Yes = Extend
+                                        className="w-full sm:w-auto"
+                                        loading={submitLoading}
+                                    >
+                                        Yes, Extend
+                                    </Button>
+                                </div>
+                                <div className="text-center mt-3">
+                                    <button
+                                        onClick={() => setPauseModalStep(1)}
+                                        className="text-xs text-text-secondary hover:text-primary hover:underline"
+                                    >
+                                        Back to selection
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {toast && (
                 <Toast
@@ -598,4 +768,3 @@ function SpecialEventsManagement() {
 }
 
 export default SpecialEventsManagement;
-

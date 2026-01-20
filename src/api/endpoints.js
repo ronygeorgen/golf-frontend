@@ -177,6 +177,8 @@ export const endpoints = {
         myRegistrations: '/special-events/registrations/',
         eventsOnDate: '/special-events/events/events_on_date/',
         calendarEvents: '/special-events/events/calendar-events/',
+        futureOccurrences: (id) => `/special-events/events/${id}/future_occurrences/`,
+        pauseOccurrences: (id) => `/special-events/events/${id}/pause_occurrences/`,
     },
 };
 
