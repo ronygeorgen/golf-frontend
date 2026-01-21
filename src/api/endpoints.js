@@ -179,6 +179,7 @@ export const endpoints = {
         calendarEvents: '/special-events/events/calendar-events/',
         futureOccurrences: (id) => `/special-events/events/${id}/future_occurrences/`,
         pauseOccurrences: (id) => `/special-events/events/${id}/pause_occurrences/`,
+        webhook: '/special-events/webhook/',
     },
 };
 

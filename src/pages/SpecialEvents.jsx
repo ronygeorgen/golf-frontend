@@ -39,18 +39,39 @@ function SpecialEvents() {
     };
 
     const handleRegister = (eventId) => {
+        const event = events.find(e => e.id === eventId);
+        const isUpfront = event?.upfront_payment;
+
         openPopup({
             type: 'warning',
-            title: 'Confirm Registration',
-            message: 'Are you sure you want to register for this event?',
+            title: isUpfront ? 'Confirm Registration & Payment' : 'Confirm Registration',
+            message: isUpfront
+                ? 'This event requires upfront payment. You will be redirected to the payment page to complete your registration. Do you want to proceed?'
+                : 'Are you sure you want to register for this event?',
             showCancel: true,
-            confirmText: 'Yes, Register',
+            confirmText: isUpfront ? 'Proceed to Payment' : 'Yes, Register',
             cancelText: 'Cancel',
             onConfirm: async () => {
                 closePopup();
                 setRegistering({ ...registering, [eventId]: true });
                 try {
-                    await axios.post(endpoints.specialEvents.register(eventId));
+                    const response = await axios.post(endpoints.specialEvents.register(eventId));
+
+                    if (response.data.is_upfront && response.data.redirect_url) {
+                        // Redirect to payment
+                        const paymentUrl = new URL(response.data.redirect_url);
+                        // Consistent with simulator booking: recipient_phone stores the temp_id
+                        paymentUrl.searchParams.append('recipient_phone', response.data.temp_id);
+
+                        // Also append phone if available, often used by external payment providers
+                        if (user?.phone) {
+                            paymentUrl.searchParams.append('phone', user.phone);
+                        }
+
+                        window.location.href = paymentUrl.toString();
+                        return;
+                    }
+
                     showSuccess('Successfully registered for the event!');
                     fetchEvents(); // Refresh to update registration status
                 } catch (error) {

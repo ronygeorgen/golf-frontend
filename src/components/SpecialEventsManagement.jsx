@@ -54,7 +54,9 @@ function SpecialEventsManagement() {
         price: '',
         show_price: false,
         is_private: false,
-        is_auto_enroll: false
+        is_auto_enroll: false,
+        upfront_payment: false,
+        redirect_url: ''
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -201,7 +203,9 @@ function SpecialEventsManagement() {
             price: event.price || '',
             show_price: event.show_price !== undefined ? event.show_price : false,
             is_private: event.is_private !== undefined ? event.is_private : false,
-            is_auto_enroll: event.is_auto_enroll !== undefined ? event.is_auto_enroll : false
+            is_auto_enroll: event.is_auto_enroll !== undefined ? event.is_auto_enroll : false,
+            upfront_payment: event.upfront_payment !== undefined ? event.upfront_payment : false,
+            redirect_url: event.redirect_url || ''
         });
         setShowForm(true);
     };
@@ -249,8 +253,8 @@ function SpecialEventsManagement() {
                         <button
                             onClick={() => setViewType('upcoming')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewType === 'upcoming'
-                                    ? 'bg-primary text-white shadow-sm'
-                                    : 'text-text-secondary hover:text-text-primary'
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'text-text-secondary hover:text-text-primary'
                                 }`}
                         >
                             Upcoming Events
@@ -258,8 +262,8 @@ function SpecialEventsManagement() {
                         <button
                             onClick={() => setViewType('conducted')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewType === 'conducted'
-                                    ? 'bg-primary text-white shadow-sm'
-                                    : 'text-text-secondary hover:text-text-primary'
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'text-text-secondary hover:text-text-primary'
                                 }`}
                         >
                             Conducted Events
@@ -608,6 +612,50 @@ function SpecialEventsManagement() {
                                             </div>
                                             <p className="text-xs text-text-secondary">
                                                 When enabled, registered customers will be automatically enrolled for the next occurrence.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm text-text-primary">Upfront Payment Required</label>
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, upfront_payment: !formData.upfront_payment })}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.upfront_payment ? 'bg-primary' : 'bg-gray-300'
+                                                        }`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${formData.upfront_payment ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
+                                                    />
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                    {formData.upfront_payment ? 'Show' : 'Hide'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-text-secondary">
+                                            If enabled, users must pay upfront to register. This creates a temporary hold on the spot.
+                                        </p>
+                                    </div>
+
+                                    {formData.upfront_payment && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1">
+                                                Redirect URL * (for payment)
+                                            </label>
+                                            <input
+                                                type="url"
+                                                required
+                                                placeholder="https://example.com/payment"
+                                                value={formData.redirect_url}
+                                                onChange={(e) => setFormData({ ...formData, redirect_url: e.target.value })}
+                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                            />
+                                            <p className="text-xs text-text-secondary mt-1">
+                                                The URL to redirect users to for payment. `temp_id` will be appended as a query parameter.
                                             </p>
                                         </div>
                                     )}
