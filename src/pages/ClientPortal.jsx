@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking, checkCoachingAvailability, checkSimulatorAvailability, clearAvailability, checkClosedDate } from '../store/slices/bookingSlice';
+import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking, checkCoachingAvailability, checkSimulatorAvailability, clearAvailability, checkClosedDate, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
 import { useNavigate } from 'react-router-dom';
 import { BookingCardSkeleton, PackagesSkeleton } from '../components/skeletons/SkeletonLoader';
 import PopupMessage from '../components/PopupMessage';
@@ -240,6 +240,9 @@ function ClientPortal() {
         dispatch(clearAvailability());
 
         try {
+            // First check special events for this date
+            await dispatch(checkSpecialEventsOnDate(rescheduleDate));
+
             // First check if the date is closed
             const closedDateResult = await dispatch(checkClosedDate(rescheduleDate)).unwrap();
             if (closedDateResult.is_closed) {
@@ -339,6 +342,11 @@ function ClientPortal() {
             }
         }
 
+        // Check for special event conflict
+        if (getSpecialEventConflict(slot)) {
+            return;
+        }
+
         // Check if this slot is already selected - if so, unselect it
         const isCurrentlySelected = rescheduleSelectedSlot && new Date(rescheduleSelectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
         if (isCurrentlySelected) {
@@ -362,7 +370,50 @@ function ClientPortal() {
         setRescheduleTime(formatTimeForInput(startTime));
     };
 
+    const getSpecialEventConflict = (slot) => {
+        if (!availability.specialEventsOnDate || availability.specialEventsOnDate.length === 0) return null;
+
+        const duration = rescheduleTarget.duration_minutes || 60;
+        const durationMs = duration * 60000;
+        const slotStart = new Date(slot.start_time);
+        const slotEnd = new Date(slotStart.getTime() + durationMs);
+
+        for (const event of availability.specialEventsOnDate) {
+            if (!event.start_time || !event.end_time) continue;
+
+            const [startH, startM, startS] = event.start_time.split(':').map(Number);
+            const [endH, endM, endS] = event.end_time.split(':').map(Number);
+
+            // Use event.date if available, otherwise fallback to the current reschedule date
+            const dateToUse = event.date || rescheduleDate;
+            if (!dateToUse) continue;
+
+            const [year, month, day] = dateToUse.split('-').map(Number);
+
+            // Construct event start/end times in UTC
+            const eventStart = new Date(Date.UTC(year, month - 1, day, startH, startM, startS || 0));
+            let eventEnd = new Date(Date.UTC(year, month - 1, day, endH, endM, endS || 0));
+
+            // Handle event crossing midnight: increment day for end time if it's earlier than or equal to start
+            if (eventEnd <= eventStart) {
+                eventEnd.setUTCDate(eventEnd.getUTCDate() + 1);
+            }
+
+            // Check for overlap:
+            // Block if the requested slot's interval [slotStart, slotEnd) 
+            // overlaps with the event's interval [eventStart, eventEnd).
+            if (slotStart < eventEnd && slotEnd > eventStart) {
+                return event;
+            }
+        }
+        return null;
+    };
+
     const isRescheduleSlotDisabled = (slot) => {
+        // Check special event conflict first
+        if (getSpecialEventConflict(slot)) return true;
+
+
         const startTime = new Date(slot.start_time);
         const requestedEndTime = new Date(startTime.getTime() + (rescheduleTarget.duration_minutes || 60) * 60000);
         const maxAvailableEndTime = slot.availability_end_time
@@ -894,7 +945,7 @@ function ClientPortal() {
                                                                     : 'border-border hover:border-primary hover:bg-background'
                                                                 }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
-                                                            title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
+                                                            title={isDisabled ? (getSpecialEventConflict(slot) ? 'Blocked by Special Event' : 'This slot cannot accommodate the session duration') : ''}
                                                         >
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
@@ -903,7 +954,11 @@ function ClientPortal() {
                                                                 })}
                                                             </div>
                                                             <div className="text-xs text-text-secondary">
-                                                                {slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available
+                                                                {getSpecialEventConflict(slot) ? (
+                                                                    <span className="text-red-600 font-bold">{getSpecialEventConflict(slot).title}</span>
+                                                                ) : (
+                                                                    <span>{slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );
@@ -930,7 +985,7 @@ function ClientPortal() {
                                                                     : 'border-border hover:border-primary hover:bg-background'
                                                                 }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
-                                                            title={isDisabled ? 'This slot cannot accommodate the session duration' : ''}
+                                                            title={isDisabled ? (getSpecialEventConflict(slot) ? 'Blocked by Special Event' : 'This slot cannot accommodate the session duration') : ''}
                                                         >
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
@@ -939,7 +994,11 @@ function ClientPortal() {
                                                                 })}
                                                             </div>
                                                             <div className="text-xs text-text-secondary">
-                                                                Bay assigned automatically
+                                                                {getSpecialEventConflict(slot) ? (
+                                                                    <span className="text-red-600 font-bold">{getSpecialEventConflict(slot).title}</span>
+                                                                ) : (
+                                                                    <span>Bay assigned automatically</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getCalendarBookings, checkClosedDate } from '../store/slices/bookingSlice';
+import { getCalendarBookings, checkClosedDate, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -15,7 +15,7 @@ const localizer = momentLocalizer(moment);
 
 function CalendarView({ isUserView = false, coachId = null, staffName = null }) {
     const dispatch = useAppDispatch();
-    const { calendarEvents: events, loading: bookingsLoading } = useAppSelector((state) => state.admin?.bookings?.list ? { calendarEvents: [], ...state.booking } : state.booking); // Handle potential state structure mismatch if needed, but existing code uses state.booking
+    const { calendarEvents: events, loading: bookingsLoading, availability } = useAppSelector((state) => state.admin?.bookings?.list ? { calendarEvents: [], ...state.booking } : state.booking); // Handle potential state structure mismatch if needed, but existing code uses state.booking
     const { user } = useAppSelector((state) => state.auth);
     const { popup, openPopup, closePopup } = usePopup();
 
@@ -109,6 +109,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         setRescheduleState(prev => ({ ...prev, error: null }));
 
         try {
+            // First check special events for this date
+            await dispatch(checkSpecialEventsOnDate(dateStr));
+
             // First check if the date is closed
             const closedDateResult = await dispatch(checkClosedDate(dateStr)).unwrap();
             if (closedDateResult.is_closed) {
@@ -286,6 +289,46 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 });
             }
         }
+    };
+
+    const getSpecialEventConflict = (slot, booking) => {
+        if (!availability?.specialEventsOnDate || availability.specialEventsOnDate.length === 0) return null;
+
+        const duration = booking?.duration_minutes || 60;
+        const durationMs = duration * 60000;
+        const slotStart = new Date(slot.start_time);
+        const slotEnd = new Date(slotStart.getTime() + durationMs);
+        const dateToCheck = rescheduleState.date;
+
+        for (const event of availability.specialEventsOnDate) {
+            if (!event.start_time || !event.end_time) continue;
+
+            const [startH, startM, startS] = event.start_time.split(':').map(Number);
+            const [endH, endM, endS] = event.end_time.split(':').map(Number);
+
+            // Use event.date if available, otherwise fallback to the current reschedule date
+            const dateToUse = event.date || dateToCheck;
+            if (!dateToUse) continue;
+
+            const [year, month, day] = dateToUse.split('-').map(Number);
+
+            // Construct event start/end times in UTC
+            const eventStart = new Date(Date.UTC(year, month - 1, day, startH, startM, startS || 0));
+            let eventEnd = new Date(Date.UTC(year, month - 1, day, endH, endM, endS || 0));
+
+            // Handle event crossing midnight: increment day for end time if it's earlier than or equal to start
+            if (eventEnd <= eventStart) {
+                eventEnd.setUTCDate(eventEnd.getUTCDate() + 1);
+            }
+
+            // Check for overlap:
+            // Block if the requested slot's interval [slotStart, slotEnd) 
+            // overlaps with the event's interval [eventStart, eventEnd).
+            if (slotStart < eventEnd && slotEnd > eventStart) {
+                return event;
+            }
+        }
+        return null;
     };
 
     const fetchSpecialEvents = async (startDate, endDate) => {
@@ -940,16 +983,28 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-1">
                                         {availableSlots.map((slot) => {
                                             const isSelected = rescheduleState.selectedSlot?.start_time === slot.start_time;
+                                            const conflict = getSpecialEventConflict(slot, rescheduleState.booking);
+                                            const disabled = !!conflict;
+
                                             return (
                                                 <button
                                                     key={slot.start_time}
-                                                    onClick={() => setRescheduleState(prev => ({ ...prev, selectedSlot: slot }))}
-                                                    className={`px-2 py-2 text-sm rounded-lg border transition-all ${isSelected
-                                                        ? 'bg-primary text-white border-primary'
-                                                        : 'bg-background text-text-primary border-border hover:border-primary'
+                                                    onClick={() => !disabled && setRescheduleState(prev => ({ ...prev, selectedSlot: slot }))}
+                                                    disabled={disabled}
+                                                    title={disabled ? (conflict ? 'Blocked by Special Event: ' + conflict.title : 'Details not available') : ''}
+                                                    className={`px-2 py-2 text-sm rounded-lg border transition-all ${disabled
+                                                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed decoration-slice'
+                                                        : isSelected
+                                                            ? 'bg-primary text-white border-primary'
+                                                            : 'bg-background text-text-primary border-border hover:border-primary'
                                                         }`}
                                                 >
                                                     {moment(slot.start_time).format('h:mm a')}
+                                                    {conflict && (
+                                                        <div className="text-xs text-red-500 font-bold block mt-1">
+                                                            {conflict.title}
+                                                        </div>
+                                                    )}
                                                 </button>
                                             );
                                         })}
