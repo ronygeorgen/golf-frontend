@@ -429,12 +429,12 @@ function UserLayout() {
                 onClick={() => navigate('/special-events')}
                 className="bg-yellow-400 hover:bg-yellow-500 text-black py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-yellow-500/20 shadow-sm transition-colors"
             >
-                <div className="animate-marquee font-bold text-sm md:text-base uppercase tracking-wider">
-                    “School of Golf Registration Now Open - Click here to register”
-                    &nbsp;&nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;&nbsp;
-                    “School of Golf Registration Now Open - Click here to register”
-                    &nbsp;&nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;&nbsp;
-                    “School of Golf Registration Now Open - Click here to register”
+                <div className="animate-marquee-seamless">
+                    {[1, 2, 3, 4].map((i) => (
+                        <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap">
+                            “School of Golf Registration Now Open - Click here to register”
+                        </span>
+                    ))}
                 </div>
             </div>
 

@@ -133,22 +133,28 @@
     /* Chrome, Safari and Opera */
 }
 
-@keyframes marquee {
+@keyframes marquee-seamless {
     0% {
-        transform: translateX(100%);
+        transform: translateX(0);
     }
 
     100% {
-        transform: translateX(-100%);
+        transform: translateX(-50%);
     }
 }
 
-.animate-marquee {
-    display: inline-block;
-    white-space: nowrap;
-    animation: marquee 40s linear infinite;
+.animate-marquee-seamless {
+    display: flex;
+    width: max-content;
+    animation: marquee-seamless 30s linear infinite;
 }
 
-.animate-marquee:hover {
+@media (max-width: 768px) {
+    .animate-marquee-seamless {
+        animation-duration: 15s;
+    }
+}
+
+.animate-marquee-seamless:hover {
     animation-play-state: paused;
 }
