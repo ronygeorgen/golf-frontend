@@ -18,14 +18,14 @@ function EventRegistrations() {
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const modalRef = useRef(null);
-    
+
     const [event, setEvent] = useState(null);
     const [allRegistrations, setAllRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updatingStatus, setUpdatingStatus] = useState({});
     const [removingRegistration, setRemovingRegistration] = useState({});
     const [showCancelled, setShowCancelled] = useState(false); // Toggle for showing cancelled
-    
+
     // Modal state
     const [showRegisterModal, setShowRegisterModal] = useState(false);
     const [users, setUsers] = useState([]);
@@ -62,7 +62,7 @@ function EventRegistrations() {
     // Debounce search
     useEffect(() => {
         if (!showRegisterModal) return;
-        
+
         const timeoutId = setTimeout(() => {
             if (searchQuery.trim()) {
                 fetchUsers(searchQuery);
@@ -79,18 +79,18 @@ function EventRegistrations() {
         try {
             // Get occurrence_date from query params if available
             const occurrenceDateParam = searchParams.get('occurrence_date');
-            
+
             const registrationsUrl = occurrenceDateParam
                 ? `${endpoints.specialEvents.registrations(eventId)}?occurrence_date=${occurrenceDateParam}`
                 : endpoints.specialEvents.registrations(eventId);
-            
+
             const [eventResponse, registrationsResponse] = await Promise.all([
                 axios.get(endpoints.specialEvents.detail(eventId)),
                 axios.get(registrationsUrl)
             ]);
             setEvent(eventResponse.data);
             setAllRegistrations(registrationsResponse.data);
-            
+
             // Use occurrence_date from query params if available, otherwise get next occurrence
             if (occurrenceDateParam) {
                 setNextOccurrenceDate(occurrenceDateParam);
@@ -107,14 +107,14 @@ function EventRegistrations() {
             setLoading(false);
         }
     };
-    
+
     const fetchUsers = async (search = '') => {
         setLoadingUsers(true);
         try {
             const params = new URLSearchParams();
             if (search) params.append('search', search);
             params.append('page_size', '50'); // Get more users for selection
-            
+
             const response = await axios.get(`${endpoints.admin.users.list}?${params.toString()}`);
             setUsers(response.data.results || []);
         } catch (error) {
@@ -124,24 +124,24 @@ function EventRegistrations() {
             setLoadingUsers(false);
         }
     };
-    
+
     const resetModalForm = () => {
         setSearchQuery('');
         setSelectedUserId('');
         setUsers([]);
     };
-    
+
     const handleOpenRegisterModal = () => {
         setShowRegisterModal(true);
         fetchUsers();
     };
-    
+
     const handleRegisterUser = async () => {
         if (!selectedUserId) {
             showError('Please select a user to register');
             return;
         }
-        
+
         setRegisteringUser(true);
         try {
             await axios.post(endpoints.specialEvents.registerUser(eventId), {
@@ -159,7 +159,7 @@ function EventRegistrations() {
             setRegisteringUser(false);
         }
     };
-    
+
     // Get next occurrence date for filtering (if needed in future)
     const getNextOccurrenceDate = () => {
         if (!event) return null;
@@ -169,12 +169,12 @@ function EventRegistrations() {
 
     const handleUpdateStatus = (registrationId) => {
         const registration = allRegistrations.find(r => r.id === registrationId);
-        const userName = registration?.user_details?.first_name 
+        const userName = registration?.user_details?.first_name
             ? `${registration.user_details.first_name} ${registration.user_details.last_name || ''}`.trim()
-            : registration?.user_details?.username 
-            ? registration.user_details.username
-            : 'this user';
-        
+            : registration?.user_details?.username
+                ? registration.user_details.username
+                : 'this user';
+
         openPopup({
             type: 'warning',
             title: 'Mark as Showed Up',
@@ -206,12 +206,12 @@ function EventRegistrations() {
 
     const handleRemoveRegistration = (registrationId) => {
         const registration = allRegistrations.find(r => r.id === registrationId);
-        const userName = registration?.user_details?.first_name 
+        const userName = registration?.user_details?.first_name
             ? `${registration.user_details.first_name} ${registration.user_details.last_name || ''}`.trim()
-            : registration?.user_details?.username 
-            ? registration.user_details.username
-            : 'this user';
-        
+            : registration?.user_details?.username
+                ? registration.user_details.username
+                : 'this user';
+
         openPopup({
             type: 'warning',
             title: 'Remove Registration',
@@ -254,7 +254,7 @@ function EventRegistrations() {
     const filteredRegistrations = showCancelled
         ? allRegistrations.filter(reg => reg.status === 'cancelled')
         : allRegistrations.filter(reg => reg.status !== 'cancelled');
-    
+
     // Check if we should show Actions column (only for non-cancelled registrations)
     const showActionsColumn = !showCancelled;
 
@@ -277,38 +277,37 @@ function EventRegistrations() {
                         Registrations for "{event?.title}"
                     </h1>
                     <div className="flex items-center gap-3">
-                        <Button
-                            onClick={handleOpenRegisterModal}
-                            className="flex items-center gap-2"
-                        >
-                            <UserPlus className="w-4 h-4" />
-                            Register Customer
-                        </Button>
+                        {!event?.upfront_payment && (
+                            <Button
+                                onClick={handleOpenRegisterModal}
+                                className="flex items-center gap-2"
+                            >
+                                <UserPlus className="w-4 h-4" />
+                                Register Customer
+                            </Button>
+                        )}
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-text-secondary font-medium">View:</span>
                             <div className="relative inline-flex bg-background border border-border rounded-lg p-1 shadow-sm">
                                 <div
-                                    className={`absolute top-1 bottom-1 w-[calc(50%-0.25rem)] bg-primary rounded-md transition-all duration-300 ease-in-out ${
-                                        showCancelled ? 'left-[calc(50%+0.125rem)]' : 'left-1'
-                                    }`}
+                                    className={`absolute top-1 bottom-1 w-[calc(50%-0.25rem)] bg-primary rounded-md transition-all duration-300 ease-in-out ${showCancelled ? 'left-[calc(50%+0.125rem)]' : 'left-1'
+                                        }`}
                                 />
                                 <button
                                     onClick={() => setShowCancelled(false)}
-                                    className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                                        !showCancelled
+                                    className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${!showCancelled
                                             ? 'text-white'
                                             : 'text-text-secondary hover:text-text-primary'
-                                    }`}
+                                        }`}
                                 >
                                     Registered ({allRegistrations.filter(r => r.status === 'registered' || r.status === 'showed_up').length})
                                 </button>
                                 <button
                                     onClick={() => setShowCancelled(true)}
-                                    className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                                        showCancelled
+                                    className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${showCancelled
                                             ? 'text-white'
                                             : 'text-text-secondary hover:text-text-primary'
-                                    }`}
+                                        }`}
                                 >
                                     Cancelled ({allRegistrations.filter(r => r.status === 'cancelled').length})
                                 </button>
@@ -433,7 +432,7 @@ function EventRegistrations() {
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        
+
                         <div className="space-y-4">
                             {/* Event Date Display (read-only) */}
                             {nextOccurrenceDate && (
@@ -442,30 +441,30 @@ function EventRegistrations() {
                                         Event Date
                                     </label>
                                     <div className="px-3 py-2 border border-border rounded-button bg-background text-text-primary">
-                                        {new Date(nextOccurrenceDate).toLocaleDateString('en-US', { 
-                                            weekday: 'long', 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric' 
+                                        {new Date(nextOccurrenceDate).toLocaleDateString('en-US', {
+                                            weekday: 'long',
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
                                         })}
                                     </div>
                                 </div>
                             )}
-                            
-                             {/* User Search */}
-                             <div>
-                                 <label className="block text-sm font-medium text-text-primary mb-1">
-                                     Search Customer *
-                                 </label>
-                                 <input
-                                     type="text"
-                                     placeholder="Search by name, email, or phone..."
-                                     value={searchQuery}
-                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                     className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
-                                 />
-                             </div>
-                            
+
+                            {/* User Search */}
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-1">
+                                    Search Customer *
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, email, or phone..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                />
+                            </div>
+
                             {/* User List */}
                             <div>
                                 <label className="block text-sm font-medium text-text-primary mb-1">
@@ -486,9 +485,8 @@ function EventRegistrations() {
                                                 <button
                                                     key={user.id}
                                                     onClick={() => setSelectedUserId(user.id)}
-                                                    className={`w-full text-left px-4 py-3 hover:bg-primary/10 transition-colors ${
-                                                        selectedUserId === user.id ? 'bg-primary/20 border-l-4 border-primary' : ''
-                                                    }`}
+                                                    className={`w-full text-left px-4 py-3 hover:bg-primary/10 transition-colors ${selectedUserId === user.id ? 'bg-primary/20 border-l-4 border-primary' : ''
+                                                        }`}
                                                 >
                                                     <div className="font-medium text-text-primary">
                                                         {user.first_name || user.username || 'N/A'}
@@ -510,7 +508,7 @@ function EventRegistrations() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="flex justify-end space-x-3 mt-6">
                             <Button
                                 type="button"
