@@ -400,7 +400,7 @@ function UserManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm">
                                                     <div className="flex items-center gap-2">
-                                                        {/* {(isAdmin || currentUser?.is_superuser) && (
+                                                        {(isAdmin || currentUser?.is_superuser) && (
                                                             <Button
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
@@ -416,7 +416,7 @@ function UserManagement() {
                                                                 <Edit className="w-4 h-4" />
                                                                 Edit
                                                             </Button>
-                                                        )} */}
+                                                        )}
                                                         {canManage && (
                                                             <Button
                                                                 onClick={(e) => {
