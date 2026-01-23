@@ -223,7 +223,7 @@ function StaffManagement() {
                             }}
                             variant="primary"
                         >
-                            {isSuperadmin ? 'Add Admin' : (user?.role === 'admin' ? 'Add Admin/Staff' : 'Add Staff Member')}
+                            {isSuperadmin ? 'Add Admin' : (user?.role === 'admin' ? 'Add Staff' : 'Add Staff Member')}
                         </Button>
                     </div>
                 </div>
@@ -239,8 +239,8 @@ function StaffManagement() {
                             <div className="p-6">
                                 <h2 className="text-2xl font-bold text-text-primary mb-6">
                                     {editingStaff ?
-                                        (isSuperadmin ? 'Edit Admin' : (user?.role === 'admin' ? 'Edit Admin/Staff' : 'Edit Staff')) :
-                                        (isSuperadmin ? 'Add Admin' : (user?.role === 'admin' ? 'Add Admin/Staff' : 'Add Staff'))}
+                                        (isSuperadmin ? 'Edit Admin' : (user?.role === 'admin' ? 'Edit Staff' : 'Edit Staff')) :
+                                        (isSuperadmin ? 'Add Admin' : (user?.role === 'admin' ? 'Add Staff' : 'Add Staff'))}
                                 </h2>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -348,7 +348,7 @@ function StaffManagement() {
                                         >
                                             {submitLoading
                                                 ? (editingStaff ? 'Updating...' : 'Creating...')
-                                                : `${editingStaff ? 'Update' : 'Create'} ${isSuperadmin ? 'Admin' : (user?.role === 'admin' ? 'Admin/Staff' : 'Staff')}`}
+                                                : `${editingStaff ? 'Update' : 'Create'} ${isSuperadmin ? 'Admin' : (user?.role === 'admin' ? 'Staff' : 'Staff')}`}
                                         </Button>
                                         <Button
                                             type="button"

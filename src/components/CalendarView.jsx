@@ -28,6 +28,10 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [specialEvents, setSpecialEvents] = useState([]);
     const [specialEventsLoading, setSpecialEventsLoading] = useState(false);
 
+    // Simulators State
+    const [simulators, setSimulators] = useState([]);
+    const [simulatorsLoading, setSimulatorsLoading] = useState(false);
+
     // Reschedule State
     const [rescheduleState, setRescheduleState] = useState({
         open: false,
@@ -57,6 +61,22 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             await action();
         }
     };
+
+    const fetchSimulators = async () => {
+        setSimulatorsLoading(true);
+        try {
+            const response = await axios.get(endpoints.simulators.active);
+            setSimulators(response.data);
+        } catch (error) {
+            console.error("Failed to fetch simulators", error);
+        } finally {
+            setSimulatorsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchSimulators();
+    }, []);
 
     useEffect(() => {
         // Calculate date range based on current view
@@ -448,7 +468,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 </p>
                 {event.type === 'simulator' ? (
                     <p>
-                        <span className="font-semibold">Simulator:</span> Bay {event.simulator?.bay_number || 'N/A'}
+                        <span className="font-semibold">Simulator:</span> {event.simulator?.name || `Bay ${event.simulator?.bay_number || 'N/A'}`}
                     </p>
                 ) : (
                     <>
@@ -457,7 +477,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         </p>
                         {event.simulator && (
                             <p>
-                                <span className="font-semibold">Assigned Bay:</span> Bay {event.simulator.bay_number} - {event.simulator.name}
+                                <span className="font-semibold">Assigned Bay:</span> {event.simulator.name}
                             </p>
                         )}
                     </>
@@ -597,28 +617,19 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 : null;
 
             if (booking.booking_type === 'simulator') {
-                if (isUserView) {
-                    // For Simulator bookings in user view, show the specific bay name
-                    title = simBayInfo || `Simulator - Bay ${booking.simulator_details?.bay_number || '?'}`;
-                } else {
-                    // Admin view
-                    title = `Simulator - ${clientFullName}`;
-                }
+                title = clientFullName;
             } else {
-                // Coaching Booking
-                const baySuffix = simBayInfo ? ` (${simBayInfo})` : '';
+                title = clientFullName;
+            }
 
-                if (isUserView) {
-                    if (coachId) {
-                        // Staff viewing their own calendar -> Show Client Name
-                        title = `Coaching - ${clientFullName}${baySuffix}`;
-                    } else {
-                        // Client viewing their own calendar -> Show Coach Name
-                        title = `Coaching - ${coachFullName}${baySuffix}`;
-                    }
+            // Determine resource ID for day view
+            let resourceId = null;
+            if (view === 'day') {
+                if (booking.booking_type === 'simulator') {
+                    resourceId = `simulator-${booking.simulator_details?.id}`;
                 } else {
-                    // Admin View -> Show Client Name
-                    title = `Coaching - ${clientFullName}${baySuffix}`;
+                    // Coaching or TPI
+                    resourceId = 'coaching-bay';
                 }
             }
 
@@ -627,9 +638,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 title: title,
                 start: startTime,
                 end: endTime,
-                resourceId: booking.booking_type === 'simulator' ?
-                    `simulator-${booking.simulator_details?.bay_number || ''}` :
-                    `coach-${booking.coach_details?.id || 'any'}`,
+                resourceId: resourceId,
                 type: booking.booking_type,
                 client: booking.client_details,
                 simulator: booking.simulator_details,
@@ -667,10 +676,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
         return {
             id: `special-${event.display_id}`,
-            title: `Special: ${event.title}`,
+            title: event.title, // Only show title (client name equivalent for events)
             start,
             end,
             allDay: false, // Ensure it shows in the time grid, not the all-day section
+            resourceId: view === 'day' ? 'special-events' : null,
             type: 'special_event',
             is_special_event: true,
             original_event: event,
@@ -705,18 +715,44 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         '#115E59', '#4338CA'
     ];
 
+    // Prepare Resources for Day View
+    const resources = view === 'day' ? [
+        ...simulators
+            .filter(sim => !sim.is_coaching_bay)
+            .sort((a, b) => a.bay_number - b.bay_number)
+            .map(sim => ({
+                id: `simulator-${sim.id}`,
+                title: sim.name
+            })),
+        {
+            id: 'coaching-bay',
+            title: simulators.find(sim => sim.is_coaching_bay)?.name || 'Coaching Bay Simulator'
+        },
+        {
+            id: 'special-events',
+            title: 'Special Events'
+        }
+    ] : null;
+
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
             <style>{`
+                /* Resource Header Styles */
+                .rbc-time-view .rbc-header {
+                    border-bottom: 2px solid #e2e8f0;
+                    padding: 12px 4px;
+                    font-weight: 700;
+                    color: #1e293b;
+                    background: #f8fafc;
+                    text-transform: uppercase;
+                    font-size: 0.75rem;
+                    letter-spacing: 0.05em;
+                }
+
                 /* Force events to take proper width in day view to prevent overlapping */
                 .rbc-day-slot .rbc-event {
-                    max-width: 20% !important;
-                    margin-right: 4px !important;
-                }
-                
-                /* Override react-big-calendar's default width calculation */
-                .rbc-events-container .rbc-event {
-                    width: 20% !important;
+                    width: 98% !important;
+                    margin: 0 auto !important;
                 }
                 
                 /* Ensure events in the same time slot are properly spaced */
@@ -724,12 +760,21 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;
+                    padding: 2px 4px;
                 }
                 
                 /* Ensure proper positioning for overlapping events */
                 .rbc-day-slot .rbc-events-container {
                     display: flex;
-                    gap: 4px;
+                    flex-direction: column;
+                }
+
+                /* Resource Column Borders */
+                .rbc-time-header-content > .rbc-row.rbc-time-header-cell {
+                    border-left: 1px solid #e2e8f0;
+                }
+                .rbc-time-content > .rbc-day-slot {
+                    border-left: 1px solid #e2e8f0;
                 }
             `}</style>
             <div className="w-full">
@@ -839,6 +884,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             min={new Date(0, 0, 0, 0, 0, 0)}
                             max={new Date(0, 0, 0, 23, 59, 0)}
                             views={['month', 'day']} // Allow month and day views - week view is disabled
+                            resources={resources}
                             messages={{
                                 next: "Next",
                                 previous: "Prev",

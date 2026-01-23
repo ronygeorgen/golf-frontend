@@ -406,6 +406,18 @@ export const createUser = createAsyncThunk(
     }
 );
 
+export const updateUser = createAsyncThunk(
+    'admin/updateUser',
+    async ({ id, userData }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.patch(endpoints.admin.users.detail(id), userData);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Initial state
 const initialState = {
     dashboard: {
@@ -814,6 +826,12 @@ const adminSlice = createSlice({
             .addCase(createUser.fulfilled, (state, action) => {
                 state.users.list.unshift(action.payload);
                 state.users.pagination.count += 1;
+            })
+            .addCase(updateUser.fulfilled, (state, action) => {
+                const index = state.users.list.findIndex(u => u.id === action.payload.id);
+                if (index !== -1) {
+                    state.users.list[index] = action.payload;
+                }
             })
             .addCase(getUsers.rejected, (state, action) => {
                 state.users.loading = false;

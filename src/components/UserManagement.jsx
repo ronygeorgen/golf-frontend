@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getUsers, toggleUserPause, createUser } from '../store/slices/adminSlice';
+import { getUsers, toggleUserPause, createUser, updateUser } from '../store/slices/adminSlice';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import CreateUserModal from './CreateUserModal';
+import EditUserModal from './EditUserModal';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
-import { Pause, Play, Search, Filter, Plus } from 'lucide-react';
+import { Pause, Play, Search, Filter, Plus, Edit } from 'lucide-react';
 
 function UserManagement() {
     const dispatch = useAppDispatch();
@@ -27,6 +28,8 @@ function UserManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchInput, setSearchInput] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
 
     useEffect(() => {
         const params = {
@@ -58,7 +61,7 @@ function UserManagement() {
             const userData = {
                 ...formData,
                 ghl_location_id: currentUser?.ghl_location_id || storedLocationId,
-                role: 'client' // Enforce client role on frontend explicitly
+                role: formData.role || 'client'
             };
             const result = await dispatch(createUser(userData));
             if (createUser.fulfilled.match(result)) {
@@ -74,6 +77,33 @@ function UserManagement() {
         } catch (error) {
             // Error handling is done in the modal via error prop/state, but we can also show popup
             throw error; // Re-throw to let modal handle it
+        }
+    };
+
+    const handleUpdateUser = async (id, formData) => {
+        try {
+            const result = await dispatch(updateUser({ id, userData: formData }));
+            if (updateUser.fulfilled.match(result)) {
+                openPopup({
+                    type: 'success',
+                    title: 'Success',
+                    message: 'User updated successfully',
+                    confirmText: 'OK',
+                });
+            } else {
+                const errorData = result.payload;
+                let errorMessage = 'Failed to update user';
+                if (typeof errorData === 'object' && errorData !== null) {
+                    errorMessage = Object.entries(errorData)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('\n');
+                } else if (typeof errorData === 'string') {
+                    errorMessage = errorData;
+                }
+                throw new Error(errorMessage);
+            }
+        } catch (error) {
+            throw error;
         }
     };
 
@@ -369,30 +399,49 @@ function UserManagement() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                                    {canManage && (
-                                                        <Button
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                handleTogglePause(user);
-                                                            }}
-                                                            variant={user.is_paused ? "primary" : "secondary"}
-                                                            className="px-3 py-1 flex items-center gap-2"
-                                                            type="button"
-                                                        >
-                                                            {user.is_paused ? (
-                                                                <>
-                                                                    <Play className="w-4 h-4" />
-                                                                    Unpause
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Pause className="w-4 h-4" />
-                                                                    Pause
-                                                                </>
-                                                            )}
-                                                        </Button>
-                                                    )}
+                                                    <div className="flex items-center gap-2">
+                                                        {/* {(isAdmin || currentUser?.is_superuser) && (
+                                                            <Button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setSelectedUser(user);
+                                                                    setIsEditModalOpen(true);
+                                                                }}
+                                                                variant="secondary"
+                                                                className="px-3 py-1 flex items-center gap-2"
+                                                                type="button"
+                                                                title="Edit User"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                                Edit
+                                                            </Button>
+                                                        )} */}
+                                                        {canManage && (
+                                                            <Button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleTogglePause(user);
+                                                                }}
+                                                                variant={user.is_paused ? "primary" : "secondary"}
+                                                                className="px-3 py-1 flex items-center gap-2"
+                                                                type="button"
+                                                            >
+                                                                {user.is_paused ? (
+                                                                    <>
+                                                                        <Play className="w-4 h-4" />
+                                                                        Unpause
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Pause className="w-4 h-4" />
+                                                                        Pause
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -438,6 +487,16 @@ function UserManagement() {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSave={handleCreateUser}
+            />
+
+            <EditUserModal
+                isOpen={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedUser(null);
+                }}
+                onSave={handleUpdateUser}
+                user={selectedUser}
             />
 
             <PopupMessage
