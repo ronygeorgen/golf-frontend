@@ -653,7 +653,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
     // Transform Special Events - convert UTC to local time
     // Match the approach used in SpecialEvents.jsx page
-    const transformedSpecialEvents = specialEvents.map(event => {
+    const transformedSpecialEvents = specialEvents.flatMap(event => {
         // Parse date manually to avoid UTC shift (like formatDate in SpecialEvents.jsx)
         const [year, month, day] = event.date.split('-').map(Number);
 
@@ -674,18 +674,54 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // Add 1 day
         }
 
-        return {
+        const baseEvent = {
             id: `special-${event.display_id}`,
-            title: event.title, // Only show title (client name equivalent for events)
-            start,
-            end,
-            allDay: false, // Ensure it shows in the time grid, not the all-day section
+            title: event.title,
             resourceId: view === 'day' ? 'special-events' : null,
             type: 'special_event',
             is_special_event: true,
             original_event: event,
-            status: 'confirmed', // Placeholder
+            status: 'confirmed',
+            allDay: false,
         };
+
+        // Check if event crosses midnight (date part of start != date part of end)
+        if (start.getDate() !== end.getDate()) {
+            const splitEvents = [];
+
+            // Part 1: Start to End of Day 1 (23:59:59)
+            const endOfDay1 = new Date(start);
+            endOfDay1.setHours(23, 59, 59, 999);
+
+            splitEvents.push({
+                ...baseEvent,
+                start: start,
+                end: endOfDay1,
+            });
+
+            // Part 2: Start of Day 2 (00:00:00) to End
+            const startOfDay2 = new Date(end);
+            startOfDay2.setHours(0, 0, 0, 0);
+
+            // Only add part 2 if it has duration
+            if (end > startOfDay2) {
+                splitEvents.push({
+                    ...baseEvent,
+                    id: `${baseEvent.id}-part2`, // Unique ID for the second part
+                    start: startOfDay2,
+                    end: end,
+                });
+            }
+
+            return splitEvents;
+        }
+
+        // No split needed
+        return [{
+            ...baseEvent,
+            start,
+            end,
+        }];
     });
 
     const displayedEvents = calendarType === 'all'
