@@ -156,13 +156,56 @@ function SpecialEventsManagement() {
         }
     };
 
+    /**
+     * Convert Halifax local time to UTC for storage
+     * IMPORTANT: Always uses Halifax (AST = UTC-4) timezone
+     * This ensures events are created correctly regardless of admin's location
+     */
+    const convertLocalDateTimeToUTC = (date, startTime, endTime) => {
+        const [year, month, day] = date.split('-').map(Number);
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+
+        // Halifax timezone: AST = UTC-4 (4 hours behind UTC)
+        const HALIFAX_OFFSET_HOURS = -4;
+
+        // Create UTC date with Halifax time values
+        const halifaxStart = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes));
+
+        // Convert Halifax time to UTC by subtracting the offset
+        // Example: 8PM Halifax (20:00) + 4 hours = 00:00 UTC (next day)
+        const utcStart = new Date(halifaxStart.getTime() - (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
+
+        // Handle end time
+        let halifaxEnd = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes));
+
+        // Handle midnight crossover in Halifax time
+        if (endHours < startHours || (endHours === 0 && startHours !== 0)) {
+            halifaxEnd = new Date(Date.UTC(year, month - 1, day + 1, endHours, endMinutes));
+        }
+
+        const utcEnd = new Date(halifaxEnd.getTime() - (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
+
+        return {
+            date: utcStart.toISOString().split('T')[0],
+            start_time: `${utcStart.getUTCHours().toString().padStart(2, '0')}:${utcStart.getUTCMinutes().toString().padStart(2, '0')}`,
+            end_time: `${utcEnd.getUTCHours().toString().padStart(2, '0')}:${utcEnd.getUTCMinutes().toString().padStart(2, '0')}`
+        };
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Convert local date+time to UTC (handles date shift for late night times)
+        const utcDateTime = convertLocalDateTimeToUTC(
+            formData.date,
+            formData.start_time,
+            formData.end_time
+        );
+
         const submitData = {
             ...formData,
-            start_time: localTimeToUTC(formData.start_time),
-            end_time: localTimeToUTC(formData.end_time),
+            ...utcDateTime, // Replaces date, start_time, end_time with UTC values
             price: formData.price ? parseFloat(formData.price) : null,
             // Only include recurring_end_date for recurring events
             recurring_end_date: formData.event_type !== 'one_time' && formData.recurring_end_date ? formData.recurring_end_date : null,
@@ -188,16 +231,57 @@ function SpecialEventsManagement() {
         }
     };
 
+    /**
+     * Convert UTC back to Halifax local time for editing
+     * IMPORTANT: Always uses Halifax (AST = UTC-4) timezone
+     */
+    const convertUTCDateTimeToLocal = (utcDate, utcStartTime, utcEndTime) => {
+        const [year, month, day] = utcDate.split('-').map(Number);
+        const [startHours, startMinutes] = utcStartTime.split(':').map(Number);
+        const [endHours, endMinutes] = utcEndTime.split(':').map(Number);
+
+        // Halifax timezone: AST = UTC-4
+        const HALIFAX_OFFSET_HOURS = -4;
+
+        // Create UTC datetimes
+        const utcStart = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes));
+        const utcEnd = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes));
+
+        // Handle midnight crossover in UTC
+        if (endHours < startHours) {
+            utcEnd.setUTCDate(utcEnd.getUTCDate() + 1);
+        }
+
+        // Convert UTC to Halifax time by adding the offset
+        // Example: 00:00 UTC - 4 hours = 20:00 previous day (Halifax)
+        const halifaxStart = new Date(utcStart.getTime() + (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
+        const halifaxEnd = new Date(utcEnd.getTime() + (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
+
+        return {
+            date: `${halifaxStart.getUTCFullYear()}-${String(halifaxStart.getUTCMonth() + 1).padStart(2, '0')}-${String(halifaxStart.getUTCDate()).padStart(2, '0')}`,
+            start_time: `${String(halifaxStart.getUTCHours()).padStart(2, '0')}:${String(halifaxStart.getUTCMinutes()).padStart(2, '0')}`,
+            end_time: `${String(halifaxEnd.getUTCHours()).padStart(2, '0')}:${String(halifaxEnd.getUTCMinutes()).padStart(2, '0')}`
+        };
+    };
+
     const handleEdit = (event) => {
         setEditingEvent(event);
+
+        // Convert UTC date+time back to local for form display
+        const localDateTime = convertUTCDateTimeToLocal(
+            event.date,
+            event.start_time,
+            event.end_time
+        );
+
         setFormData({
             title: event.title || '',
             description: event.description || '',
             event_type: event.event_type || 'one_time',
-            date: event.date || '',
+            date: localDateTime.date,
             recurring_end_date: event.recurring_end_date || '',
-            start_time: utcTimeToLocal(event.start_time) || '09:00',
-            end_time: utcTimeToLocal(event.end_time) || '17:00',
+            start_time: localDateTime.start_time,
+            end_time: localDateTime.end_time,
             max_capacity: event.max_capacity || 10,
             is_active: event.is_active !== undefined ? event.is_active : true,
             price: event.price || '',
