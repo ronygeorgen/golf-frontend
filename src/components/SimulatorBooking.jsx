@@ -51,12 +51,8 @@ function SimulatorBooking({ client }) {
     const isStaffOrAdmin = user?.role === 'staff' || user?.role === 'admin' || user?.is_superuser;
 
     // Calculate min date
-    // specific rule: clients/guests cannot book today (must book 24h ahead -> tomorrow)
-    // Staff/Admins can book today
+    // Allow all users (including clients/guests) to book starting from today for simulators
     const minDate = new Date();
-    if (!isStaffOrAdmin) {
-        minDate.setDate(minDate.getDate() + 1);
-    }
     const minDateString = minDate.toISOString().split('T')[0];
 
     // Calculate max date (30 days from today)
