@@ -10,15 +10,15 @@
  */
 export const localTimeToUTC = (localTime) => {
     if (!localTime) return localTime;
-    
+
     const [hours, minutes] = localTime.split(':').map(Number);
     const now = new Date();
     const localDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
-    
+
     // Get UTC time
     const utcHours = localDate.getUTCHours().toString().padStart(2, '0');
     const utcMinutes = localDate.getUTCMinutes().toString().padStart(2, '0');
-    
+
     return `${utcHours}:${utcMinutes}`;
 };
 
@@ -29,15 +29,15 @@ export const localTimeToUTC = (localTime) => {
  */
 export const utcTimeToLocal = (utcTime) => {
     if (!utcTime) return utcTime;
-    
+
     const [hours, minutes] = utcTime.split(':').map(Number);
     const now = new Date();
     const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hours, minutes));
-    
+
     // Get local time
     const localHours = utcDate.getHours().toString().padStart(2, '0');
     const localMinutes = utcDate.getMinutes().toString().padStart(2, '0');
-    
+
     return `${localHours}:${localMinutes}`;
 };
 
@@ -63,15 +63,41 @@ export const formatUTCDateTimeToLocal = (utcDateTime) => {
  */
 export const localDateTimeToUTC = (date, time) => {
     if (!date || !time) return null;
-    
+
     const [year, month, day] = date.split('-').map(Number);
     const [hours, minutes] = time.split(':').map(Number);
-    
+
     // Create date in local timezone
     const localDate = new Date(year, month - 1, day, hours, minutes);
-    
+
     // Return ISO string (automatically in UTC)
     return localDate.toISOString();
+};
+
+/**
+ * Convert UTC date and time to local date for display
+ * This is critical for special events where a late-night event (e.g., 8 PM Halifax)
+ * is stored as the next day in UTC (e.g., Feb 3 00:00 UTC for Feb 2 8 PM Halifax).
+ * We need to show the correct local date to users.
+ * 
+ * @param {string} utcDate - Date in YYYY-MM-DD format (UTC)
+ * @param {string} utcTime - Time in HH:MM or HH:MM:SS format (UTC)
+ * @returns {Date} - JavaScript Date object in local timezone
+ */
+export const utcDateTimeToLocalDate = (utcDate, utcTime) => {
+    if (!utcDate || !utcTime) return null;
+
+    // Parse UTC date and time
+    const [year, month, day] = utcDate.split('-').map(Number);
+    const timeParts = utcTime.split(':').map(Number);
+    const hours = timeParts[0];
+    const minutes = timeParts[1];
+
+    // Create a UTC datetime
+    const utcDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+
+    // Return the Date object - when displayed, it will automatically show in local timezone
+    return utcDateTime;
 };
 
 

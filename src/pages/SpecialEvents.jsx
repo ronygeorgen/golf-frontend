@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { useAppSelector } from '../store/hooks';
-import { utcTimeToLocal } from '../utils/timezone';
+import { utcTimeToLocal, utcDateTimeToLocalDate } from '../utils/timezone';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import PopupMessage from '../components/PopupMessage';
@@ -109,9 +109,25 @@ function SpecialEvents() {
         });
     };
 
-    const formatDate = (dateString) => {
+    const formatDate = (dateString, timeString) => {
         if (!dateString) return '';
-        // Parse the YYYY-MM-DD string manually to avoid UTC shift
+
+        // CRITICAL FIX: Combine UTC date and time to get the correct local date
+        // Example: Event stored as "2026-02-03" at "00:00:00" UTC 
+        // should display as "February 2, 2026" in Halifax (not February 3)
+        if (timeString) {
+            const localDate = utcDateTimeToLocalDate(dateString, timeString);
+            if (localDate) {
+                return localDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+        }
+
+        // Fallback: if no time provided, just format the date as-is
         const [year, month, day] = dateString.split('-').map(Number);
         const date = new Date(year, month - 1, day);
         return date.toLocaleDateString('en-US', {
@@ -195,7 +211,7 @@ function SpecialEvents() {
                                             <div className="flex items-center gap-2 text-text-secondary">
                                                 <Calendar className="w-5 h-5" />
                                                 <span className="font-medium">Date:</span>
-                                                <span>{formatDate(event.next_occurrence_date || event.date)}</span>
+                                                <span>{formatDate(event.next_occurrence_date || event.date, event.start_time)}</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-text-secondary">
                                                 <Clock className="w-5 h-5" />
