@@ -23,9 +23,9 @@ export const localTimeToUTC = (localTime) => {
 };
 
 /**
- * Convert UTC time (HH:MM format) to local time (HH:MM format)
+ * Convert UTC time (HH:MM format) to Halifax time (HH:MM format)
  * @param {string} utcTime - Time in HH:MM format (UTC)
- * @returns {string} - Time in HH:MM format (user's local time)
+ * @returns {string} - Time in HH:MM format (Halifax/Atlantic Time)
  */
 export const utcTimeToLocal = (utcTime) => {
     if (!utcTime) return utcTime;
@@ -34,11 +34,22 @@ export const utcTimeToLocal = (utcTime) => {
     const now = new Date();
     const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hours, minutes));
 
-    // Get local time
-    const localHours = utcDate.getHours().toString().padStart(2, '0');
-    const localMinutes = utcDate.getMinutes().toString().padStart(2, '0');
+    // Convert to Halifax timezone
+    const halifaxTimeString = utcDate.toLocaleString('en-US', {
+        timeZone: 'America/Halifax',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
 
-    return `${localHours}:${localMinutes}`;
+    // Extract hours and minutes from the formatted string (format: "HH:mm")
+    const timeParts = halifaxTimeString.match(/(\d+):(\d+)/);
+    if (timeParts) {
+        return `${timeParts[1].padStart(2, '0')}:${timeParts[2].padStart(2, '0')}`;
+    }
+
+    // Fallback (shouldn't happen)
+    return utcTime;
 };
 
 /**
@@ -75,14 +86,14 @@ export const localDateTimeToUTC = (date, time) => {
 };
 
 /**
- * Convert UTC date and time to local date for display
+ * Convert UTC date and time to Halifax timezone date for display
  * This is critical for special events where a late-night event (e.g., 8 PM Halifax)
  * is stored as the next day in UTC (e.g., Feb 3 00:00 UTC for Feb 2 8 PM Halifax).
- * We need to show the correct local date to users.
+ * We need to show the correct Halifax date to users regardless of their browser timezone.
  * 
  * @param {string} utcDate - Date in YYYY-MM-DD format (UTC)
  * @param {string} utcTime - Time in HH:MM or HH:MM:SS format (UTC)
- * @returns {Date} - JavaScript Date object in local timezone
+ * @returns {Date} - JavaScript Date object representing Halifax time
  */
 export const utcDateTimeToLocalDate = (utcDate, utcTime) => {
     if (!utcDate || !utcTime) return null;
@@ -96,8 +107,27 @@ export const utcDateTimeToLocalDate = (utcDate, utcTime) => {
     // Create a UTC datetime
     const utcDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes));
 
-    // Return the Date object - when displayed, it will automatically show in local timezone
-    return utcDateTime;
+    // Convert to Halifax timezone string and parse back
+    // This gives us the correct Halifax date even when the browser is in a different timezone
+    const halifaxTimeString = utcDateTime.toLocaleString('en-US', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
+    // Parse the Halifax time string back to a Date object
+    // Format is: "MM/DD/YYYY, HH:mm:ss"
+    const [datePart, timePart] = halifaxTimeString.split(', ');
+    const [m, d, y] = datePart.split('/').map(Number);
+    const [h, min, s] = timePart.split(':').map(Number);
+
+    // Return a date object representing the Halifax time
+    return new Date(y, m - 1, d, h, min, s);
 };
 
 
