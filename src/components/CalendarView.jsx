@@ -597,7 +597,13 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }
     };
 
-    // Transform events for calendar - convert UTC to local time
+    // Transform events for calendar - convert UTC to Halifax timezone
+    console.log('🔍 DEBUG: Calendar Transformation Started');
+    console.log('📊 Redux Events Count:', events.length);
+    console.log('📊 Calendar Type:', calendarType);
+    console.log('📊 Show Cancelled Only:', showCancelledOnly);
+    console.log('📊 Raw Events:', events);
+
     const transformedEvents = events
         .filter(booking => calendarType === 'all' || booking.booking_type === calendarType)
         .filter(booking => {
@@ -613,6 +619,17 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             // Convert UTC booking times to Halifax timezone
             const startTime = utcToHalifaxDate(booking.start_time);
             const endTime = utcToHalifaxDate(booking.end_time);
+
+            console.log('🔄 Converting Booking:', {
+                id: booking.id,
+                client: `${booking.client_details?.first_name} ${booking.client_details?.last_name}`,
+                type: booking.booking_type,
+                status: booking.status,
+                utc_start: booking.start_time,
+                halifax_start: startTime,
+                utc_end: booking.end_time,
+                halifax_end: endTime
+            });
 
             // Enhanced Title Logic
             let title;
@@ -734,9 +751,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }];
     });
 
+    console.log('✅ Transformed Events Count:', transformedEvents.length);
+    console.log('✅ Transformed Events:', transformedEvents);
+
     const displayedEvents = calendarType === 'all'
         ? (showCancelledOnly ? transformedEvents : [...transformedEvents, ...transformedSpecialEvents])
         : (calendarType === 'special_event' ? transformedSpecialEvents : transformedEvents);
+
+    console.log('🎯 Final Displayed Events Count:', displayedEvents.length);
+    console.log('🎯 Final Displayed Events:', displayedEvents);
 
     const loading = calendarType === 'all'
         ? (bookingsLoading || (canViewSpecialEvents && specialEventsLoading))
