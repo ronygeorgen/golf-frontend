@@ -10,6 +10,8 @@ import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { utcTimeToLocal, utcToHalifaxDate } from '../utils/timezone';
 import Button from './ui/Button';
+import BookForClientModal from './BookForClientModal';
+import { UserPlus } from 'lucide-react';
 
 const localizer = momentLocalizer(moment);
 
@@ -43,8 +45,17 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     });
     const [availableSlots, setAvailableSlots] = useState([]);
     const [slotsLoading, setSlotsLoading] = useState(false);
+    const [showBookForClientModal, setShowBookForClientModal] = useState(false);
 
     const canViewSpecialEvents = user && (user.role === 'admin' || user.role === 'staff' || user.is_superuser);
+    // For calendar pages (/calendar, /admin/calendar): only superadmins and admins can book for clients
+    // For coaching-sessions calendar (/coaching-sessions/calendar): superadmins, admins, and staffs can book
+    const isCoachingSessionsCalendar = isUserView && coachId && user && user.id === parseInt(coachId);
+    const canBookForClients = user && (
+        isCoachingSessionsCalendar
+            ? (user.role === 'admin' || user.role === 'staff' || user.is_superuser) // coaching-sessions calendar
+            : (user.role === 'admin' || user.is_superuser) // regular calendar pages
+    );
 
     // Check if user can manage bookings (Admin, Staff, or the Client of the booking)
     const canManageBooking = (booking) => {
@@ -819,6 +830,17 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             {staffName ? `${staffName}'s Coaching Sessions Calendar` : isUserView ? 'My Bookings Calendar' : 'Bookings Calendar'}
                         </h1>
                         <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
+                            {canBookForClients && (
+                                <Button
+                                    onClick={() => setShowBookForClientModal(true)}
+                                    variant="primary"
+                                    className="flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                    <span className="hidden sm:inline">+Book for clients</span>
+                                    <span className="sm:hidden">+Book</span>
+                                </Button>
+                            )}
                             <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 bg-background/40 backdrop-blur-md rounded-2xl p-1.5 shadow-sm border border-border/40">
                                 {/* Type Toggles */}
                                 <div className="flex items-center gap-1 p-1 bg-surface/30 rounded-xl border border-border/20">
@@ -1117,6 +1139,24 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Book for Client Modal */}
+            {canBookForClients && (
+                <BookForClientModal
+                    isOpen={showBookForClientModal}
+                    onClose={() => setShowBookForClientModal(false)}
+                    onBookingSuccess={() => {
+                        // Refresh calendar after successful booking
+                        dispatch(getCalendarBookings({
+                            startDate: moment(date).startOf('month').toDate(),
+                            endDate: moment(date).endOf('month').toDate(),
+                            bookingType: calendarType === 'all' ? null : calendarType,
+                            coachId: coachId,
+                            status: showCancelledOnly ? 'cancelled' : null
+                        }));
+                    }}
+                />
             )}
         </div>
     );

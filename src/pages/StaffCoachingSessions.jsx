@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { BookingCardSkeleton } from '../components/skeletons/SkeletonLoader';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import BookForClientModal from '../components/BookForClientModal';
+import { UserPlus } from 'lucide-react';
 
 function StaffCoachingSessions() {
     const dispatch = useAppDispatch();
@@ -13,6 +15,7 @@ function StaffCoachingSessions() {
     const { upcomingBookings, completedBookings, loading, upcomingPagination, completedPagination } = useAppSelector((state) => state.booking);
     const [page, setPage] = useState(1);
     const [filter, setFilter] = useState('upcoming'); // 'upcoming' or 'completed'
+    const [showBookForClientModal, setShowBookForClientModal] = useState(false);
 
     const isUpcoming = filter === 'upcoming';
     const currentBookings = isUpcoming ? upcomingBookings : completedBookings;
@@ -60,12 +63,23 @@ function StaffCoachingSessions() {
                                 View your coaching sessions where clients have booked you as their coach
                             </p>
                         </div>
-                        <Button
-                            onClick={handleViewCalendar}
-                            variant="primary"
-                        >
-                            View on Calendar
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button
+                                onClick={() => setShowBookForClientModal(true)}
+                                variant="primary"
+                                className="flex items-center gap-2 whitespace-nowrap"
+                            >
+                                <UserPlus className="w-4 h-4" />
+                                <span className="hidden sm:inline">+Book for clients</span>
+                                <span className="sm:hidden">+Book</span>
+                            </Button>
+                            <Button
+                                onClick={handleViewCalendar}
+                                variant="secondary"
+                            >
+                                View on Calendar
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -203,6 +217,16 @@ function StaffCoachingSessions() {
                     )}
                 </div>
             </div>
+
+            {/* Book for Client Modal */}
+            <BookForClientModal
+                isOpen={showBookForClientModal}
+                onClose={() => setShowBookForClientModal(false)}
+                onBookingSuccess={() => {
+                    // Refresh coaching sessions after successful booking
+                    dispatch(getCoachingSessionsByCoach({ page, filter }));
+                }}
+            />
         </div>
     );
 }

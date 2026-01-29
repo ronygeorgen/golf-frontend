@@ -14,7 +14,7 @@ import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
 
-function CoachingBooking({ client }) {
+function CoachingBooking({ client, onBookingSuccess }) {
     const { user: reduxUser } = useAppSelector((state) => state.auth);
     const user = reduxUser || JSON.parse(localStorage.getItem('user')) || {};
 
@@ -549,6 +549,12 @@ function CoachingBooking({ client }) {
             setSelectedPackage(null); // Clear package
             setSelectedCoach(null); // Clear coach
             setBookingSuccess(true);
+            if (onBookingSuccess) {
+                // Delay closing modal to show success message
+                setTimeout(() => {
+                    onBookingSuccess();
+                }, 2000);
+            }
         } else {
             // ... (error handling)
             let errorMessage = 'Unknown error';

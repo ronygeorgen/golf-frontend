@@ -7,7 +7,7 @@ import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
 
-function SimulatorBooking({ client }) {
+function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
@@ -544,6 +544,11 @@ function SimulatorBooking({ client }) {
                         message: 'You will be redirected to complete your booking payment.',
                     });
 
+                    // Call onBookingSuccess to close modal before redirect
+                    if (onBookingSuccess) {
+                        onBookingSuccess();
+                    }
+
                     // Redirect after short delay
                     setTimeout(() => {
                         window.location.href = url.toString();
@@ -568,6 +573,12 @@ function SimulatorBooking({ client }) {
                 dispatch(getSimulatorCredits(client ? { user_id: client.id } : {}));
                 dispatch(getAvailableSimulatorHours(params));
                 showSuccess('Booking confirmed successfully!');
+                if (onBookingSuccess) {
+                    // Delay closing modal to show success message
+                    setTimeout(() => {
+                        onBookingSuccess();
+                    }, 2000);
+                }
             } else if (createBooking.rejected.match(result)) {
                 // Handle different error response formats
                 let errorMessage = 'Unknown error';
