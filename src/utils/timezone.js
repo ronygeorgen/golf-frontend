@@ -130,6 +130,41 @@ export const utcDateTimeToLocalDate = (utcDate, utcTime) => {
     return new Date(y, m - 1, d, h, min, s);
 };
 
+/**
+ * Convert UTC datetime string (ISO format) to Halifax timezone Date object
+ * Used for converting booking times from backend to display in calendar
+ * 
+ * @param {string} utcDateTimeString - ISO datetime string in UTC (e.g., "2026-01-30T20:00:00Z")
+ * @returns {Date} - JavaScript Date object representing Halifax time
+ */
+export const utcToHalifaxDate = (utcDateTimeString) => {
+    if (!utcDateTimeString) return null;
+
+    // Parse the UTC datetime string
+    const utcDate = new Date(utcDateTimeString);
+
+    // Convert to Halifax timezone string
+    const halifaxTimeString = utcDate.toLocaleString('en-US', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
+    // Parse the Halifax time string back to a Date object
+    // Format is: "MM/DD/YYYY, HH:mm:ss"
+    const [datePart, timePart] = halifaxTimeString.split(', ');
+    const [m, d, y] = datePart.split('/').map(Number);
+    const [h, min, s] = timePart.split(':').map(Number);
+
+    // Return a date object representing the Halifax time
+    return new Date(y, m - 1, d, h, min, s);
+};
+
 
 
 
