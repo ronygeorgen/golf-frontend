@@ -79,6 +79,7 @@ function AdminLayout() {
                 { path: '/admin/simulator-packages', label: 'Manage Simulator Only Packages', icon: Clock },
                 { path: '/admin/special-events', label: 'Manage Special Events', icon: CalendarDays },
                 { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },
+                { path: '/admin/liability-waiver', label: 'Manage Liability Waiver', icon: ShieldCheck },
                 ...(isSuperadmin ? [{ path: '/admin/ghl-locations', label: 'Manage GHL Locations', icon: MapPin }] : []),
             ]
         },

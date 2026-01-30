@@ -155,11 +155,51 @@ export const logout = createAsyncThunk(
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             sessionStorage.removeItem('dobPopupShown'); // Clear DOB popup flag on logout
+            sessionStorage.removeItem('waiverPopupShown'); // Clear waiver popup flag on logout
             return null;
         } catch (error) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             sessionStorage.removeItem('dobPopupShown'); // Clear DOB popup flag on logout
+            sessionStorage.removeItem('waiverPopupShown'); // Clear waiver popup flag on logout
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getActiveWaiver = createAsyncThunk(
+    'auth/getActiveWaiver',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.auth.liabilityWaiver);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const checkWaiverAcceptance = createAsyncThunk(
+    'auth/checkWaiverAcceptance',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.auth.checkWaiverAcceptance);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const acceptWaiver = createAsyncThunk(
+    'auth/acceptWaiver',
+    async (data, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(endpoints.auth.acceptWaiver, {
+                accepted_at: data.accepted_at
+            });
+            return response.data;
+        } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
         }
     }
@@ -184,6 +224,8 @@ const getInitialState = () => {
         error: null,
         otpSent: false,
         otpMessage: null,
+        activeWaiver: null,
+        waiverAcceptance: null,
     };
 };
 
@@ -414,7 +456,55 @@ const authSlice = createSlice({
                 state.error = null;
                 state.otpSent = false;
                 state.otpMessage = null;
+                state.activeWaiver = null;
+                state.waiverAcceptance = null;
                 localStorage.removeItem('locationId');
+            });
+
+        // Get Active Waiver
+        builder
+            .addCase(getActiveWaiver.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(getActiveWaiver.fulfilled, (state, action) => {
+                state.loading = false;
+                state.activeWaiver = action.payload.waiver;
+            })
+            .addCase(getActiveWaiver.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Check Waiver Acceptance
+        builder
+            .addCase(checkWaiverAcceptance.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(checkWaiverAcceptance.fulfilled, (state, action) => {
+                state.loading = false;
+                state.waiverAcceptance = action.payload;
+            })
+            .addCase(checkWaiverAcceptance.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Accept Waiver
+        builder
+            .addCase(acceptWaiver.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(acceptWaiver.fulfilled, (state, action) => {
+                state.loading = false;
+                state.waiverAcceptance = {
+                    ...state.waiverAcceptance,
+                    accepted: true,
+                    needs_acceptance: false
+                };
+            })
+            .addCase(acceptWaiver.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     },
 });

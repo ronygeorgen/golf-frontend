@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { requestOTP, verifyOTP, clearError, clearOTP } from '../store/slices/authSlice';
+import { requestOTP, verifyOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import DOBPopup from '../components/DOBPopup';
+import LiabilityWaiverPopup from '../components/LiabilityWaiverPopup';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
 
 function SignIn() {
     const dispatch = useAppDispatch();
-    const { loading, error, otpSent, otpMessage } = useAppSelector((state) => state.auth);
+    const { loading, error, otpSent, otpMessage, user } = useAppSelector((state) => state.auth);
     const location = useLocation();
     
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState('phone');
     const [showDOBPopup, setShowDOBPopup] = useState(false);
+    const [showWaiverPopup, setShowWaiverPopup] = useState(false);
+    const [activeWaiver, setActiveWaiver] = useState(null);
     
     const navigate = useNavigate();
     const { toast, showInfo, showSuccess, hideToast } = useToast();
@@ -65,10 +68,35 @@ function SignIn() {
         dispatch(clearError());
         const result = await dispatch(verifyOTP({ phone, otp }));
         if (verifyOTP.fulfilled.match(result)) {
-            // Clear the DOB popup flag on new login
+            // Clear the popup flags on new login
             sessionStorage.removeItem('dobPopupShown');
+            sessionStorage.removeItem('waiverPopupShown');
             
-            // Check if DOB is needed
+            // Check for waiver first
+            try {
+                const waiverResult = await dispatch(getActiveWaiver());
+                if (getActiveWaiver.fulfilled.match(waiverResult) && waiverResult.payload.waiver) {
+                    const waiver = waiverResult.payload.waiver;
+                    setActiveWaiver(waiver);
+                    
+                    // Check if user has accepted
+                    const acceptanceResult = await dispatch(checkWaiverAcceptance());
+                    if (checkWaiverAcceptance.fulfilled.match(acceptanceResult)) {
+                        const acceptance = acceptanceResult.payload;
+                        
+                        // Show waiver popup if needed
+                        if (acceptance.waiver_exists && acceptance.needs_acceptance) {
+                            setShowWaiverPopup(true);
+                            sessionStorage.setItem('waiverPopupShown', 'true');
+                            return; // Don't check DOB yet
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking waiver:', error);
+            }
+            
+            // Check if DOB is needed (only after waiver is handled)
             if (result.payload.needs_dob) {
                 setShowDOBPopup(true);
                 sessionStorage.setItem('dobPopupShown', 'true');
@@ -175,6 +203,20 @@ function SignIn() {
                 </p>
             </div>
             
+            <LiabilityWaiverPopup
+                isOpen={showWaiverPopup}
+                onClose={() => {
+                    setShowWaiverPopup(false);
+                    // After waiver is accepted, check for DOB popup
+                    if (user && !user.date_of_birth) {
+                        setShowDOBPopup(true);
+                        sessionStorage.setItem('dobPopupShown', 'true');
+                    } else {
+                        navigate('/'); // Navigate to root, LandingRedirect will handle role-based redirect
+                    }
+                }}
+                waiver={activeWaiver}
+            />
             <DOBPopup 
                 isOpen={showDOBPopup}
                 onClose={() => {

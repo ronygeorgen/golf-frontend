@@ -5,8 +5,10 @@ import { logout, getProfile } from '../store/slices/authSlice';
 import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package, UserCheck } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 import DOBPopup from './DOBPopup';
+import LiabilityWaiverPopup from './LiabilityWaiverPopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
+import { getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
 
 function UserLayout() {
     const navigate = useNavigate();
@@ -18,6 +20,8 @@ function UserLayout() {
     const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
     const [coachingSessionsMenuOpen, setCoachingSessionsMenuOpen] = useState(false);
     const [showDOBPopup, setShowDOBPopup] = useState(false);
+    const [showWaiverPopup, setShowWaiverPopup] = useState(false);
+    const [activeWaiver, setActiveWaiver] = useState(null);
     const dropdownRef = useRef(null);
     const packagesMenuRef = useRef(null);
     const coachingSessionsMenuRef = useRef(null);
@@ -60,8 +64,52 @@ function UserLayout() {
         };
     }, []);
 
-    // Check for missing DOB only once per session (not on every reload)
+    // Check for liability waiver acceptance
     useEffect(() => {
+        const checkWaiver = async () => {
+            if (!user) return;
+            
+            const waiverPopupShown = sessionStorage.getItem('waiverPopupShown');
+            if (waiverPopupShown === 'true') return; // Already shown in this session
+            
+            try {
+                // Get active waiver
+                const waiverResult = await dispatch(getActiveWaiver());
+                if (getActiveWaiver.fulfilled.match(waiverResult) && waiverResult.payload.waiver) {
+                    const waiver = waiverResult.payload.waiver;
+                    setActiveWaiver(waiver);
+                    
+                    // Check if user has accepted
+                    const acceptanceResult = await dispatch(checkWaiverAcceptance());
+                    if (checkWaiverAcceptance.fulfilled.match(acceptanceResult)) {
+                        const acceptance = acceptanceResult.payload;
+                        
+                        // Show popup if waiver exists and user hasn't accepted or content changed
+                        if (acceptance.waiver_exists && acceptance.needs_acceptance) {
+                            const timer = setTimeout(() => {
+                                setShowWaiverPopup(true);
+                                sessionStorage.setItem('waiverPopupShown', 'true');
+                            }, 500);
+                            return () => clearTimeout(timer);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking waiver:', error);
+            }
+        };
+        
+        if (user && location.pathname !== '/profile') {
+            checkWaiver();
+        }
+    }, [user, location.pathname, dispatch]);
+
+    // Check for missing DOB only once per session (not on every reload)
+    // This should run AFTER waiver popup is handled
+    useEffect(() => {
+        // Don't show DOB popup if waiver popup is showing
+        if (showWaiverPopup) return;
+        
         // Check if we've already shown the popup in this session
         const dobPopupShown = sessionStorage.getItem('dobPopupShown');
 
@@ -77,7 +125,7 @@ function UserLayout() {
             setShowDOBPopup(false);
             sessionStorage.removeItem('dobPopupShown');
         }
-    }, [user, location.pathname]);
+    }, [user, location.pathname, showWaiverPopup]);
 
     const handleLogout = async () => {
         await dispatch(logout());
@@ -443,6 +491,23 @@ function UserLayout() {
                 <Outlet />
             </main>
 
+            <LiabilityWaiverPopup
+                isOpen={showWaiverPopup}
+                onClose={() => {
+                    setShowWaiverPopup(false);
+                    // After waiver is accepted, check for DOB popup
+                    if (user && !user.date_of_birth) {
+                        const dobPopupShown = sessionStorage.getItem('dobPopupShown');
+                        if (!dobPopupShown) {
+                            setTimeout(() => {
+                                setShowDOBPopup(true);
+                                sessionStorage.setItem('dobPopupShown', 'true');
+                            }, 500);
+                        }
+                    }
+                }}
+                waiver={activeWaiver}
+            />
             <DOBPopup
                 isOpen={showDOBPopup}
                 onClose={() => {

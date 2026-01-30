@@ -15,6 +15,9 @@ export const endpoints = {
         ghlLocations: '/auth/ghl-locations/',
         updateDob: '/auth/update-dob/',
         memberList: '/auth/member-list/',
+        liabilityWaiver: '/auth/liability-waiver/',
+        checkWaiverAcceptance: '/auth/liability-waiver/check/',
+        acceptWaiver: '/auth/liability-waiver/accept/',
     },
 
     // Admin endpoints
@@ -84,6 +87,14 @@ export const endpoints = {
             delete: (id) => `/admin/closed-days/${id}/`,
             checkDate: '/admin/closed-days/check-date/',
             checkDatetime: '/admin/closed-days/check-datetime/',
+        },
+        liabilityWaiver: {
+            list: '/admin/liability-waiver/',
+            detail: (id) => `/admin/liability-waiver/${id}/`,
+            create: '/admin/liability-waiver/',
+            update: (id) => `/admin/liability-waiver/${id}/`,
+            delete: (id) => `/admin/liability-waiver/${id}/`,
+            acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
         },
     },
 
