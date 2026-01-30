@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { signup, verifyOTP, requestOTP, clearError, clearOTP } from '../store/slices/authSlice';
+import { signup, verifyOTP, requestOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
+import LiabilityWaiverPopup from '../components/LiabilityWaiverPopup';
 import { X } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
 function SignUp() {
     const dispatch = useAppDispatch();
-    const { loading, error, otpSent, otpMessage } = useAppSelector((state) => state.auth);
+    const { loading, error, otpSent, otpMessage, user } = useAppSelector((state) => state.auth);
+    
+    const [showWaiverPopup, setShowWaiverPopup] = useState(false);
+    const [activeWaiver, setActiveWaiver] = useState(null);
     
     const [formData, setFormData] = useState({
         email: '',
@@ -136,7 +140,35 @@ function SignUp() {
         dispatch(clearError());
         const result = await dispatch(verifyOTP({ phone: formData.phone, otp }));
         if (verifyOTP.fulfilled.match(result)) {
-            // After OTP verification, redirect to booking page
+            // Clear the popup flags on new signup
+            sessionStorage.removeItem('dobPopupShown');
+            sessionStorage.removeItem('waiverPopupShown');
+            
+            // Check for waiver first
+            try {
+                const waiverResult = await dispatch(getActiveWaiver());
+                if (getActiveWaiver.fulfilled.match(waiverResult) && waiverResult.payload.waiver) {
+                    const waiver = waiverResult.payload.waiver;
+                    setActiveWaiver(waiver);
+                    
+                    // Check if user has accepted
+                    const acceptanceResult = await dispatch(checkWaiverAcceptance());
+                    if (checkWaiverAcceptance.fulfilled.match(acceptanceResult)) {
+                        const acceptance = acceptanceResult.payload;
+                        
+                        // Show waiver popup if needed
+                        if (acceptance.waiver_exists && acceptance.needs_acceptance) {
+                            setShowWaiverPopup(true);
+                            sessionStorage.setItem('waiverPopupShown', 'true');
+                            return; // Don't redirect yet
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking waiver:', error);
+            }
+            
+            // If no waiver needed, redirect to booking page
             navigate('/booking');
         }
     };
@@ -341,6 +373,16 @@ function SignUp() {
                     </Link>
                 </p>
             </div>
+            
+            <LiabilityWaiverPopup
+                isOpen={showWaiverPopup}
+                onClose={() => {
+                    setShowWaiverPopup(false);
+                    // After waiver is accepted, redirect to booking page
+                    navigate('/booking');
+                }}
+                waiver={activeWaiver}
+            />
         </div>
     );
 }
