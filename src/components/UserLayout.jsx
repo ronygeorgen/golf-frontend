@@ -475,7 +475,7 @@ function UserLayout() {
             {/* Running Banner */}
             <div
                 onClick={() => navigate('/special-events')}
-                className="bg-yellow-400 hover:bg-yellow-500 text-black py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-yellow-500/20 shadow-sm transition-colors"
+                className="bg-red-100 hover:bg-red-200 text-red-900 py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-red-300/30 shadow-sm transition-colors"
             >
                 <div className="animate-marquee-seamless">
                     {[1, 2, 3, 4].map((i) => (
