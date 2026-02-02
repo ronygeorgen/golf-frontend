@@ -11,6 +11,7 @@ import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getMySimul
 import usePopup from '../hooks/usePopup';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import { utcTimeToLocal } from '../utils/timezone';
 
 function ClientPortal() {
     const dispatch = useAppDispatch();
@@ -249,6 +250,17 @@ function ClientPortal() {
                 setRescheduleError(`This date is closed: ${closedDateResult.closure_title || 'Closed for maintenance/holiday'}`);
                 setRescheduleCheckingAvailability(false);
                 return;
+            }
+            
+            // Check for partial closures and show info (not blocking)
+            if (closedDateResult.has_partial_closure && closedDateResult.partial_closures) {
+                const closureMessages = closedDateResult.partial_closures.map(closure => {
+                    const startTime = utcTimeToLocal(closure.start_time);
+                    const endTime = utcTimeToLocal(closure.end_time);
+                    return `${startTime} - ${endTime}`;
+                }).join(', ');
+                // Note: Partial closures don't block rescheduling, slots will be filtered by availability
+                console.info(`Partial closures on ${rescheduleDate}: ${closureMessages}`);
             }
 
             if (rescheduleTarget.booking_type === 'coaching') {

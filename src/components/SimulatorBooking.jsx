@@ -6,6 +6,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
+import { utcTimeToLocal } from '../utils/timezone';
 
 function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
@@ -139,11 +140,13 @@ function SimulatorBooking({ client, onBookingSuccess }) {
     // Track closed day status
     const [isClosedDay, setIsClosedDay] = useState(false);
     const [checkingClosedDay, setCheckingClosedDay] = useState(false);
+    const [partialClosures, setPartialClosures] = useState([]);
 
     useEffect(() => {
         const checkClosedStatus = async () => {
             if (!date) {
                 setIsClosedDay(false);
+                setPartialClosures([]);
                 return;
             }
 
@@ -152,14 +155,30 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                 const result = await dispatch(checkClosedDate(date)).unwrap();
                 if (result.is_closed) {
                     setIsClosedDay(true);
+                    setPartialClosures([]);
                     showError(`This date is closed: ${result.closure_title || 'Closed for maintenance/holiday'}`);
                 } else {
                     setIsClosedDay(false);
+                    // Check for partial closures
+                    if (result.has_partial_closure && result.partial_closures) {
+                        setPartialClosures(result.partial_closures);
+                        // Show informational message about partial closures
+                        const closureMessages = result.partial_closures.map(closure => {
+                            const startTime = utcTimeToLocal(closure.start_time);
+                            const endTime = utcTimeToLocal(closure.end_time);
+                            return `${startTime} - ${endTime}`;
+                        }).join(', ');
+                        // Note: Using a less intrusive info message instead of error
+                        console.info(`Partial closures on this date: ${closureMessages}`);
+                    } else {
+                        setPartialClosures([]);
+                    }
                 }
             } catch (error) {
                 // Determine if we should treat error as closed or not, usually not closed if check fails unless 400 bad request
                 console.error('Failed to check closed date:', error);
                 setIsClosedDay(false);
+                setPartialClosures([]);
             } finally {
                 setCheckingClosedDay(false);
             }

@@ -41,7 +41,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         date: '',
         selectedSlot: null,
         loading: false,
-        error: null
+        error: null,
+        info: null
     });
     const [availableSlots, setAvailableSlots] = useState([]);
     const [slotsLoading, setSlotsLoading] = useState(false);
@@ -136,8 +137,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const fetchAvailableSlots = async (dateStr, booking) => {
         setSlotsLoading(true);
         setAvailableSlots([]);
-        // Clear any previous errors in the reschedule modal state
-        setRescheduleState(prev => ({ ...prev, error: null }));
+        // Clear any previous errors and info in the reschedule modal state
+        setRescheduleState(prev => ({ ...prev, error: null, info: null }));
 
         try {
             // First check special events for this date
@@ -152,6 +153,20 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 }));
                 setSlotsLoading(false);
                 return;
+            }
+            
+            // Check for partial closures and show info (not blocking)
+            if (closedDateResult.has_partial_closure && closedDateResult.partial_closures) {
+                const closureMessages = closedDateResult.partial_closures.map(closure => {
+                    const startTime = utcTimeToLocal(closure.start_time);
+                    const endTime = utcTimeToLocal(closure.end_time);
+                    return `${startTime} - ${endTime}`;
+                }).join(', ');
+                // Set as info message (not error) - slots will still be filtered by availability check
+                setRescheduleState(prev => ({
+                    ...prev,
+                    info: `Note: Facility will be closed ${closureMessages} on this date. These time slots will not be available.`
+                }));
             }
 
             let response;
@@ -1141,6 +1156,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             {rescheduleState.error && (
                                 <div className="p-3 bg-red-50 text-danger text-sm rounded-lg">
                                     {rescheduleState.error}
+                                </div>
+                            )}
+                            {rescheduleState.info && (
+                                <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-lg">
+                                    {rescheduleState.info}
                                 </div>
                             )}
 
