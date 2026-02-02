@@ -480,7 +480,7 @@ function UserLayout() {
                 <div className="animate-marquee-seamless">
                     {[1, 2, 3, 4].map((i) => (
                         <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap">
-                            “School of Golf Registration Now Open - Click here to register”
+                            “School of golf registration ends at midnight tonight - click here to register”
                         </span>
                     ))}
                 </div>
