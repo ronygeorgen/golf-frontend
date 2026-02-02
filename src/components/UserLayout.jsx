@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout, getProfile } from '../store/slices/authSlice';
-import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package, UserCheck } from 'lucide-react';
+import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package, UserCheck, AlertCircle } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 import DOBPopup from './DOBPopup';
 import LiabilityWaiverPopup from './LiabilityWaiverPopup';
@@ -479,8 +479,9 @@ function UserLayout() {
             >
                 <div className="animate-marquee-seamless">
                     {[1, 2, 3, 4].map((i) => (
-                        <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap">
-                            “School of golf registration ends at midnight tonight - click here to register”
+                        <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap flex items-center justify-center gap-2">
+                            <AlertCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                            "School of golf registration ends at midnight tonight - click here to register"
                         </span>
                     ))}
                 </div>
