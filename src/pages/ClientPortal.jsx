@@ -268,7 +268,8 @@ function ClientPortal() {
                     date: rescheduleDate,
                     packageId: rescheduleTarget.coaching_package,
                     coachId: rescheduleTarget.coach,
-                    duration: rescheduleTarget.duration_minutes || 60
+                    duration: rescheduleTarget.duration_minutes || 60,
+                    exclude_booking_id: rescheduleTarget.id // Exclude current booking when rescheduling
                 }));
 
                 if (checkCoachingAvailability.fulfilled.match(result)) {
@@ -296,7 +297,8 @@ function ClientPortal() {
             } else if (rescheduleTarget.booking_type === 'simulator') {
                 const result = await dispatch(checkSimulatorAvailability({
                     date: rescheduleDate,
-                    duration: rescheduleTarget.duration_minutes || 60
+                    duration: rescheduleTarget.duration_minutes || 60,
+                    exclude_booking_id: rescheduleTarget.id // Exclude current booking when rescheduling
                 }));
 
                 if (checkSimulatorAvailability.fulfilled.match(result)) {
@@ -499,7 +501,13 @@ function ClientPortal() {
             closeRescheduleModal();
         } else {
             const errorPayload = result.payload || {};
-            const errorMessage = errorPayload.error || errorPayload.detail || errorPayload.message || 'Unable to reschedule booking.';
+            // Handle non_field_errors (from serializer validation)
+            let errorMessage = errorPayload.error || errorPayload.detail || errorPayload.message || 'Unable to reschedule booking.';
+            if (errorPayload.non_field_errors && Array.isArray(errorPayload.non_field_errors) && errorPayload.non_field_errors.length > 0) {
+                errorMessage = errorPayload.non_field_errors[0];
+            } else if (errorPayload.non_field_errors && typeof errorPayload.non_field_errors === 'string') {
+                errorMessage = errorPayload.non_field_errors;
+            }
             setRescheduleError(errorMessage);
             openPopup({
                 type: 'error',

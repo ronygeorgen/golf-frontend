@@ -175,7 +175,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     params: {
                         date: dateStr,
                         duration: booking.duration_minutes || 60,
-                        simulator_count: 1 // Assuming 1 for reschedule for now
+                        simulator_count: 1, // Assuming 1 for reschedule for now
+                        exclude_booking_id: booking.id // Exclude current booking when rescheduling
                     }
                 });
             } else {
@@ -185,7 +186,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         date: dateStr,
                         package_id: booking.package?.id,
                         coach_id: booking.coach?.id, // Keep same coach
-                        duration: booking.duration_minutes
+                        duration: booking.duration_minutes,
+                        exclude_booking_id: booking.id // Exclude current booking when rescheduling
                     }
                 });
             }
@@ -246,7 +248,13 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         } catch (error) {
             console.error("Reschedule failed", error);
             const errorData = error.response?.data || {};
-            const errorMsg = errorData.error || errorData.detail || errorData.message || 'Failed to reschedule booking.';
+            // Handle non_field_errors (from serializer validation)
+            let errorMsg = errorData.error || errorData.detail || errorData.message || 'Failed to reschedule booking.';
+            if (errorData.non_field_errors && Array.isArray(errorData.non_field_errors) && errorData.non_field_errors.length > 0) {
+                errorMsg = errorData.non_field_errors[0];
+            } else if (errorData.non_field_errors && typeof errorData.non_field_errors === 'string') {
+                errorMsg = errorData.non_field_errors;
+            }
             const isLockError = errorData.lock_applies;
 
             // Handle 24h lock override for admins (though this shouldn't happen now after backend fix)
@@ -272,7 +280,13 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             }));
                         } catch (err) {
                             const errData = err.response?.data || {};
-                            const errMsg = errData.error || errData.detail || errData.message || 'Failed to force reschedule.';
+                            // Handle non_field_errors (from serializer validation)
+                            let errMsg = errData.error || errData.detail || errData.message || 'Failed to force reschedule.';
+                            if (errData.non_field_errors && Array.isArray(errData.non_field_errors) && errData.non_field_errors.length > 0) {
+                                errMsg = errData.non_field_errors[0];
+                            } else if (errData.non_field_errors && typeof errData.non_field_errors === 'string') {
+                                errMsg = errData.non_field_errors;
+                            }
                             openPopup({ type: 'error', title: 'Error', message: errMsg });
                             setRescheduleState(prev => ({ ...prev, loading: false, error: errMsg }));
                         }

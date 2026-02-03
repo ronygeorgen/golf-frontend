@@ -61,7 +61,7 @@ function PopupMessage({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
             <div
                 className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
                 onClick={showCancel ? handleClose : undefined}

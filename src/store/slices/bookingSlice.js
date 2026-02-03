@@ -202,14 +202,18 @@ export const getBookingStats = createAsyncThunk(
 
 export const checkSimulatorAvailability = createAsyncThunk(
     'booking/checkSimulatorAvailability',
-    async ({ date, duration, simulator_count = 1 }, { rejectWithValue }) => {
+    async ({ date, duration, simulator_count = 1, exclude_booking_id }, { rejectWithValue }) => {
         try {
+            const params = {
+                date: date,
+                duration: duration,
+                simulator_count: simulator_count,
+            };
+            if (exclude_booking_id) {
+                params.exclude_booking_id = exclude_booking_id;
+            }
             const response = await apiClient.get(endpoints.bookings.checkSimulatorAvailability, {
-                params: {
-                    date: date,
-                    duration: duration,
-                    simulator_count: simulator_count,
-                },
+                params: params,
             });
             return {
                 slots: response.data.available_slots || [],
@@ -228,11 +232,12 @@ export const checkSimulatorAvailability = createAsyncThunk(
 
 export const checkCoachingAvailability = createAsyncThunk(
     'booking/checkCoachingAvailability',
-    async ({ date, packageId, coachId, duration = 60 }, { rejectWithValue }) => {
+    async ({ date, packageId, coachId, duration = 60, exclude_booking_id }, { rejectWithValue }) => {
         try {
             const params = { date: date, duration: duration };
             if (packageId) params.package_id = packageId;
             if (coachId) params.coach_id = coachId;
+            if (exclude_booking_id) params.exclude_booking_id = exclude_booking_id;
 
             const response = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
                 params: params,
