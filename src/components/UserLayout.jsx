@@ -475,13 +475,12 @@ function UserLayout() {
             {/* Running Banner */}
             <div
                 onClick={() => navigate('/special-events')}
-                className="bg-red-100 hover:bg-red-200 text-red-900 py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-red-300/30 shadow-sm transition-colors"
+                className="bg-blue-100 hover:bg-blue-200 text-blue-900 py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-blue-300/30 shadow-sm transition-colors"
             >
                 <div className="animate-marquee-seamless">
                     {[1, 2, 3, 4].map((i) => (
                         <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap flex items-center justify-center gap-2">
-                            <AlertCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                            "School of golf registration ends at midnight tonight - click here to register"
+                            "Grand Opening on Saturday 6-9pm, come celebrate with us!"
                         </span>
                     ))}
                 </div>
