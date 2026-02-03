@@ -245,10 +245,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
         } catch (error) {
             console.error("Reschedule failed", error);
-            const errorMsg = error.response?.data?.error || 'Failed to reschedule booking.';
-            const isLockError = error.response?.data?.lock_applies;
+            const errorData = error.response?.data || {};
+            const errorMsg = errorData.error || errorData.detail || errorData.message || 'Failed to reschedule booking.';
+            const isLockError = errorData.lock_applies;
 
-            // Handle 24h lock override for admins
+            // Handle 24h lock override for admins (though this shouldn't happen now after backend fix)
             if (isLockError && (user.role === 'admin' || user.is_superuser)) {
                 openPopup({
                     type: 'warning',
@@ -270,14 +271,22 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 status: showCancelledOnly ? 'cancelled' : null
                             }));
                         } catch (err) {
-                            openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force reschedule.' });
+                            const errData = err.response?.data || {};
+                            const errMsg = errData.error || errData.detail || errData.message || 'Failed to force reschedule.';
+                            openPopup({ type: 'error', title: 'Error', message: errMsg });
+                            setRescheduleState(prev => ({ ...prev, loading: false, error: errMsg }));
                         }
                     }
                 });
             } else {
+                // Show error in the modal and also as a popup for visibility
                 setRescheduleState(prev => ({ ...prev, loading: false, error: errorMsg }));
+                openPopup({
+                    type: 'error',
+                    title: 'Reschedule Failed',
+                    message: errorMsg
+                });
             }
-            setRescheduleState(prev => ({ ...prev, loading: false }));
         }
     };
 

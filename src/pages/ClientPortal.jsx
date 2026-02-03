@@ -498,7 +498,8 @@ function ClientPortal() {
             });
             closeRescheduleModal();
         } else {
-            const errorMessage = result.payload?.error || result.payload?.detail || 'Unable to reschedule booking.';
+            const errorPayload = result.payload || {};
+            const errorMessage = errorPayload.error || errorPayload.detail || errorPayload.message || 'Unable to reschedule booking.';
             setRescheduleError(errorMessage);
             openPopup({
                 type: 'error',
