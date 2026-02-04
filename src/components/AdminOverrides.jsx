@@ -15,6 +15,9 @@ import PopupMessage from './PopupMessage';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import moment from 'moment';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
+import { FaSearch, FaUser, FaExclamationTriangle, FaPlus, FaMinus } from 'react-icons/fa';
 
 function AdminOverrides() {
     const dispatch = useAppDispatch();
@@ -22,22 +25,10 @@ function AdminOverrides() {
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
 
-    const [coachingForm, setCoachingForm] = useState({
-        clientIdentifier: '',
-        packageId: '',
-        sessionCount: 1,
-        simulatorHours: 0,
-        note: '',
-    });
-    const [simForm, setSimForm] = useState({
-        clientIdentifier: '',
-        hours: 1,
-        note: '',
-    });
     const [showManualForms, setShowManualForms] = useState(false);
-    const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'coaching', 'simulator'
-    const [searchQuery, setSearchQuery] = useState(''); // Search by customer name, phone, or email
-    const [cancellingBookingId, setCancellingBookingId] = useState(null); // Track which booking is being cancelled
+    const [bookingFilter, setBookingFilter] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [cancellingBookingId, setCancellingBookingId] = useState(null);
 
     useEffect(() => {
         if (packages.list.length === 0) {
@@ -46,9 +37,7 @@ function AdminOverrides() {
     }, [dispatch, packages.list.length]);
 
     useEffect(() => {
-        // Fetch locked bookings on mount
         dispatch(getLockedBookings());
-
         return () => {
             dispatch(resetOverrideStatus('coaching'));
             dispatch(resetOverrideStatus('simulator'));
@@ -65,18 +54,17 @@ function AdminOverrides() {
             showCancel: true,
             onConfirm: async () => {
                 closePopup();
-                setCancellingBookingId(booking.id); // Set loading state
+                setCancellingBookingId(booking.id);
                 try {
                     const result = await dispatch(adminCancelBooking({ bookingId: booking.id, forceOverride: true }));
                     if (adminCancelBooking.fulfilled.match(result)) {
-                        // Refresh locked bookings list
                         dispatch(getLockedBookings());
                         showSuccess(result.payload?.message || 'Booking cancelled successfully. Credits/sessions have been restored.');
                     } else {
                         showError(result.payload?.error || result.payload?.detail || 'Unable to cancel booking.');
                     }
                 } finally {
-                    setCancellingBookingId(null); // Clear loading state
+                    setCancellingBookingId(null);
                 }
             },
         });
@@ -98,282 +86,57 @@ function AdminOverrides() {
         return `${Math.floor(duration.asHours())} hours ${duration.minutes()} minutes`;
     };
 
-    const handleCoachingSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!coachingForm.packageId) {
-            showError('Please select a package.');
-            return;
-        }
-
-        dispatch(resetOverrideStatus('coaching'));
-        const payload = {
-            client_identifier: coachingForm.clientIdentifier,
-            package_id: coachingForm.packageId || undefined,
-            session_count: Number(coachingForm.sessionCount) || 1,
-            note: coachingForm.note,
-        };
-        // Add simulator hours if provided
-        if (coachingForm.simulatorHours > 0) {
-            payload.simulator_hours = Number(coachingForm.simulatorHours);
-        }
-
-        try {
-            const result = await dispatch(grantCoachingSessions(payload));
-
-            if (grantCoachingSessions.fulfilled.match(result)) {
-                showSuccess(result.payload?.message || 'Coaching sessions added successfully.');
-                setCoachingForm({ clientIdentifier: '', packageId: '', sessionCount: 1, simulatorHours: 0, note: '' });
-            } else if (grantCoachingSessions.rejected.match(result)) {
-                const errorData = result.payload;
-                const nonFieldErrors = errorData?.non_field_errors;
-                const errorMessage = Array.isArray(nonFieldErrors) ? nonFieldErrors[0] : (errorData?.detail || errorData?.error || 'Unknown error');
-
-                // Check if this is the "no active purchase" error
-                if (errorMessage === "The client does not have an active purchase for the selected package.") {
-                    openPopup({
-                        type: 'warning',
-                        title: 'No Active Package',
-                        message: "The client does not have an active purchase for this package.\n\nDo you want to create a package for them and add the session(s)?",
-                        confirmText: 'Yes, Create & Add',
-                        cancelText: 'Cancel',
-                        showCancel: true,
-                        onConfirm: async () => {
-                            const retryPayload = { ...payload, create_if_missing: true };
-                            const retryResult = await dispatch(grantCoachingSessions(retryPayload));
-
-                            if (grantCoachingSessions.fulfilled.match(retryResult)) {
-                                showSuccess(retryResult.payload?.message || 'Package created and sessions added successfully.');
-                                setCoachingForm({ clientIdentifier: '', packageId: '', sessionCount: 1, simulatorHours: 0, note: '' });
-                            } else {
-                                const retryError = retryResult.payload?.error || retryResult.payload?.detail || 'Failed to create package.';
-                                showError(typeof retryError === 'string' ? retryError : JSON.stringify(retryError));
-                            }
-                        }
-                    });
-                } else {
-                    showError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
-                }
-            }
-        } catch (err) {
-            console.error(err);
-            showError('An unexpected error occurred.');
-        }
-    };
-
-    const handleSimulatorSubmit = async (e) => {
-        e.preventDefault();
-        dispatch(resetOverrideStatus('simulator'));
-
-        try {
-            const result = await dispatch(
-                grantSimulatorCredits({
-                    client_identifier: simForm.clientIdentifier,
-                    hours: Number(simForm.hours) || 1,
-                    note: simForm.note,
-                })
-            );
-
-            if (grantSimulatorCredits.fulfilled.match(result)) {
-                showSuccess(result.payload?.message || 'Simulator credits granted successfully.');
-                setSimForm({ clientIdentifier: '', hours: 1, note: '' });
-            } else {
-                const error = result.payload?.error || result.payload?.detail || 'Failed to grant credits.';
-                showError(typeof error === 'string' ? error : JSON.stringify(error));
-            }
-        } catch (err) {
-            console.error(err);
-            showError('An unexpected error occurred.');
-        }
-    };
-
     return (
         <div className="space-y-6">
-            {/* Header with Manual Add Credits Button */}
             <div className="flex items-center justify-end">
                 <Button
                     onClick={() => setShowManualForms(!showManualForms)}
                     variant={showManualForms ? 'secondary' : 'primary'}
                 >
-                    {showManualForms ? 'Hide Forms' : 'Manually Add Credits'}
+                    {showManualForms ? 'Hide Forms' : 'Manually Add/Remove Credits'}
                 </Button>
             </div>
 
-            {/* Manual Forms Section - Conditionally shown above bookings */}
             {showManualForms && (
                 <div className="space-y-6">
                     <div className="bg-status-pending-bg border border-status-pending-text/20 rounded-card p-4 text-status-pending-text text-sm">
                         <p className="font-semibold">Override capabilities</p>
                         <ul className="list-disc list-inside mt-2 space-y-1">
-                            <li>Use this panel to restore coaching sessions or grant simulator credits inside the 24-hour lock window.</li>
-                            <li>Search by email or phone; we'll match the client automatically.</li>
+                            <li>Use this panel to restore or reduce coaching sessions and simulator credits.</li>
+                            <li>Search by email or phone to find the client.</li>
                             <li>Admin overrides automatically log the actor performing the change.</li>
                         </ul>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-surface shadow-card rounded-card p-6 border border-border">
-                            <h2 className="text-xl font-semibold text-text-primary mb-1">Restore Coaching Sessions</h2>
-                            <p className="text-sm text-text-secondary mb-4">
-                                Add sessions back to a client's package when you approve a late cancellation or goodwill credit.
-                            </p>
-                            <form className="space-y-4" onSubmit={handleCoachingSubmit}>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">Client email or phone</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={coachingForm.clientIdentifier}
-                                        onChange={(e) => setCoachingForm({ ...coachingForm, clientIdentifier: e.target.value })}
-                                        placeholder="e.g. golfer@example.com"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">Package</label>
-                                    <select
-                                        required
-                                        value={coachingForm.packageId}
-                                        onChange={(e) => setCoachingForm({ ...coachingForm, packageId: e.target.value, simulatorHours: 0 })}
-                                    >
-                                        <option value="" disabled>Select a Package</option>
-                                        {packages.list.map((pkg) => (
-                                            <option key={pkg.id} value={pkg.id}>
-                                                {pkg.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-1">Sessions to add</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={coachingForm.sessionCount}
-                                            onChange={(e) => setCoachingForm({ ...coachingForm, sessionCount: e.target.value })}
-                                        />
-                                    </div>
-                                    {(() => {
-                                        if (!coachingForm.packageId) {
-                                            return null;
-                                        }
+                        <CoachingOverrideForm
+                            packages={packages}
+                            overrides={overrides}
+                            dispatch={dispatch}
+                            showSuccess={showSuccess}
+                            showError={showError}
+                            openPopup={openPopup}
+                        />
 
-                                        const selectedPackage = packages.list.find(pkg => pkg.id === Number(coachingForm.packageId));
-                                        if (!selectedPackage) {
-                                            return null;
-                                        }
-
-                                        // Check if package has simulator hours (combo package)
-                                        // Only show field if simulator_hours exists and is greater than 0
-                                        const simulatorHours = selectedPackage.simulator_hours;
-                                        const hoursValue = simulatorHours !== null && simulatorHours !== undefined
-                                            ? parseFloat(simulatorHours)
-                                            : 0;
-                                        const hasSimulatorHours = hoursValue > 0;
-
-                                        // Only show simulator hours field if combo package is selected
-                                        if (hasSimulatorHours) {
-                                            return (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-text-primary mb-1">Simulator Hours to add</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={coachingForm.simulatorHours}
-                                                        onChange={(e) => setCoachingForm({ ...coachingForm, simulatorHours: e.target.value })}
-                                                        placeholder="0"
-                                                    />
-                                                    <p className="text-xs text-text-secondary mt-1">
-                                                        Hours will be added back to the same package
-                                                    </p>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">Note</label>
-                                    <input
-                                        type="text"
-                                        value={coachingForm.note}
-                                        onChange={(e) => setCoachingForm({ ...coachingForm, note: e.target.value })}
-                                        placeholder="Optional admin note"
-                                    />
-                                </div>
-                                <Button
-                                    type="submit"
-                                    disabled={overrides.coaching.loading}
-                                    variant="primary"
-                                    className="w-full"
-                                >
-                                    {overrides.coaching.loading ? 'Adding Sessions...' : 'Add Sessions'}
-                                </Button>
-                            </form>
-                        </div>
-
-                        <div className="bg-surface shadow-card rounded-card p-6 border border-border">
-                            <h2 className="text-xl font-semibold text-text-primary mb-1">Grant Simulator Credits</h2>
-                            <p className="text-sm text-text-secondary mb-4">
-                                Give clients a free simulator session credit for approved cancellations or goodwill gestures.
-                            </p>
-                            <form className="space-y-4" onSubmit={handleSimulatorSubmit}>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">Client email or phone</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={simForm.clientIdentifier}
-                                        onChange={(e) => setSimForm({ ...simForm, clientIdentifier: e.target.value })}
-                                        placeholder="e.g. golfer@example.com"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">Hours to grant</label>
-                                    <input
-                                        type="number"
-                                        min="0.5"
-                                        step="0.5"
-                                        required
-                                        value={simForm.hours}
-                                        onChange={(e) => setSimForm({ ...simForm, hours: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-1">Note</label>
-                                    <input
-                                        type="text"
-                                        value={simForm.note}
-                                        onChange={(e) => setSimForm({ ...simForm, note: e.target.value })}
-                                        placeholder="Optional admin note"
-                                    />
-                                </div>
-                                <Button
-                                    type="submit"
-                                    disabled={overrides.simulator.loading}
-                                    variant="primary"
-                                    className="w-full"
-                                >
-                                    {overrides.simulator.loading ? 'Granting Credits...' : 'Grant Credits'}
-                                </Button>
-                            </form>
-                        </div>
+                        <SimulatorOverrideForm
+                            overrides={overrides}
+                            dispatch={dispatch}
+                            showSuccess={showSuccess}
+                            showError={showError}
+                        />
                     </div>
                 </div>
             )}
 
-            {/* Locked Bookings Section - Always visible below forms */}
             <div className="bg-surface shadow-card rounded-card p-6 border border-border">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                     <div>
                         <h2 className="text-xl font-semibold text-text-primary mb-1">Locked Bookings (&lt; 24 Hours)</h2>
                         <p className="text-sm text-text-secondary">
-                            Bookings that are less than 24 hours away. Only admins can cancel these bookings.
+                            Bookings less than 24 hours away. Only admins can cancel these.
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        {/* Filter Buttons */}
                         <div className="inline-flex rounded-full border border-border bg-surface shadow-sm text-xs font-medium">
                             {['all', 'coaching', 'simulator'].map((filter) => (
                                 <button
@@ -398,7 +161,6 @@ function AdminOverrides() {
                     </div>
                 </div>
 
-                {/* Search Bar */}
                 <div className="mb-4">
                     <input
                         type="text"
@@ -418,14 +180,8 @@ function AdminOverrides() {
                             : JSON.stringify(overrides.lockedBookings.error)}
                     </div>
                 ) : (() => {
-                    // Filter bookings based on type and search query
                     const filteredBookings = overrides.lockedBookings.list.filter((booking) => {
-                        // Filter by booking type
-                        if (bookingFilter !== 'all' && booking.booking_type !== bookingFilter) {
-                            return false;
-                        }
-
-                        // Filter by search query
+                        if (bookingFilter !== 'all' && booking.booking_type !== bookingFilter) return false;
                         if (searchQuery.trim()) {
                             const query = searchQuery.toLowerCase().trim();
                             const client = booking.client_details || {};
@@ -434,42 +190,18 @@ function AdminOverrides() {
                             const fullName = `${firstName} ${lastName}`.trim();
                             const phone = (client.phone || '').toLowerCase();
                             const email = (client.email || '').toLowerCase();
-
-                            return (
-                                fullName.includes(query) ||
-                                firstName.includes(query) ||
-                                lastName.includes(query) ||
-                                phone.includes(query) ||
-                                email.includes(query)
-                            );
+                            return fullName.includes(query) || firstName.includes(query) || lastName.includes(query) || phone.includes(query) || email.includes(query);
                         }
-
                         return true;
                     });
 
-                    if (overrides.lockedBookings.list.length === 0) {
-                        return (
-                            <div className="text-center py-8 text-text-secondary">
-                                No bookings are currently locked (less than 24 hours away).
-                            </div>
-                        );
-                    }
-
-                    if (filteredBookings.length === 0) {
-                        return (
-                            <div className="text-center py-8 text-text-secondary">
-                                No bookings match your search criteria.
-                            </div>
-                        );
-                    }
+                    if (overrides.lockedBookings.list.length === 0) return <div className="text-center py-8 text-text-secondary">No bookings are currently locked.</div>;
+                    if (filteredBookings.length === 0) return <div className="text-center py-8 text-text-secondary">No bookings match your search.</div>;
 
                     return (
                         <div className="space-y-4">
                             {filteredBookings.map((booking) => (
-                                <div
-                                    key={booking.id}
-                                    className="bg-background border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
-                                >
+                                <div key={booking.id} className="bg-background border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-2">
@@ -482,35 +214,25 @@ function AdminOverrides() {
                                             </div>
                                             <div className="space-y-1">
                                                 <p className="text-sm font-medium text-text-primary">
-                                                    <span className="text-text-secondary">Client:</span>{' '}
-                                                    {booking.client_details?.first_name || 'N/A'}{' '}
-                                                    {booking.client_details?.last_name || ''}
-                                                    {booking.client_details?.phone && (
-                                                        <span className="text-text-secondary ml-2">
-                                                            ({booking.client_details.phone})
-                                                        </span>
-                                                    )}
+                                                    <span className="text-text-secondary">Client:</span> {booking.client_details?.first_name || 'N/A'} {booking.client_details?.last_name || ''}
+                                                    {booking.client_details?.phone && <span className="text-text-secondary ml-2">({booking.client_details.phone})</span>}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Time:</span>{' '}
-                                                    {formatDateTime(booking.start_time)} - {moment(booking.end_time).format('h:mm A')}
+                                                    <span className="font-medium">Time:</span> {formatDateTime(booking.start_time)} - {moment(booking.end_time).format('h:mm A')}
                                                 </p>
                                                 {booking.booking_type === 'coaching' && booking.coach_details && (
                                                     <p className="text-sm text-text-secondary">
-                                                        <span className="font-medium">Coach:</span>{' '}
-                                                        {booking.coach_details.first_name} {booking.coach_details.last_name}
+                                                        <span className="font-medium">Coach:</span> {booking.coach_details.first_name} {booking.coach_details.last_name}
                                                     </p>
                                                 )}
                                                 {booking.booking_type === 'simulator' && booking.simulator_details && (
                                                     <p className="text-sm text-text-secondary">
-                                                        <span className="font-medium">Simulator:</span>{' '}
-                                                        Bay {booking.simulator_details.bay_number} - {booking.simulator_details.name}
+                                                        <span className="font-medium">Simulator:</span> Bay {booking.simulator_details.bay_number} - {booking.simulator_details.name}
                                                     </p>
                                                 )}
                                                 {booking.package_purchase_details && (
                                                     <p className="text-sm text-text-secondary">
-                                                        <span className="font-medium">Package:</span>{' '}
-                                                        {booking.package_purchase_details.package_details?.title || 'N/A'}
+                                                        <span className="font-medium">Package:</span> {booking.package_purchase_details.package_details?.title || 'N/A'}
                                                     </p>
                                                 )}
                                             </div>
@@ -544,13 +266,590 @@ function AdminOverrides() {
                 onConfirm={popup.onConfirm ? async () => {
                     const action = popup.onConfirm;
                     closePopup();
-                    if (action) {
-                        await action();
-                    }
+                    if (action) await action();
                 } : closePopup}
                 onClose={closePopup}
             />
             {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} duration={toast.duration} />}
+        </div>
+    );
+}
+
+// --- Sub-Components ---
+
+function CoachingOverrideForm({ packages, overrides, dispatch, showSuccess, showError, openPopup }) {
+    const [mode, setMode] = useState('add'); // 'add' | 'reduce'
+    const [addForm, setAddForm] = useState({
+        clientIdentifier: '',
+        packageId: '',
+        sessionCount: 1,
+        simulatorHours: 0,
+        note: '',
+    });
+
+    // Reduce Mode State
+    const [searchUserQuery, setSearchUserQuery] = useState('');
+    const [foundUser, setFoundUser] = useState(null);
+    const [userPackages, setUserPackages] = useState([]);
+    const [loadingUser, setLoadingUser] = useState(false);
+    const [reduceValues, setReduceValues] = useState({}); // { [purchaseId]: { sessions: 0, hours: 0 } }
+    const [processingReduce, setProcessingReduce] = useState(null); // purchaseId currently processing
+
+    const handleSearchUser = async () => {
+        if (!searchUserQuery) return;
+        setLoadingUser(true);
+        setFoundUser(null);
+        setUserPackages([]);
+        try {
+            const response = await apiClient.get(endpoints.admin.users.list, {
+                params: { search: searchUserQuery, page_size: 1 }
+            });
+            const users = response.data?.results || [];
+            if (users.length > 0) {
+                const user = users[0];
+                setFoundUser(user);
+                // Fetch packages
+                const packagesRes = await apiClient.get(endpoints.coaching.userPurchases, {
+                    params: { user_id: user.id, page_size: 100 }
+                });
+                const packagesData = packagesRes.data;
+                const packagesList = Array.isArray(packagesData) ? packagesData : (packagesData?.results || []);
+                setUserPackages(packagesList);
+            } else {
+                showError('User not found.');
+            }
+        } catch (error) {
+            console.error(error);
+            showError('Error searching for user.');
+        } finally {
+            setLoadingUser(false);
+        }
+    };
+
+    const handleAddSubmit = async (e) => {
+        e.preventDefault();
+        if (!addForm.packageId) {
+            showError('Please select a package.');
+            return;
+        }
+
+        dispatch(resetOverrideStatus('coaching'));
+        const payload = {
+            client_identifier: addForm.clientIdentifier,
+            package_id: addForm.packageId,
+            session_count: Number(addForm.sessionCount),
+            note: addForm.note,
+        };
+        if (addForm.simulatorHours > 0) {
+            payload.simulator_hours = Number(addForm.simulatorHours);
+        }
+
+        try {
+            const result = await dispatch(grantCoachingSessions(payload));
+            if (grantCoachingSessions.fulfilled.match(result)) {
+                showSuccess('Coaching sessions added successfully.');
+                setAddForm({ ...addForm, clientIdentifier: '', sessionCount: 1, simulatorHours: 0, note: '' });
+            } else if (grantCoachingSessions.rejected.match(result)) {
+                const errorData = result.payload;
+                const errorMessage = (errorData?.non_field_errors?.[0]) || errorData?.detail || errorData?.error || 'Unknown error';
+                if (errorMessage === "The client does not have an active purchase for the selected package.") {
+                    openPopup({
+                        type: 'warning',
+                        title: 'No Active Package',
+                        message: "Client doesn't have an active purchase.\n\nCreate a new package and add sessions?",
+                        confirmText: 'Yes, Create & Add',
+                        showCancel: true,
+                        onConfirm: async () => {
+                            const retryPayload = { ...payload, create_if_missing: true };
+                            const retryResult = await dispatch(grantCoachingSessions(retryPayload));
+                            if (grantCoachingSessions.fulfilled.match(retryResult)) {
+                                showSuccess('Package created and sessions added.');
+                                setAddForm({ ...addForm, clientIdentifier: '', sessionCount: 1, simulatorHours: 0, note: '' });
+                            } else {
+                                const retryError = retryResult.payload?.error || 'Failed to create package.';
+                                showError(typeof retryError === 'string' ? retryError : JSON.stringify(retryError));
+                            }
+                        }
+                    });
+                } else {
+                    showError(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+                }
+            }
+        } catch (err) {
+            showError('An unexpected error occurred.');
+        }
+    };
+
+    const handleReduceSubmit = async (purchaseId) => {
+        const values = reduceValues[purchaseId] || { sessions: 0, hours: 0 };
+        const sessionsToRemove = Number(values.sessions) || 0;
+        const hoursToRemove = Number(values.hours) || 0;
+
+        if (sessionsToRemove <= 0 && hoursToRemove <= 0) {
+            showError("Enter a value to remove.");
+            return;
+        }
+
+        openPopup({
+            type: 'warning',
+            title: 'Confirm Reduction',
+            message: `Remove ${sessionsToRemove} sessions and ${hoursToRemove} simulator hours from this package?`,
+            confirmText: 'Confirm Reduce',
+            showCancel: true,
+            onConfirm: async () => {
+                setProcessingReduce(purchaseId);
+                try {
+                    const payload = {
+                        client_identifier: foundUser.email || foundUser.phone || foundUser.username,
+                        session_count: -sessionsToRemove, // Negative for reduction
+                        simulator_hours: -hoursToRemove, // Negative for reduction
+                        package_purchase_id: purchaseId,
+                        note: "Admin manual reduction",
+                    };
+
+                    const result = await dispatch(grantCoachingSessions(payload));
+                    if (grantCoachingSessions.fulfilled.match(result)) {
+                        showSuccess('Reduction applied successfully.');
+                        // Refresh packages
+                        const packagesRes = await apiClient.get(endpoints.coaching.userPurchases, {
+                            params: { user_id: foundUser.id, page_size: 100 }
+                        });
+                        const packagesData = packagesRes.data;
+                        const packagesList = Array.isArray(packagesData) ? packagesData : (packagesData?.results || []);
+                        setUserPackages(packagesList);
+                        setReduceValues(prev => ({ ...prev, [purchaseId]: { sessions: 0, hours: 0 } }));
+                    } else {
+                        showError(result.payload?.error || 'Failed to reduce sessions.');
+                    }
+                } finally {
+                    setProcessingReduce(null);
+                }
+            }
+        });
+    };
+
+    return (
+        <div className="bg-surface shadow-card rounded-card p-6 border border-border">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-text-primary">Coaching Sessions</h2>
+                <div className="flex bg-background rounded-lg p-1 border border-border">
+                    <button
+                        onClick={() => setMode('add')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'add' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                        Add
+                    </button>
+                    <button
+                        onClick={() => setMode('reduce')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'reduce' ? 'bg-danger/10 text-danger' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                        Reduce
+                    </button>
+                </div>
+            </div>
+
+            {mode === 'add' ? (
+                <form className="space-y-4" onSubmit={handleAddSubmit}>
+                    <p className="text-sm text-text-secondary mb-4">Add sessions or hours to a client's package.</p>
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Client Identifier</label>
+                        <input
+                            type="text"
+                            required
+                            value={addForm.clientIdentifier}
+                            onChange={(e) => setAddForm({ ...addForm, clientIdentifier: e.target.value })}
+                            placeholder="Email, Phone, or Name"
+                            className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Package</label>
+                        <select
+                            required
+                            value={addForm.packageId}
+                            onChange={(e) => setAddForm({ ...addForm, packageId: e.target.value, simulatorHours: 0 })}
+                            className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        >
+                            <option value="" disabled>Select a Package</option>
+                            {packages.list.map((pkg) => (
+                                <option key={pkg.id} value={pkg.id}>{pkg.title}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-1">Sessions to Add</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={addForm.sessionCount}
+                                onChange={(e) => setAddForm({ ...addForm, sessionCount: e.target.value })}
+                                className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                            />
+                        </div>
+                        {addForm.packageId && packages.list.find(p => p.id === Number(addForm.packageId))?.simulator_hours > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-1">Sim Hours to Add</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    value={addForm.simulatorHours}
+                                    onChange={(e) => setAddForm({ ...addForm, simulatorHours: e.target.value })}
+                                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Note</label>
+                        <input
+                            type="text"
+                            value={addForm.note}
+                            onChange={(e) => setAddForm({ ...addForm, note: e.target.value })}
+                            className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                    </div>
+                    <Button type="submit" disabled={overrides.coaching.loading} variant="primary" className="w-full">
+                        {overrides.coaching.loading ? 'Adding...' : 'Add Sessions'}
+                    </Button>
+                </form>
+            ) : (
+                <div className="space-y-4">
+                    <p className="text-sm text-text-secondary mb-2">Search for a client to view and reduce their package balance.</p>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Enter client phone provided (preferred) or email"
+                            value={searchUserQuery}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSearchUserQuery(val);
+                                if (!val) {
+                                    setFoundUser(null);
+                                    setUserPackages([]);
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSearchUser();
+                                }
+                            }}
+                            className="flex-1 px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                        <Button onClick={handleSearchUser} disabled={loadingUser || !searchUserQuery} variant="secondary">
+                            {loadingUser ? '...' : <FaSearch />}
+                        </Button>
+                    </div>
+
+                    {foundUser && (
+                        <div className="mt-4 animate-fadeIn">
+                            <div className="flex items-center gap-2 mb-3 text-sm font-medium text-text-primary pb-2 border-b border-border">
+                                <FaUser className="text-text-secondary" />
+                                {foundUser.first_name} {foundUser.last_name} ({foundUser.phone})
+                            </div>
+
+                            {userPackages.length === 0 ? (
+                                <p className="text-sm text-text-secondary italic">No active packages found.</p>
+                            ) : (
+                                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                                    {userPackages.map(pkg => (
+                                        <div key={pkg.id} className="bg-background border border-border rounded-lg p-3 text-sm">
+                                            <div className="font-semibold text-text-primary mb-1">{pkg.package_details?.title || pkg.purchase_name}</div>
+                                            <div className="flex justify-between text-xs text-text-secondary mb-3">
+                                                <span>Remaining: <span className="text-text-primary font-medium">{pkg.sessions_remaining} sessions</span></span>
+                                                <span><span className="text-text-primary font-medium">{Number(pkg.simulator_hours_remaining)} hrs</span> sim</span>
+                                            </div>
+
+                                            <div className="bg-surface rounded border border-border p-2">
+                                                <div className="text-xs font-medium text-danger mb-2">Reduce by:</div>
+                                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                                    <div className={Number(pkg.simulator_hours_remaining) > 0 ? "" : "col-span-2"}>
+                                                        <label className="block text-[10px] text-text-secondary uppercase">Sessions</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max={pkg.sessions_remaining}
+                                                            className="w-full px-2 py-1 text-sm border border-border rounded"
+                                                            value={reduceValues[pkg.id]?.sessions || ''}
+                                                            onChange={e => setReduceValues(prev => ({
+                                                                ...prev, [pkg.id]: { ...(prev[pkg.id] || {}), sessions: e.target.value }
+                                                            }))}
+                                                        />
+                                                    </div>
+                                                    {Number(pkg.simulator_hours_remaining) > 0 && (
+                                                        <div>
+                                                            <label className="block text-[10px] text-text-secondary uppercase">Sim Hours</label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.5"
+                                                                max={pkg.simulator_hours_remaining}
+                                                                className="w-full px-2 py-1 text-sm border border-border rounded"
+                                                                value={reduceValues[pkg.id]?.hours || ''}
+                                                                onChange={e => setReduceValues(prev => ({
+                                                                    ...prev, [pkg.id]: { ...(prev[pkg.id] || {}), hours: e.target.value }
+                                                                }))}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="danger"
+                                                    className="w-full text-xs py-1"
+                                                    disabled={processingReduce === pkg.id}
+                                                    onClick={() => handleReduceSubmit(pkg.id)}
+                                                >
+                                                    {processingReduce === pkg.id ? 'Reducing...' : 'Confirm Reduction'}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function SimulatorOverrideForm({ overrides, dispatch, showSuccess, showError }) {
+    const [mode, setMode] = useState('add');
+    const [grantForm, setGrantForm] = useState({ clientIdentifier: '', hours: 1, note: '' });
+
+    // Reduce Mode State
+    const [searchUserQuery, setSearchUserQuery] = useState('');
+    const [foundUser, setFoundUser] = useState(null);
+    const [userCredits, setUserCredits] = useState([]);
+    const [totalCredits, setTotalCredits] = useState(0);
+    const [loadingUser, setLoadingUser] = useState(false);
+    const [reduceHours, setReduceHours] = useState('');
+    const [processingReduce, setProcessingReduce] = useState(false);
+
+    const handleSearchUser = async () => {
+        if (!searchUserQuery) return;
+        setLoadingUser(true);
+        setFoundUser(null);
+        setUserCredits([]);
+        setTotalCredits(0);
+        try {
+            const response = await apiClient.get(endpoints.admin.users.list, {
+                params: { search: searchUserQuery, page_size: 1 }
+            });
+            const users = response.data?.results || [];
+            if (users.length > 0) {
+                const user = users[0];
+                setFoundUser(user);
+
+                // Fetch active credits
+                const creditsRes = await apiClient.get(endpoints.simulators.credits, {
+                    params: { client_id: user.id, status: 'available' }
+                });
+                const credits = creditsRes.data?.results || creditsRes.data || [];
+                setUserCredits(credits);
+                const total = credits.reduce((sum, c) => sum + Number(c.hours_remaining), 0);
+                setTotalCredits(total);
+            } else {
+                showError('User not found.');
+            }
+        } catch (error) {
+            console.error(error);
+            showError('Error searching for user.');
+        } finally {
+            setLoadingUser(false);
+        }
+    };
+
+    const handleGrantSubmit = async (e) => {
+        e.preventDefault();
+        dispatch(resetOverrideStatus('simulator'));
+        try {
+            const result = await dispatch(grantSimulatorCredits({
+                client_identifier: grantForm.clientIdentifier,
+                hours: Number(grantForm.hours),
+                note: grantForm.note,
+            }));
+            if (grantSimulatorCredits.fulfilled.match(result)) {
+                showSuccess('Simulator credits granted.');
+                setGrantForm({ clientIdentifier: '', hours: 1, note: '' });
+            } else {
+                showError(result.payload?.error || 'Failed to grant credits.');
+            }
+        } catch (err) {
+            showError('An unexpected error occurred.');
+        }
+    };
+
+    const handleReduceSubmit = async () => {
+        const hours = Number(reduceHours);
+        if (!hours || hours <= 0) {
+            showError('Please enter valid hours to remove.');
+            return;
+        }
+        if (hours > totalCredits) {
+            showError(`Cannot remove ${hours} hours. User only has ${totalCredits} available.`);
+            return;
+        }
+
+        setProcessingReduce(true);
+        try {
+            const payload = {
+                client_identifier: foundUser.email || foundUser.phone || foundUser.username,
+                hours: -hours, // Negative for reduction
+                reason: 'manual', // or generic
+                note: "Admin manual reduction"
+            };
+            const result = await dispatch(grantSimulatorCredits(payload));
+            if (grantSimulatorCredits.fulfilled.match(result)) {
+                showSuccess('Credits removed successfully.');
+                setReduceHours('');
+                // Refresh
+                const creditsRes = await apiClient.get(endpoints.simulators.credits, {
+                    params: { client_id: foundUser.id, status: 'available' }
+                });
+                const credits = creditsRes.data?.results || creditsRes.data || [];
+                setUserCredits(credits);
+                const total = credits.reduce((sum, c) => sum + Number(c.hours_remaining), 0);
+                setTotalCredits(total);
+            } else {
+                showError(result.payload?.error || 'Failed to reduce credits.');
+            }
+        } finally {
+            setProcessingReduce(false);
+        }
+    };
+
+    return (
+        <div className="bg-surface shadow-card rounded-card p-6 border border-border">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-text-primary">Simulator Credits</h2>
+                <div className="flex bg-background rounded-lg p-1 border border-border">
+                    <button
+                        onClick={() => setMode('add')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'add' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                        Grant
+                    </button>
+                    <button
+                        onClick={() => setMode('reduce')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'reduce' ? 'bg-danger/10 text-danger' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                        Reduce
+                    </button>
+                </div>
+            </div>
+
+            {mode === 'add' ? (
+                <form className="space-y-4" onSubmit={handleGrantSubmit}>
+                    <p className="text-sm text-text-secondary mb-4">Give free simulator session credits.</p>
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Client Identifier</label>
+                        <input
+                            type="text"
+                            required
+                            value={grantForm.clientIdentifier}
+                            onChange={(e) => setGrantForm({ ...grantForm, clientIdentifier: e.target.value })}
+                            placeholder="Email, Phone"
+                            className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Hours to Grant</label>
+                        <input
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            value={grantForm.hours}
+                            onChange={(e) => setGrantForm({ ...grantForm, hours: e.target.value })}
+                            className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Note</label>
+                        <input
+                            type="text"
+                            value={grantForm.note}
+                            onChange={(e) => setGrantForm({ ...grantForm, note: e.target.value })}
+                            className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                    </div>
+                    <Button type="submit" disabled={overrides.simulator.loading} variant="primary" className="w-full">
+                        {overrides.simulator.loading ? 'Granting...' : 'Grant Credits'}
+                    </Button>
+                </form>
+            ) : (
+                <div className="space-y-4">
+                    <p className="text-sm text-text-secondary mb-2">Search for a client to deduct credits.</p>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Client phone or email"
+                            value={searchUserQuery}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSearchUserQuery(val);
+                                if (!val) {
+                                    setFoundUser(null);
+                                    setUserCredits([]);
+                                    setTotalCredits(0);
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSearchUser();
+                                }
+                            }}
+                            className="flex-1 px-3 py-2 border border-border rounded-md bg-background"
+                        />
+                        <Button onClick={handleSearchUser} disabled={loadingUser || !searchUserQuery} variant="secondary">
+                            {loadingUser ? '...' : <FaSearch />}
+                        </Button>
+                    </div>
+
+                    {foundUser && (
+                        <div className="mt-4 animate-fadeIn">
+                            <div className="flex items-center gap-2 mb-3 text-sm font-medium text-text-primary pb-2 border-b border-border">
+                                <FaUser className="text-text-secondary" />
+                                {foundUser.first_name} {foundUser.last_name} ({foundUser.phone})
+                            </div>
+
+                            <div className="bg-background border border-border rounded-lg p-3 text-sm flex justify-between items-center mb-4">
+                                <span className="text-text-secondary">Total Available:</span>
+                                <span className="text-lg font-bold text-success">{totalCredits} Hours</span>
+                            </div>
+
+                            {totalCredits > 0 ? (
+                                <div className="bg-surface rounded border border-border p-3">
+                                    <label className="block text-xs font-medium text-danger mb-2 uppercase">Hours to Remove</label>
+                                    <input
+                                        type="number"
+                                        min="0.5"
+                                        step="0.5"
+                                        max={totalCredits}
+                                        value={reduceHours}
+                                        onChange={(e) => setReduceHours(e.target.value)}
+                                        className="w-full px-3 py-2 border border-border rounded mb-3"
+                                        placeholder="0.0"
+                                    />
+                                    <Button
+                                        onClick={handleReduceSubmit}
+                                        disabled={processingReduce || !reduceHours}
+                                        variant="danger"
+                                        className="w-full"
+                                    >
+                                        {processingReduce ? 'Removing...' : 'Confirm Reduction'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-text-secondary italic text-center">User has no available credits to reduce.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
