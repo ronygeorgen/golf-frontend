@@ -117,6 +117,7 @@ export const endpoints = {
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
         availableSimulatorHours: '/bookings/available-simulator-hours/',
         guestCreate: '/bookings/guest-create/',
+        staffDailySchedule: '/bookings/staff_daily_schedule/',
     },
 
     // Simulator endpoints (public)

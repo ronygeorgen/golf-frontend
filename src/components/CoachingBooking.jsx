@@ -13,7 +13,8 @@ import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
-import { utcTimeToLocal } from '../utils/timezone';
+import { utcTimeToLocal, halifaxDateTimeToUTC } from '../utils/timezone';
+import StaffDailySchedule from './StaffDailySchedule';
 
 function CoachingBooking({ client, onBookingSuccess }) {
     const { user: reduxUser } = useAppSelector((state) => state.auth);
@@ -41,6 +42,9 @@ function CoachingBooking({ client, onBookingSuccess }) {
     const [coaches, setCoaches] = useState([]);
     const [toast, setToast] = useState({ show: false, message: '' });
     const [packageType, setPackageType] = useState('personal'); // 'personal' or 'organization'
+    const [showStaffSchedule, setShowStaffSchedule] = useState(false);
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [manualTime, setManualTime] = useState('');
 
     // Step management: 'form' -> 'slots' -> 'summary'
     const [currentStep, setCurrentStep] = useState('form');
@@ -60,6 +64,44 @@ function CoachingBooking({ client, onBookingSuccess }) {
             purchases.find((p) => p.package === selectedPackage)?.package_details;
     }, [selectedPackage, packages, purchases]);
 
+
+    const submitManualBooking = async () => {
+        if (!date || !manualTime || !selectedPackage || !selectedCoach) {
+            openPopup('Error', 'error', 'Please fill in all fields (Date, Time, Package, Coach).');
+            return;
+        }
+
+        // CRITICAL: Convert Halifax time to UTC
+        // Admin enters date/time in Halifax timezone (e.g., 2026-02-05 14:00 Halifax)
+        // We need to convert this to UTC for storage in the database
+        const utcStartTime = halifaxDateTimeToUTC(date, manualTime);
+        const startDateUTC = new Date(utcStartTime);
+        const endDateUTC = new Date(startDateUTC.getTime() + duration * 60000);
+
+        const payload = {
+            start_time: utcStartTime,
+            end_time: endDateUTC.toISOString(),
+            coaching_package: selectedPackage,
+            coach: selectedCoach,
+            duration_minutes: duration,
+            booking_type: 'coaching',
+            client_id: client ? client.id : undefined,
+            client: client ? client.id : undefined
+        };
+
+        try {
+            const result = await dispatch(createBooking(payload));
+            if (createBooking.fulfilled.match(result)) {
+                setBookingSuccess(true);
+                if (onBookingSuccess) onBookingSuccess();
+                openPopup('Success', 'success', 'Manual booking created successfully.');
+            } else {
+                openPopup('Error', 'error', result.payload || 'Failed to create booking');
+            }
+        } catch (error) {
+            openPopup('Error', 'error', 'An unexpected error occurred.');
+        }
+    };
     // Filter packages to only show those the user has purchases for (with sessions remaining)
     // This prevents staff from seeing packages they referred to clients
     const availablePackages = useMemo(() => {
@@ -722,6 +764,33 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                     onClick={(e) => e.target.showPicker && e.target.showPicker()}
                                     className="w-full cursor-pointer"
                                 />
+                                {isAdminOrStaff && date && (
+                                    <div className="mt-2 text-right">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowStaffSchedule(!showStaffSchedule)}
+                                            className="text-sm text-primary hover:text-primary-dark font-medium underline"
+                                        >
+                                            {showStaffSchedule ? 'Hide Staff Schedule' : 'View Staff Availability'}
+                                        </button>
+                                    </div>
+                                )}
+                                {isAdminOrStaff && showStaffSchedule && (
+                                    <div className="mt-2 relative z-10">
+                                        <div className="absolute top-0 left-0 w-full min-w-[300px] z-50 shadow-lg">
+                                            <StaffDailySchedule date={date} />
+                                        </div>
+                                        {/* Spacer to prevent overlap if relative positioning isn't enough, 
+                                            but absolute over overlays is usually better. 
+                                            However, absolute might clip if parent overflow is hidden. 
+                                            Let's use static for now to push content down. */}
+                                    </div>
+                                )}
+                                {isAdminOrStaff && showStaffSchedule && (
+                                    <div className="mt-2">
+                                        <StaffDailySchedule date={date} />
+                                    </div>
+                                )}
                             </div>
 
                             <div>
@@ -917,246 +986,294 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                     >
                                         {loading || bookingLoading ? 'Checking Availability...' : 'Check Availability'}
                                     </Button>
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
 
-            {/* Step 2: Slots Step */}
-            {currentStep === 'slots' && (
-                <div className="bg-surface rounded-card shadow-card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-text-primary">Available Time Slots</h2>
-                        <Button
-                            onClick={handleBack}
-                            variant="secondary"
-                            className="flex items-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                            Back
-                        </Button>
-                    </div>
-                    {loading || bookingLoading ? (
-                        <BookingSlotsSkeleton count={8} />
-                    ) : availability.coaching && availability.coaching.length > 0 ? (
-                        <>
-                            {availability.specialEventMessage && (
-                                <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-4">
-                                    <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
-                                </div>
-                            )}
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                                <h3 className="text-lg font-bold text-text-primary">Select a Time Slot</h3>
-                                <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
-                                    <span className="font-medium">Book coaching sessions for</span>
-                                    <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
-                                        {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
-                                    </span>
-                                    <span className="text-text-secondary/50">|</span>
-                                    <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
-                                        {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''} `.trim() : `${duration} min`}
-                                    </span>
-                                    {selectedCoach && (
-                                        <>
-                                            <span className="text-text-secondary/50">|</span>
-                                            <span className="px-2 py-1 bg-status-personal-bg text-status-personal-text rounded-badge font-semibold">
-                                                {coaches.find(c => c.id === selectedCoach)?.first_name} {coaches.find(c => c.id === selectedCoach)?.last_name}
-                                            </span>
-                                        </>
-                                    )}
-                                    {selectedPackage && (
-                                        <>
-                                            <span className="text-text-secondary/50">|</span>
-                                            <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
-                                                {packages.find(p => p.id === selectedPackage)?.title}
-                                            </span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
-                                {availability.coaching.map((slot, index) => {
-                                    const disabled = isSlotDisabled(slot);
-                                    const conflict = getSpecialEventConflict(slot);
-                                    const specialEvent = conflict?.event;
-                                    const isDurationConflict = conflict?.isDurationConflict;
-                                    const eventStartTime = conflict?.eventStartTime;
-                                    const suggestedDuration = disabled && !specialEvent ? getSuggestedDuration(slot) : null;
-                                    // Check if this slot is selected (compare by start_time since that's unique)
-                                    const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
+                                    {isAdminOrStaff && (
+                                        <div className="mt-6 border-t pt-4">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-sm font-bold text-gray-700">Admin Controls</h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsManualMode(!isManualMode)}
+                                                    className={`text-xs px-3 py-1 rounded border ${isManualMode ? 'bg-orange-100 border-orange-300 text-orange-800' : 'bg-gray-100 text-gray-600'}`}
+                                                >
+                                                    {isManualMode ? 'Disable Manual Mode' : 'Enable Manual Mode'}
+                                                </button>
+                                            </div>
 
-                                    return (
-                                        <div
-                                            key={index}
-                                            className={`p-4 border-2 rounded-card transition duration-200 relative group ${disabled
-                                                ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
-                                                : isSelected
-                                                    ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
-                                                    : 'border-border hover:border-primary hover:bg-background cursor-pointer'
-                                                }`}
-                                            onClick={() => !disabled && handleSlotSelect(slot)}
-                                        >
-                                            <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
-                                                {new Date(slot.start_time).toLocaleTimeString('en-US', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </div>
-                                            <div className={`text-sm ${disabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
-                                                {duration} minutes
-                                            </div>
-                                            <div className="text-xs text-gray-400 mt-1">
-                                                Coach & Bay assigned at confirmation
-                                            </div>
-                                            {disabled && (
-                                                <div className="mt-2 pt-2 border-t border-danger/30">
-                                                    {specialEvent ? (
-                                                        <div className="text-xs text-danger font-medium">
-                                                            {isDurationConflict ? (
-                                                                <>
-                                                                    Exceeds availability
-                                                                    <div className="text-danger/80 mt-1">
-                                                                        Max: {conflict.maxDuration} mins
-                                                                    </div>
-                                                                </>
-                                                            ) : (
-                                                                `Event: ${specialEvent.title}`
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="text-xs text-danger font-medium">
-                                                                Exceeds availability
-                                                            </div>
-                                                            <div className="text-xs text-danger/80 mt-1">
-                                                                Max: {suggestedDuration} mins
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {/* Tooltip on hover */}
-                                            {disabled && (
-                                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                                                    <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg w-max max-w-xs sm:max-w-md text-center">
-                                                        {specialEvent ? (
-                                                            isDurationConflict ? (
-                                                                <>
-                                                                    <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
-                                                                    <div className="mb-1">
-                                                                        Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
-                                                                    </div>
-                                                                    <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <div className="font-semibold mb-1">⚠️ Unavailable</div>
-                                                                    <div className="mb-1">Special Event: {specialEvent.title}</div>
-                                                                    <div className="text-yellow-300 font-medium">Please select a different time</div>
-                                                                </>
-                                                            )
-                                                        ) : (
-                                                            <>
-                                                                <div className="font-semibold mb-1">⚠️ Duration too long</div>
-                                                                <div className="mb-1">
-                                                                    Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                                                </div>
-                                                                <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} mins or less</div>
-                                                            </>
-                                                        )}
-                                                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
-                                                            <div className="border-4 border-transparent border-t-gray-900"></div>
-                                                        </div>
+                                            {isManualMode && (
+                                                <div className="bg-orange-50 border border-orange-200 rounded p-4 space-y-4">
+                                                    <p className="text-xs text-orange-700 font-medium">
+                                                        Warning: Manual booking bypasses availability checks. Ensure staff and bay are actually free.
+                                                    </p>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                                                        <input
+                                                            type="time"
+                                                            value={manualTime}
+                                                            onChange={(e) => setManualTime(e.target.value)}
+                                                            className="w-full px-3 py-2 border rounded"
+                                                        />
                                                     </div>
+                                                    {!selectedCoach && (
+                                                        <p className="text-xs text-red-500">Please select a coach above.</p>
+                                                    )}
+                                                    <Button
+                                                        onClick={submitManualBooking}
+                                                        disabled={bookingLoading || !manualTime || !selectedPackage || !selectedCoach || !date}
+                                                        variant="accent" // Use a different variant for manual
+                                                        className="w-full"
+                                                    >
+                                                        {bookingLoading ? 'Booking...' : 'Force Book Session'}
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-center py-8 text-text-secondary">
-                            <p>No available time slots found. Please try a different date or package.</p>
+                                    )}
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
-            )}
+            )
+            }
+
+            {/* Step 2: Slots Step */}
+            {
+                currentStep === 'slots' && (
+                    <div className="bg-surface rounded-card shadow-card p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold text-text-primary">Available Time Slots</h2>
+                            <Button
+                                onClick={handleBack}
+                                variant="secondary"
+                                className="flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                                Back
+                            </Button>
+                        </div>
+                        {loading || bookingLoading ? (
+                            <BookingSlotsSkeleton count={8} />
+                        ) : availability.coaching && availability.coaching.length > 0 ? (
+                            <>
+                                {availability.specialEventMessage && (
+                                    <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-4">
+                                        <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
+                                    </div>
+                                )}
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+                                    <h3 className="text-lg font-bold text-text-primary">Select a Time Slot</h3>
+                                    <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
+                                        <span className="font-medium">Book coaching sessions for</span>
+                                        <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
+                                            {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
+                                        </span>
+                                        <span className="text-text-secondary/50">|</span>
+                                        <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
+                                            {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''} `.trim() : `${duration} min`}
+                                        </span>
+                                        {selectedCoach && (
+                                            <>
+                                                <span className="text-text-secondary/50">|</span>
+                                                <span className="px-2 py-1 bg-status-personal-bg text-status-personal-text rounded-badge font-semibold">
+                                                    {coaches.find(c => c.id === selectedCoach)?.first_name} {coaches.find(c => c.id === selectedCoach)?.last_name}
+                                                </span>
+                                            </>
+                                        )}
+                                        {selectedPackage && (
+                                            <>
+                                                <span className="text-text-secondary/50">|</span>
+                                                <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
+                                                    {packages.find(p => p.id === selectedPackage)?.title}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+                                    {availability.coaching.map((slot, index) => {
+                                        const disabled = isSlotDisabled(slot);
+                                        const conflict = getSpecialEventConflict(slot);
+                                        const specialEvent = conflict?.event;
+                                        const isDurationConflict = conflict?.isDurationConflict;
+                                        const eventStartTime = conflict?.eventStartTime;
+                                        const suggestedDuration = disabled && !specialEvent ? getSuggestedDuration(slot) : null;
+                                        // Check if this slot is selected (compare by start_time since that's unique)
+                                        const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
+
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`p-4 border-2 rounded-card transition duration-200 relative group ${disabled
+                                                    ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
+                                                    : isSelected
+                                                        ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
+                                                        : 'border-border hover:border-primary hover:bg-background cursor-pointer'
+                                                    }`}
+                                                onClick={() => !disabled && handleSlotSelect(slot)}
+                                            >
+                                                <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
+                                                    {new Date(slot.start_time).toLocaleTimeString('en-US', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </div>
+                                                <div className={`text-sm ${disabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
+                                                    {duration} minutes
+                                                </div>
+                                                <div className="text-xs text-gray-400 mt-1">
+                                                    Coach & Bay assigned at confirmation
+                                                </div>
+                                                {disabled && (
+                                                    <div className="mt-2 pt-2 border-t border-danger/30">
+                                                        {specialEvent ? (
+                                                            <div className="text-xs text-danger font-medium">
+                                                                {isDurationConflict ? (
+                                                                    <>
+                                                                        Exceeds availability
+                                                                        <div className="text-danger/80 mt-1">
+                                                                            Max: {conflict.maxDuration} mins
+                                                                        </div>
+                                                                    </>
+                                                                ) : (
+                                                                    `Event: ${specialEvent.title}`
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-xs text-danger font-medium">
+                                                                    Exceeds availability
+                                                                </div>
+                                                                <div className="text-xs text-danger/80 mt-1">
+                                                                    Max: {suggestedDuration} mins
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {/* Tooltip on hover */}
+                                                {disabled && (
+                                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                                        <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg w-max max-w-xs sm:max-w-md text-center">
+                                                            {specialEvent ? (
+                                                                isDurationConflict ? (
+                                                                    <>
+                                                                        <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
+                                                                        <div className="mb-1">
+                                                                            Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                                                        </div>
+                                                                        <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className="font-semibold mb-1">⚠️ Unavailable</div>
+                                                                        <div className="mb-1">Special Event: {specialEvent.title}</div>
+                                                                        <div className="text-yellow-300 font-medium">Please select a different time</div>
+                                                                    </>
+                                                                )
+                                                            ) : (
+                                                                <>
+                                                                    <div className="font-semibold mb-1">⚠️ Duration too long</div>
+                                                                    <div className="mb-1">
+                                                                        Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                    </div>
+                                                                    <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} mins or less</div>
+                                                                </>
+                                                            )}
+                                                            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+                                                                <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center py-8 text-text-secondary">
+                                <p>No available time slots found. Please try a different date or package.</p>
+                            </div>
+                        )}
+                    </div>
+                )
+            }
 
             {/* Step 3: Summary Step */}
-            {currentStep === 'summary' && selectedSlot && (
-                <div className="bg-surface rounded-card shadow-card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-text-primary">Booking Summary</h2>
-                        <Button
-                            onClick={handleBack}
-                            variant="secondary"
-                            className="flex items-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                            Back
-                        </Button>
-                    </div>
-                    <div className="bg-background rounded-card p-6">
-                        <h4 className="text-lg font-bold text-text-primary mb-4">Confirm Your Booking</h4>
-                        <div className="space-y-2 mb-4">
-                            <p className="text-text-primary">
-                                <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
-                            </p>
-                            <p className="text-text-primary">
-                                <span className="font-medium">Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            <p className="text-text-primary">
-                                <span className="font-medium">Duration:</span> {duration} minutes
-                            </p>
-                            {selectedSlot.available_coaches && selectedSlot.available_coaches.length > 0 && (
-                                <div className="mt-4">
-                                    <p className="font-medium text-text-primary mb-2">Available Coaches:</p>
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {selectedSlot.available_coaches.map((coach, idx) => (
-                                            <li key={idx} className="text-text-secondary">
-                                                {coach.name} (Bay {coach.assigned_bay})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                            {selectedPackage && (
-                                <p className="text-text-primary">
-                                    <span className="font-medium">
-                                        {packageType === 'organization' ? 'Group sessions left after booking:' : 'Sessions left after booking:'}
-                                    </span> {Math.max(sessionsRemaining - 1, 0)}
-                                </p>
-                            )}
+            {
+                currentStep === 'summary' && selectedSlot && (
+                    <div className="bg-surface rounded-card shadow-card p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold text-text-primary">Booking Summary</h2>
+                            <Button
+                                onClick={handleBack}
+                                variant="secondary"
+                                className="flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                                Back
+                            </Button>
                         </div>
-                        <Button
-                            onClick={handleBooking}
-                            disabled={bookingLoading}
-                            loading={bookingLoading}
-                            variant="primary"
-                            className="w-full py-3 flex items-center justify-center gap-2"
-                        >
-                            {bookingLoading ? (
-                                <>
-                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span>Processing...</span>
-                                </>
-                            ) : (
-                                'Confirm Booking'
-                            )}
-                        </Button>
+                        <div className="bg-background rounded-card p-6">
+                            <h4 className="text-lg font-bold text-text-primary mb-4">Confirm Your Booking</h4>
+                            <div className="space-y-2 mb-4">
+                                <p className="text-text-primary">
+                                    <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
+                                </p>
+                                <p className="text-text-primary">
+                                    <span className="font-medium">Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                <p className="text-text-primary">
+                                    <span className="font-medium">Duration:</span> {duration} minutes
+                                </p>
+                                {selectedSlot.available_coaches && selectedSlot.available_coaches.length > 0 && (
+                                    <div className="mt-4">
+                                        <p className="font-medium text-text-primary mb-2">Available Coaches:</p>
+                                        <ul className="list-disc list-inside space-y-1">
+                                            {selectedSlot.available_coaches.map((coach, idx) => (
+                                                <li key={idx} className="text-text-secondary">
+                                                    {coach.name} (Bay {coach.assigned_bay})
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {selectedPackage && (
+                                    <p className="text-text-primary">
+                                        <span className="font-medium">
+                                            {packageType === 'organization' ? 'Group sessions left after booking:' : 'Sessions left after booking:'}
+                                        </span> {Math.max(sessionsRemaining - 1, 0)}
+                                    </p>
+                                )}
+                            </div>
+                            <Button
+                                onClick={handleBooking}
+                                disabled={bookingLoading}
+                                loading={bookingLoading}
+                                variant="primary"
+                                className="w-full py-3 flex items-center justify-center gap-2"
+                            >
+                                {bookingLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Processing...</span>
+                                    </>
+                                ) : (
+                                    'Confirm Booking'
+                                )}
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             <PopupMessage
                 open={popup.open}
@@ -1175,7 +1292,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                 } : closePopup}
                 onClose={closePopup}
             />
-        </div>
+        </div >
     );
 }
 

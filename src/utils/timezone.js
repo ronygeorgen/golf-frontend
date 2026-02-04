@@ -175,3 +175,51 @@ export const utcToHalifaxDate = (utcDateTimeString) => {
 
 
 
+
+
+/**
+ * Convert Halifax local date and time to UTC ISO string
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {string} time - Time in HH:MM format (Halifax time)
+ * @returns {string} - ISO datetime string in UTC
+ */
+export const halifaxDateTimeToUTC = (date, time) => {
+    if (!date || !time) return null;
+
+    const [year, month, day] = date.split('-').map(Number);
+    const [hours, minutes] = time.split(':').map(Number);
+
+    // Create a date string in ISO format
+    const dateTimeStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+
+    // Create a temporary date object (will be in browser's local timezone)
+    const tempDate = new Date(dateTimeStr);
+
+    // Get what this date/time would be in Halifax timezone
+    const halifaxString = tempDate.toLocaleString('en-US', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
+    // Parse the Halifax string to get the actual Halifax time
+    const [hDate, hTime] = halifaxString.split(', ');
+    const [hMonth, hDay, hYear] = hDate.split('/').map(Number);
+    const [hHour, hMin, hSec] = hTime.split(':').map(Number);
+
+    // Calculate the offset between what we created and what Halifax shows
+    const halifaxDate = new Date(hYear, hMonth - 1, hDay, hHour, hMin, hSec);
+    const offset = tempDate.getTime() - halifaxDate.getTime();
+
+    // Create the correct date by applying the offset
+    const inputDate = new Date(year, month - 1, day, hours, minutes, 0);
+    const utcDate = new Date(inputDate.getTime() - offset);
+
+    // Return ISO string (in UTC)
+    return utcDate.toISOString();
+};
