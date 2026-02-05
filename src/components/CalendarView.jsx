@@ -154,7 +154,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 setSlotsLoading(false);
                 return;
             }
-            
+
             // Check for partial closures and show info (not blocking)
             if (closedDateResult.has_partial_closure && closedDateResult.partial_closures) {
                 const closureMessages = closedDateResult.partial_closures.map(closure => {
@@ -330,25 +330,54 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 openPopup({
                     type: 'warning',
                     title: 'Force Cancel?',
-                    message: `${errorMsg}\n\nDo you want to force cancel this booking?`,
-                    confirmText: 'Yes, Force Cancel',
-                    showCancel: true,
-                    onConfirm: async () => {
-                        try {
-                            await axios.post(endpoints.bookings.cancel(bookingId), { force_override: true });
-                            openPopup({ type: 'success', title: 'Cancelled', message: 'Booking cancelled with override.' });
-                            // Refresh
-                            dispatch(getCalendarBookings({
-                                startDate: moment(date).startOf('month').toDate(),
-                                endDate: moment(date).endOf('month').toDate(),
-                                bookingType: calendarType === 'all' ? null : calendarType,
-                                coachId: coachId,
-                                status: showCancelledOnly ? 'cancelled' : null
-                            }));
-                        } catch (err) {
-                            openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force cancel.' });
+                    message: `${errorMsg}\n\nThis booking is within the 24-hour window. Do you want to give the customer credit?`,
+                    customActions: [
+                        {
+                            label: 'Yes, Refund Credit',
+                            variant: 'primary',
+                            onClick: async () => {
+                                try {
+                                    await axios.post(endpoints.bookings.cancel(bookingId), { force_override: true, refund_credit: true });
+                                    openPopup({ type: 'success', title: 'Cancelled', message: 'Booking cancelled with credit override.' });
+                                    // Refresh
+                                    dispatch(getCalendarBookings({
+                                        startDate: moment(date).startOf('month').toDate(),
+                                        endDate: moment(date).endOf('month').toDate(),
+                                        bookingType: calendarType === 'all' ? null : calendarType,
+                                        coachId: coachId,
+                                        status: showCancelledOnly ? 'cancelled' : null
+                                    }));
+                                } catch (err) {
+                                    openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force cancel.' });
+                                }
+                            }
+                        },
+                        {
+                            label: 'No, Cancel Without Refund',
+                            variant: 'danger',
+                            onClick: async () => {
+                                try {
+                                    await axios.post(endpoints.bookings.cancel(bookingId), { force_override: true, refund_credit: false });
+                                    openPopup({ type: 'success', title: 'Cancelled', message: 'Booking cancelled without refund.' });
+                                    // Refresh
+                                    dispatch(getCalendarBookings({
+                                        startDate: moment(date).startOf('month').toDate(),
+                                        endDate: moment(date).endOf('month').toDate(),
+                                        bookingType: calendarType === 'all' ? null : calendarType,
+                                        coachId: coachId,
+                                        status: showCancelledOnly ? 'cancelled' : null
+                                    }));
+                                } catch (err) {
+                                    openPopup({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to force cancel.' });
+                                }
+                            }
+                        },
+                        {
+                            label: 'Cancel',
+                            variant: 'secondary',
+                            shouldClose: true
                         }
-                    }
+                    ]
                 });
             } else {
                 openPopup({
@@ -1117,6 +1146,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 showCancel={popup.showCancel}
                 onConfirm={popup.onConfirm ? handlePopupConfirm : closePopup}
                 onClose={closePopup}
+                customActions={popup.customActions}
             />
             {/* Reschedule Modal */}
             {rescheduleState.open && (

@@ -38,6 +38,7 @@ function PopupMessage({
     showCancel = false,
     onConfirm,
     onClose,
+    customActions,
 }) {
     if (!open) {
         return null;
@@ -83,24 +84,43 @@ function PopupMessage({
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
-                    {showCancel && (
-                        <Button
-                            type="button"
-                            onClick={handleClose}
-                            variant="secondary"
-                            className="px-4 py-2 text-sm"
-                        >
-                            {cancelText}
-                        </Button>
+                    {customActions ? (
+                        customActions.map((action, index) => (
+                            <Button
+                                key={index}
+                                type="button"
+                                onClick={() => {
+                                    if (action.onClick) action.onClick();
+                                    if (action.shouldClose !== false) handleClose();
+                                }}
+                                variant={action.variant || 'primary'}
+                                className={action.className || "px-4 py-2 text-sm"}
+                            >
+                                {action.label}
+                            </Button>
+                        ))
+                    ) : (
+                        <>
+                            {showCancel && (
+                                <Button
+                                    type="button"
+                                    onClick={handleClose}
+                                    variant="secondary"
+                                    className="px-4 py-2 text-sm"
+                                >
+                                    {cancelText}
+                                </Button>
+                            )}
+                            <Button
+                                type="button"
+                                onClick={handleConfirm}
+                                variant={type === 'error' ? 'danger' : type === 'warning' ? 'accent' : 'primary'}
+                                className="px-4 py-2 text-sm"
+                            >
+                                {confirmText}
+                            </Button>
+                        </>
                     )}
-                    <Button
-                        type="button"
-                        onClick={handleConfirm}
-                        variant={type === 'error' ? 'danger' : type === 'warning' ? 'accent' : 'primary'}
-                        className="px-4 py-2 text-sm"
-                    >
-                        {confirmText}
-                    </Button>
                 </div>
             </div>
         </div>

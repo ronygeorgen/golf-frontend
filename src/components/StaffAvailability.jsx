@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getStaff, getStaffAvailability, updateStaffAvailability, getStaffDayAvailability, updateStaffDayAvailability, setSelectedStaff } from '../store/slices/adminSlice';
+import { getStaff, getStaffAvailability, updateStaffAvailability, getStaffDayAvailability, updateStaffDayAvailability, setSelectedStaff, getStaffBlockedDates, blockStaffDate, unblockStaffDate } from '../store/slices/adminSlice';
 import { Plus, Trash2, ArrowLeft, ChevronDown } from 'lucide-react';
-import { localTimeToUTC, utcTimeToLocal } from '../utils/timezone';
+import { utcTimeToLocal } from '../utils/timezone';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -29,19 +29,25 @@ function StaffAvailability() {
     const navigate = useNavigate();
     const { id } = useParams();
     const { popup, openPopup, closePopup } = usePopup();
-    const { list: staff, loading, selectedStaff, availability, dayAvailability } = useAppSelector((state) => state.admin.staff);
+    const { list: staff, loading, selectedStaff, availability, dayAvailability, blockedDates } = useAppSelector((state) => state.admin.staff);
 
     // Filter state
     const [filter, setFilter] = useState('all');
 
     // Add form state
     const [showAddForm, setShowAddForm] = useState(false);
-    const [availabilityType, setAvailabilityType] = useState(null); // 'weekly' or 'day_specific'
+    const [availabilityType, setAvailabilityType] = useState(null); // 'weekly', 'day_specific', or 'block_date'
     const [newAvailability, setNewAvailability] = useState({
         day_of_week: '',
         date: '',
         start_time: '09:00',
         end_time: '17:00'
+    });
+    const [blockDateData, setBlockDateData] = useState({
+        date: '',
+        start_time: '',
+        end_time: '',
+        reason: ''
     });
     const [addingAvailability, setAddingAvailability] = useState(false);
 
@@ -67,6 +73,7 @@ function StaffAvailability() {
         if (selectedStaff) {
             dispatch(getStaffAvailability({ staffId: selectedStaff.id }));
             dispatch(getStaffDayAvailability({ staffId: selectedStaff.id }));
+            dispatch(getStaffBlockedDates({ staffId: selectedStaff.id }));
         }
     }, [dispatch, selectedStaff]);
 
@@ -102,6 +109,12 @@ function StaffAvailability() {
             start_time: '09:00',
             end_time: '17:00'
         });
+        setBlockDateData({
+            date: '',
+            start_time: '',
+            end_time: '',
+            reason: ''
+        });
     };
 
     const handleAddAvailability = async () => {
@@ -122,7 +135,7 @@ function StaffAvailability() {
             // Check if this day and start_time already exists
             const exists = availabilityArray.some(avail =>
                 avail.day_of_week === parseInt(newAvailability.day_of_week) &&
-                avail.start_time === localTimeToUTC(newAvailability.start_time)
+                avail.start_time === newAvailability.start_time
             );
 
             if (exists) {
@@ -134,13 +147,13 @@ function StaffAvailability() {
                 return;
             }
 
-            // Convert local times to UTC before sending
+            // Convert Halifax times to UTC before sending (regardless of admin's browser timezone)
             const updatedAvailability = [
                 ...availabilityArray,
                 {
                     day_of_week: parseInt(newAvailability.day_of_week),
-                    start_time: localTimeToUTC(newAvailability.start_time),
-                    end_time: localTimeToUTC(newAvailability.end_time)
+                    start_time: newAvailability.start_time,
+                    end_time: newAvailability.end_time
                 }
             ];
 
@@ -178,7 +191,7 @@ function StaffAvailability() {
             // Check if this date and start_time already exists
             const exists = dayAvailabilityArray.some(avail =>
                 avail.date === newAvailability.date &&
-                avail.start_time === localTimeToUTC(newAvailability.start_time)
+                avail.start_time === newAvailability.start_time
             );
 
             if (exists) {
@@ -195,8 +208,8 @@ function StaffAvailability() {
                 ...dayAvailabilityArray,
                 {
                     date: newAvailability.date,
-                    start_time: localTimeToUTC(newAvailability.start_time),
-                    end_time: localTimeToUTC(newAvailability.end_time)
+                    start_time: newAvailability.start_time,
+                    end_time: newAvailability.end_time
                 }
             ];
 
@@ -219,6 +232,109 @@ function StaffAvailability() {
             } finally {
                 setAddingAvailability(false);
             }
+        } else if (availabilityType === 'block_date') {
+            if (!blockDateData.date) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Select a date',
+                    message: 'Please select a date to block.',
+                });
+                return;
+            }
+
+            const blockedDatesArray = Array.isArray(blockedDates) ? blockedDates : [];
+
+            // Check if this date is already blocked
+            const exists = blockedDatesArray.some(bd => bd.date === blockDateData.date);
+
+            if (exists) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Date already blocked',
+                    message: 'This date is already blocked for this staff member.',
+                });
+                return;
+            }
+
+            // Validate times if provided
+            if ((blockDateData.start_time && !blockDateData.end_time) || (!blockDateData.start_time && blockDateData.end_time)) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Invalid Time Range',
+                    message: 'Please provide both start time and end time for partial-day blocks, or leave both empty for full-day blocks.',
+                });
+                return;
+            }
+
+            if (blockDateData.start_time && blockDateData.end_time && blockDateData.start_time >= blockDateData.end_time) {
+                openPopup({
+                    type: 'warning',
+                    title: 'Invalid Time Range',
+                    message: 'End time must be after start time.',
+                });
+                return;
+            }
+
+            setAddingAvailability(true);
+            try {
+                const payload = {
+                    staffId: selectedStaff.id,
+                    date: blockDateData.date,
+                    reason: blockDateData.reason
+                };
+
+                // Only include times if both are provided
+                if (blockDateData.start_time && blockDateData.end_time) {
+                    payload.start_time = blockDateData.start_time;
+                    payload.end_time = blockDateData.end_time;
+                }
+
+                const result = await dispatch(blockStaffDate(payload));
+
+                if (blockStaffDate.fulfilled.match(result)) {
+                    const { cancelled_bookings, refunded_sessions, refunded_simulator_hours, message } = result.payload;
+
+                    openPopup({
+                        type: 'success',
+                        title: 'Date Blocked Successfully',
+                        message: (
+                            <div className="space-y-2">
+                                <p>{message}</p>
+                                {cancelled_bookings > 0 && (
+                                    <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm">
+                                        <p className="font-semibold text-blue-900">Cancellation Summary:</p>
+                                        <ul className="mt-2 space-y-1 text-blue-800">
+                                            <li>• Cancelled Bookings: {cancelled_bookings}</li>
+                                            <li>• Refunded Sessions: {refunded_sessions}</li>
+                                            {refunded_simulator_hours > 0 && (
+                                                <li>• Refunded Simulator Hours: {refunded_simulator_hours.toFixed(2)}</li>
+                                            )}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        ),
+                    });
+
+                    // Reset form
+                    setBlockDateData({
+                        date: '',
+                        start_time: '',
+                        end_time: '',
+                        reason: ''
+                    });
+                    setShowAddForm(false);
+                    setAvailabilityType(null);
+                } else {
+                    openPopup({
+                        type: 'error',
+                        title: 'Error',
+                        message: result.payload?.error || 'Failed to block date.',
+                    });
+                }
+            } finally {
+                setAddingAvailability(false);
+            }
         }
     };
 
@@ -228,7 +344,7 @@ function StaffAvailability() {
         if (isDaySpecific) {
             const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
             const updatedValue = (field === 'start_time' || field === 'end_time')
-                ? localTimeToUTC(value)
+                ? value
                 : value;
 
             const updatedDayAvailability = dayAvailabilityArray.map(avail =>
@@ -244,7 +360,7 @@ function StaffAvailability() {
         } else {
             const availabilityArray = Array.isArray(availability) ? availability : [];
             const updatedValue = (field === 'start_time' || field === 'end_time')
-                ? localTimeToUTC(value)
+                ? value
                 : field === 'day_of_week' ? parseInt(value) : value;
 
             const updatedAvailability = availabilityArray.map(avail =>
@@ -409,7 +525,7 @@ function StaffAvailability() {
                                     className="flex items-center space-x-2 bg-primary hover:bg-primary-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200 whitespace-nowrap"
                                 >
                                     <Plus className="w-5 h-5" />
-                                    <span className="whitespace-nowrap">Add Availability</span>
+                                    <span className="whitespace-nowrap">Add/Block Availability</span>
                                     <ChevronDown className={`w-4 h-4 transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
                                 </button>
 
@@ -430,6 +546,13 @@ function StaffAvailability() {
                                                 <div className="font-medium">Day-Specific</div>
                                                 <div className="text-xs text-gray-500">One-time availability</div>
                                             </button>
+                                            <button
+                                                onClick={() => handleAddTypeSelect('block_date')}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors border-t border-gray-200"
+                                            >
+                                                <div className="font-medium">Block Specific Date</div>
+                                                <div className="text-xs text-gray-500">Make staff unavailable</div>
+                                            </button>
                                         </div>
                                     </div>
                                 )}
@@ -439,72 +562,135 @@ function StaffAvailability() {
 
                     {/* Add Availability Form */}
                     {showAddForm && (
-                        <div className={`mb-6 p-4 rounded-lg border ${availabilityType === 'weekly' ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                        <div className={`mb-6 p-4 rounded-lg border ${availabilityType === 'weekly' ? 'bg-blue-50 border-blue-200' :
+                            availabilityType === 'day_specific' ? 'bg-green-50 border-green-200' :
+                                'bg-red-50 border-red-200'
+                            }`}>
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                                Add New {availabilityType === 'weekly' ? 'Weekly Recurring' : 'Day-Specific'} Availability
+                                {availabilityType === 'weekly' ? 'Add New Weekly Recurring Availability' :
+                                    availabilityType === 'day_specific' ? 'Add New Day-Specific Availability' :
+                                        'Block Specific Date'}
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                {availabilityType === 'weekly' ? (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Day of Week
-                                        </label>
-                                        <select
-                                            value={newAvailability.day_of_week}
-                                            onChange={(e) => setNewAvailability({ ...newAvailability, day_of_week: e.target.value })}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                        >
-                                            <option value="" className="text-gray-900">Select day</option>
-                                            {DAYS_OF_WEEK.map(day => (
-                                                <option key={day.value} value={day.value} className="text-gray-900">
-                                                    {day.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                {availabilityType === 'block_date' ? (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Date to Block
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={blockDateData.date}
+                                                onChange={(e) => setBlockDateData({ ...blockDateData, date: e.target.value })}
+                                                min={new Date().toISOString().split('T')[0]}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Start Time (Optional)
+                                            </label>
+                                            <input
+                                                type="time"
+                                                value={blockDateData.start_time}
+                                                onChange={(e) => setBlockDateData({ ...blockDateData, start_time: e.target.value })}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">Leave empty for full-day block</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                End Time (Optional)
+                                            </label>
+                                            <input
+                                                type="time"
+                                                value={blockDateData.end_time}
+                                                onChange={(e) => setBlockDateData({ ...blockDateData, end_time: e.target.value })}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">Leave empty for full-day block</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Reason (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={blockDateData.reason}
+                                                onChange={(e) => setBlockDateData({ ...blockDateData, reason: e.target.value })}
+                                                placeholder="e.g., Vacation, Doctor appointment"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
+                                            />
+                                        </div>
+                                    </>
                                 ) : (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={newAvailability.date}
-                                            onChange={(e) => setNewAvailability({ ...newAvailability, date: e.target.value })}
-                                            min={new Date().toISOString().split('T')[0]}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-white"
-                                        />
-                                    </div>
+                                    <>
+                                        {availabilityType === 'weekly' ? (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Day of Week
+                                                </label>
+                                                <select
+                                                    value={newAvailability.day_of_week}
+                                                    onChange={(e) => setNewAvailability({ ...newAvailability, day_of_week: e.target.value })}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                                                >
+                                                    <option value="" className="text-gray-900">Select day</option>
+                                                    {DAYS_OF_WEEK.map(day => (
+                                                        <option key={day.value} value={day.value} className="text-gray-900">
+                                                            {day.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Date
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={newAvailability.date}
+                                                    onChange={(e) => setNewAvailability({ ...newAvailability, date: e.target.value })}
+                                                    min={new Date().toISOString().split('T')[0]}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-white"
+                                                />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Start Time
+                                            </label>
+                                            <input
+                                                type="time"
+                                                value={newAvailability.start_time}
+                                                onChange={(e) => setNewAvailability({ ...newAvailability, start_time: e.target.value })}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                End Time
+                                            </label>
+                                            <input
+                                                type="time"
+                                                value={newAvailability.end_time}
+                                                onChange={(e) => setNewAvailability({ ...newAvailability, end_time: e.target.value })}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                    </>
                                 )}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Start Time
-                                    </label>
-                                    <input
-                                        type="time"
-                                        value={newAvailability.start_time}
-                                        onChange={(e) => setNewAvailability({ ...newAvailability, start_time: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        End Time
-                                    </label>
-                                    <input
-                                        type="time"
-                                        value={newAvailability.end_time}
-                                        onChange={(e) => setNewAvailability({ ...newAvailability, end_time: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
                                 <div className="flex items-end space-x-2">
                                     <button
                                         onClick={handleAddAvailability}
                                         disabled={addingAvailability}
-                                        className={`flex-1 ${availabilityType === 'weekly' ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300' : 'bg-green-600 hover:bg-green-700 disabled:bg-green-300'} disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200`}
+                                        className={`flex-1 ${availabilityType === 'weekly' ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300' :
+                                            availabilityType === 'day_specific' ? 'bg-green-600 hover:bg-green-700 disabled:bg-green-300' :
+                                                'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
+                                            } disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200`}
                                     >
-                                        {addingAvailability ? 'Adding...' : 'Add'}
+                                        {addingAvailability ? (availabilityType === 'block_date' ? 'Blocking...' : 'Adding...') : (availabilityType === 'block_date' ? 'Block Date' : 'Add')}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -564,8 +750,8 @@ function StaffAvailability() {
                                         <tr key={avail.displayKey} className="hover:bg-gray-50">
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${avail.type === 'weekly'
-                                                        ? 'bg-blue-100 text-blue-800'
-                                                        : 'bg-green-100 text-green-800'
+                                                    ? 'bg-blue-100 text-blue-800'
+                                                    : 'bg-green-100 text-green-800'
                                                     }`}>
                                                     {avail.type === 'weekly' ? 'Weekly' : 'Day-Specific'}
                                                 </span>
@@ -601,22 +787,22 @@ function StaffAvailability() {
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <input
                                                     type="time"
-                                                    value={utcTimeToLocal(avail.start_time) || '09:00'}
+                                                    value={avail.start_time || '09:00'}
                                                     onChange={(e) => handleUpdateAvailability(avail.id, 'start_time', e.target.value, avail.type === 'day_specific')}
                                                     className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${avail.type === 'weekly'
-                                                            ? 'focus:ring-blue-500'
-                                                            : 'focus:ring-green-500'
+                                                        ? 'focus:ring-blue-500'
+                                                        : 'focus:ring-green-500'
                                                         }`}
                                                 />
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <input
                                                     type="time"
-                                                    value={utcTimeToLocal(avail.end_time) || '17:00'}
+                                                    value={avail.end_time || '17:00'}
                                                     onChange={(e) => handleUpdateAvailability(avail.id, 'end_time', e.target.value, avail.type === 'day_specific')}
                                                     className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${avail.type === 'weekly'
-                                                            ? 'focus:ring-blue-500'
-                                                            : 'focus:ring-green-500'
+                                                        ? 'focus:ring-blue-500'
+                                                        : 'focus:ring-green-500'
                                                         }`}
                                                 />
                                             </td>
@@ -634,6 +820,122 @@ function StaffAvailability() {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+
+                    {/* Blocked Dates Section */}
+                    {!loading && blockedDates && blockedDates.length > 0 && (
+                        <div className="mt-8">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Blocked Dates</h3>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-red-50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Date
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Type / Time
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Reason
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Blocked By
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {blockedDates.map((blocked) => (
+                                            <tr key={blocked.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    <span className="text-gray-900 font-medium">
+                                                        {new Date(blocked.date + 'T00:00:00').toLocaleDateString('en-US', {
+                                                            weekday: 'short',
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                            day: 'numeric'
+                                                        })}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    {blocked.is_full_day_block ? (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                            Full Day
+                                                        </span>
+                                                    ) : (
+                                                        <div>
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                                Partial Day
+                                                            </span>
+                                                            <div className="text-sm text-gray-600 mt-1">
+                                                                {blocked.start_time} - {blocked.end_time}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <span className="text-gray-600">
+                                                        {blocked.reason || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    <span className="text-gray-600 text-sm">
+                                                        {blocked.created_by_name || 'Admin'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    <button
+                                                        onClick={() => {
+                                                            openPopup({
+                                                                type: 'warning',
+                                                                title: 'Unblock Date',
+                                                                message: `Are you sure you want to unblock ${new Date(blocked.date + 'T00:00:00').toLocaleDateString()}? This will allow bookings on this date again.`,
+                                                                customActions: [
+                                                                    {
+                                                                        label: 'Unblock',
+                                                                        variant: 'primary',
+                                                                        onClick: async () => {
+                                                                            const result = await dispatch(unblockStaffDate({
+                                                                                staffId: selectedStaff.id,
+                                                                                date: blocked.date
+                                                                            }));
+                                                                            if (unblockStaffDate.fulfilled.match(result)) {
+                                                                                openPopup({
+                                                                                    type: 'success',
+                                                                                    title: 'Date Unblocked',
+                                                                                    message: result.payload?.message || 'Date has been unblocked successfully.',
+                                                                                });
+                                                                            } else {
+                                                                                openPopup({
+                                                                                    type: 'error',
+                                                                                    title: 'Error',
+                                                                                    message: result.payload?.error || 'Failed to unblock date.',
+                                                                                });
+                                                                            }
+                                                                        }
+                                                                    },
+                                                                    {
+                                                                        label: 'Cancel',
+                                                                        variant: 'secondary',
+                                                                        shouldClose: true
+                                                                    }
+                                                                ]
+                                                            });
+                                                        }}
+                                                        className="text-red-600 hover:text-red-900 font-medium text-sm"
+                                                    >
+                                                        Unblock
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 

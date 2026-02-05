@@ -132,6 +132,58 @@ export const updateStaffDayAvailability = createAsyncThunk(
     }
 );
 
+// Staff Blocked Dates thunks
+export const getStaffBlockedDates = createAsyncThunk(
+    'admin/getStaffBlockedDates',
+    async ({ staffId }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.admin.staff.blockedDates(staffId));
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const blockStaffDate = createAsyncThunk(
+    'admin/blockStaffDate',
+    async ({ staffId, date, start_time, end_time, reason }, { rejectWithValue }) => {
+        try {
+            const payload = { date, reason };
+
+            // Only include times if both are provided
+            if (start_time && end_time) {
+                payload.start_time = start_time;
+                payload.end_time = end_time;
+            }
+
+            const response = await apiClient.post(
+                endpoints.admin.staff.blockedDates(staffId),
+                payload
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const unblockStaffDate = createAsyncThunk(
+    'admin/unblockStaffDate',
+    async ({ staffId, date }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.delete(
+                endpoints.admin.staff.blockedDates(staffId),
+                { data: { date } }
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+
 // Simulator thunks
 export const getSimulators = createAsyncThunk(
     'admin/getSimulators',
@@ -311,9 +363,12 @@ export const updateBookingStatus = createAsyncThunk(
 
 export const adminCancelBooking = createAsyncThunk(
     'admin/adminCancelBooking',
-    async ({ bookingId, forceOverride = false }, { rejectWithValue }) => {
+    async ({ bookingId, forceOverride = false, refundCredit = undefined }, { rejectWithValue }) => {
         try {
-            const payload = forceOverride ? { force_override: true } : {};
+            const payload = {};
+            if (forceOverride) payload.force_override = true;
+            if (refundCredit !== undefined) payload.refund_credit = refundCredit;
+
             const response = await apiClient.post(endpoints.admin.bookings.cancel(bookingId), payload);
             return response.data;
         } catch (error) {
@@ -431,6 +486,7 @@ const initialState = {
         selectedStaff: null,
         availability: [],
         dayAvailability: [],
+        blockedDates: [],
         loading: false,
         error: null,
     },
@@ -630,6 +686,56 @@ const adminSlice = createSlice({
                 state.staff.loading = false;
                 state.staff.error = action.payload;
             });
+
+        // Staff Blocked Dates
+        builder
+            .addCase(getStaffBlockedDates.pending, (state) => {
+                state.staff.loading = true;
+                state.staff.error = null;
+            })
+            .addCase(getStaffBlockedDates.fulfilled, (state, action) => {
+                state.staff.loading = false;
+                state.staff.blockedDates = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(getStaffBlockedDates.rejected, (state, action) => {
+                state.staff.loading = false;
+                state.staff.error = action.payload;
+            })
+            .addCase(blockStaffDate.pending, (state) => {
+                state.staff.loading = true;
+                state.staff.error = null;
+            })
+            .addCase(blockStaffDate.fulfilled, (state, action) => {
+                state.staff.loading = false;
+                // Add the new blocked date to the list if it has the blocked_date property
+                if (action.payload?.blocked_date) {
+                    state.staff.blockedDates.push(action.payload.blocked_date);
+                }
+            })
+            .addCase(blockStaffDate.rejected, (state, action) => {
+                state.staff.loading = false;
+                state.staff.error = action.payload;
+            })
+            .addCase(unblockStaffDate.pending, (state) => {
+                state.staff.loading = true;
+                state.staff.error = null;
+            })
+            .addCase(unblockStaffDate.fulfilled, (state, action) => {
+                state.staff.loading = false;
+                // Remove the unblocked date from the list
+                // The date is in the meta.arg.date
+                const dateToRemove = action.meta?.arg?.date;
+                if (dateToRemove) {
+                    state.staff.blockedDates = state.staff.blockedDates.filter(
+                        bd => bd.date !== dateToRemove
+                    );
+                }
+            })
+            .addCase(unblockStaffDate.rejected, (state, action) => {
+                state.staff.loading = false;
+                state.staff.error = action.payload;
+            });
+
 
         // Simulators
         builder

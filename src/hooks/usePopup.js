@@ -9,6 +9,7 @@ const defaultState = {
     cancelText: 'Cancel',
     showCancel: false,
     onConfirm: null,
+    customActions: null,
 };
 
 export function usePopup() {

@@ -45,28 +45,46 @@ function AdminOverrides() {
     }, [dispatch]);
 
     const handleCancelBooking = async (booking) => {
+        const performCancel = async (refundCredit) => {
+            setCancellingBookingId(booking.id);
+            try {
+                const result = await dispatch(adminCancelBooking({
+                    bookingId: booking.id,
+                    forceOverride: true,
+                    refundCredit: refundCredit
+                }));
+                if (adminCancelBooking.fulfilled.match(result)) {
+                    dispatch(getLockedBookings());
+                    showSuccess(result.payload?.message || 'Booking cancelled successfully.');
+                } else {
+                    showError(result.payload?.error || result.payload?.detail || 'Unable to cancel booking.');
+                }
+            } finally {
+                setCancellingBookingId(null);
+            }
+        };
+
         openPopup({
             type: 'warning',
-            title: 'Cancel Booking?',
-            message: `Are you sure you want to cancel this ${booking.booking_type} booking? This will apply the 24-hour override and restore the appropriate credits/sessions.`,
-            confirmText: 'Yes, Cancel',
-            cancelText: 'Keep Booking',
-            showCancel: true,
-            onConfirm: async () => {
-                closePopup();
-                setCancellingBookingId(booking.id);
-                try {
-                    const result = await dispatch(adminCancelBooking({ bookingId: booking.id, forceOverride: true }));
-                    if (adminCancelBooking.fulfilled.match(result)) {
-                        dispatch(getLockedBookings());
-                        showSuccess(result.payload?.message || 'Booking cancelled successfully. Credits/sessions have been restored.');
-                    } else {
-                        showError(result.payload?.error || result.payload?.detail || 'Unable to cancel booking.');
-                    }
-                } finally {
-                    setCancellingBookingId(null);
+            title: 'Cancel Locked Booking',
+            message: `This booking is within the 24-hour window. Do you want to give the customer credit?`,
+            customActions: [
+                {
+                    label: 'Yes, Refund Credit',
+                    variant: 'primary',
+                    onClick: () => performCancel(true)
+                },
+                {
+                    label: 'No, Cancel Without Refund',
+                    variant: 'danger',
+                    onClick: () => performCancel(false)
+                },
+                {
+                    label: 'Cancel',
+                    variant: 'secondary',
+                    shouldClose: true
                 }
-            },
+            ]
         });
     };
 
@@ -269,6 +287,7 @@ function AdminOverrides() {
                     if (action) await action();
                 } : closePopup}
                 onClose={closePopup}
+                customActions={popup.customActions}
             />
             {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} duration={toast.duration} />}
         </div>

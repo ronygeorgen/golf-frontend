@@ -23,6 +23,59 @@ export const localTimeToUTC = (localTime) => {
 };
 
 /**
+ * Convert Halifax time (HH:MM format) to UTC time (HH:MM format)
+ * This function always converts from Halifax timezone, regardless of browser timezone
+ * @param {string} halifaxTime - Time in HH:MM format (Halifax/America/Halifax timezone)
+ * @returns {string} - Time in HH:MM format (UTC)
+ */
+export const halifaxTimeToUTC = (halifaxTime) => {
+    if (!halifaxTime) return halifaxTime;
+
+    const [hours, minutes] = halifaxTime.split(':').map(Number);
+    const now = new Date();
+    
+    // Create a date string representing Halifax time on today's date
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateTimeStr = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    
+    // Create a date object - this will be interpreted in browser's local timezone
+    const tempDate = new Date(dateTimeStr);
+    
+    // Get what this time would be in Halifax timezone
+    const halifaxString = tempDate.toLocaleString('en-US', {
+        timeZone: 'America/Halifax',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    
+    // Parse Halifax time to get the actual Halifax datetime
+    const [hDate, hTime] = halifaxString.split(', ');
+    const [hMonth, hDay, hYear] = hDate.split('/').map(Number);
+    const [hHour, hMin, hSec] = hTime.split(':').map(Number);
+    const halifaxDate = new Date(hYear, hMonth - 1, hDay, hHour, hMin, hSec);
+    
+    // Calculate offset between browser timezone and Halifax
+    const offset = tempDate.getTime() - halifaxDate.getTime();
+    
+    // Create the correct Halifax datetime
+    const inputDate = new Date(year, now.getMonth(), now.getDate(), hours, minutes, 0);
+    const utcDate = new Date(inputDate.getTime() - offset);
+    
+    // Extract UTC hours and minutes
+    const utcHours = utcDate.getUTCHours().toString().padStart(2, '0');
+    const utcMinutes = utcDate.getUTCMinutes().toString().padStart(2, '0');
+    
+    return `${utcHours}:${utcMinutes}`;
+};
+
+/**
  * Convert UTC time (HH:MM format) to Halifax time (HH:MM format)
  * @param {string} utcTime - Time in HH:MM format (UTC)
  * @returns {string} - Time in HH:MM format (Halifax/Atlantic Time)
