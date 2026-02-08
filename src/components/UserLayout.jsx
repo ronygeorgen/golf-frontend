@@ -473,18 +473,18 @@ function UserLayout() {
             </header>
 
             {/* Running Banner */}
-            {/* <div
+            <div
                 onClick={() => navigate('/special-events')}
                 className="bg-blue-100 hover:bg-blue-200 text-blue-900 py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-blue-300/30 shadow-sm transition-colors"
             >
                 <div className="animate-marquee-seamless">
                     {[1, 2, 3, 4].map((i) => (
                         <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap flex items-center justify-center gap-2">
-                            "Grand Opening on Saturday 6-9pm, come celebrate with us!"
+                            "Super Bowl Party Tonight! Come and join us!"
                         </span>
                     ))}
                 </div>
-            </div> */}
+            </div>
 
             {/* Main Content */}
             <main className="pt-0">
