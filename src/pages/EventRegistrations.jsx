@@ -296,8 +296,8 @@ function EventRegistrations() {
                                 <button
                                     onClick={() => setShowCancelled(false)}
                                     className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${!showCancelled
-                                            ? 'text-white'
-                                            : 'text-text-secondary hover:text-text-primary'
+                                        ? 'text-white'
+                                        : 'text-text-secondary hover:text-text-primary'
                                         }`}
                                 >
                                     Registered ({allRegistrations.filter(r => r.status === 'registered' || r.status === 'showed_up').length})
@@ -305,8 +305,8 @@ function EventRegistrations() {
                                 <button
                                     onClick={() => setShowCancelled(true)}
                                     className={`relative z-10 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${showCancelled
-                                            ? 'text-white'
-                                            : 'text-text-secondary hover:text-text-primary'
+                                        ? 'text-white'
+                                        : 'text-text-secondary hover:text-text-primary'
                                         }`}
                                 >
                                     Cancelled ({allRegistrations.filter(r => r.status === 'cancelled').length})
@@ -352,7 +352,7 @@ function EventRegistrations() {
                                             {reg.user_details?.phone || 'N/A'}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">
-                                            {new Date(reg.registered_at).toLocaleString()}
+                                            {new Date(reg.registered_at).toLocaleString('en-US', { timeZone: 'America/Halifax' })}
                                         </td>
                                         <td className="px-4 py-3">
                                             <Badge variant={reg.status === 'showed_up' ? 'success' : reg.status === 'cancelled' ? 'danger' : 'primary'}>
@@ -445,7 +445,8 @@ function EventRegistrations() {
                                             weekday: 'long',
                                             year: 'numeric',
                                             month: 'long',
-                                            day: 'numeric'
+                                            day: 'numeric',
+                                            timeZone: 'America/Halifax'
                                         })}
                                     </div>
                                 </div>

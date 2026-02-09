@@ -561,7 +561,8 @@ function GuestCoachingBooking() {
                                                 <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                     {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                                         hour: '2-digit',
-                                                        minute: '2-digit'
+                                                        minute: '2-digit',
+                                                        timeZone: 'America/Halifax'
                                                     })}
                                                 </div>
                                                 <div className="text-sm text-text-secondary">
@@ -578,7 +579,7 @@ function GuestCoachingBooking() {
                                                         <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg max-w-xs">
                                                             <div className="font-semibold mb-1">⚠️ Duration too long</div>
                                                             <div className="mb-1">
-                                                                Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
                                                             </div>
                                                             <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} or less</div>
                                                             <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
@@ -616,7 +617,8 @@ function GuestCoachingBooking() {
                                             weekday: 'long',
                                             year: 'numeric',
                                             month: 'long',
-                                            day: 'numeric'
+                                            day: 'numeric',
+                                            timeZone: 'America/Halifax'
                                         })}
                                     </p>
                                 </div>
@@ -625,10 +627,12 @@ function GuestCoachingBooking() {
                                     <p className="font-semibold text-text-primary">
                                         {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', {
                                             hour: '2-digit',
-                                            minute: '2-digit'
+                                            minute: '2-digit',
+                                            timeZone: 'America/Halifax'
                                         })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', {
                                             hour: '2-digit',
-                                            minute: '2-digit'
+                                            minute: '2-digit',
+                                            timeZone: 'America/Halifax'
                                         })}
                                     </p>
                                 </div>

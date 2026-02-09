@@ -22,7 +22,7 @@ function GiftClaim() {
         setProcessingId(gift.id);
         setProcessingAction(action);
         const result = await dispatch(claimGift({ token: gift.gift_token, action }));
-        
+
         if (claimGift.fulfilled.match(result)) {
             if (action === 'accept') {
                 openPopup({
@@ -81,68 +81,68 @@ function GiftClaim() {
                 <h2 className="text-xl font-bold text-text-primary">Pending Gifts</h2>
             </div>
             <div className="flex-1">
-            <div className="space-y-4">
-                {giftsPending.map((gift) => (
-                    <div key={gift.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow bg-surface">
-                        <div className="flex justify-between items-start mb-3">
-                            <div className="flex-1">
-                                <h3 className="font-semibold text-text-primary">{gift.purchase_name || gift.package_details?.title}</h3>
-                                <p className="text-sm text-text-secondary mt-1">{gift.package_details?.title}</p>
-                                <p className="text-sm text-text-secondary">{gift.package_details?.description}</p>
-                                {gift.original_owner_details && (
-                                    <p className="text-sm text-text-secondary mt-2">
-                                        From: {gift.original_owner_details.first_name} {gift.original_owner_details.last_name}
-                                    </p>
-                                )}
+                <div className="space-y-4">
+                    {giftsPending.map((gift) => (
+                        <div key={gift.id} className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow bg-surface">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex-1">
+                                    <h3 className="font-semibold text-text-primary">{gift.purchase_name || gift.package_details?.title}</h3>
+                                    <p className="text-sm text-text-secondary mt-1">{gift.package_details?.title}</p>
+                                    <p className="text-sm text-text-secondary">{gift.package_details?.description}</p>
+                                    {gift.original_owner_details && (
+                                        <p className="text-sm text-text-secondary mt-2">
+                                            From: {gift.original_owner_details.first_name} {gift.original_owner_details.last_name}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="ml-4 text-right">
+                                    <div className="text-2xl font-bold text-primary">{gift.sessions_total}</div>
+                                    <div className="text-xs text-text-secondary">sessions</div>
+                                </div>
                             </div>
-                            <div className="ml-4 text-right">
-                                <div className="text-2xl font-bold text-primary">{gift.sessions_total}</div>
-                                <div className="text-xs text-text-secondary">sessions</div>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={() => handleClaimGift(gift, 'accept')}
+                                    disabled={processingId === gift.id}
+                                    variant="primary"
+                                    className="flex-1"
+                                >
+                                    {processingId === gift.id && processingAction === 'accept' ? 'Accepting...' : 'Accept Gift'}
+                                </Button>
+                                <Button
+                                    onClick={() => handleClaimGift(gift, 'reject')}
+                                    disabled={processingId === gift.id}
+                                    variant="danger"
+                                    className="flex-1"
+                                >
+                                    {processingId === gift.id && processingAction === 'reject' ? 'Rejecting...' : 'Reject'}
+                                </Button>
                             </div>
+                            {gift.gift_expires_at && (
+                                <p className="text-xs text-text-secondary mt-2">
+                                    Expires: {new Date(gift.gift_expires_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                </p>
+                            )}
                         </div>
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={() => handleClaimGift(gift, 'accept')}
-                                disabled={processingId === gift.id}
-                                variant="primary"
-                                className="flex-1"
-                            >
-                                {processingId === gift.id && processingAction === 'accept' ? 'Accepting...' : 'Accept Gift'}
-                            </Button>
-                            <Button
-                                onClick={() => handleClaimGift(gift, 'reject')}
-                                disabled={processingId === gift.id}
-                                variant="danger"
-                                className="flex-1"
-                            >
-                                {processingId === gift.id && processingAction === 'reject' ? 'Rejecting...' : 'Reject'}
-                            </Button>
-                        </div>
-                        {gift.gift_expires_at && (
-                            <p className="text-xs text-text-secondary mt-2">
-                                Expires: {new Date(gift.gift_expires_at).toLocaleDateString()}
-                            </p>
-                        )}
-                    </div>
-                ))}
-            </div>
-            <PopupMessage
-                open={popup.open}
-                type={popup.type}
-                title={popup.title}
-                message={popup.message}
-                confirmText={popup.confirmText}
-                cancelText={popup.cancelText}
-                showCancel={popup.showCancel}
-                onConfirm={popup.onConfirm ? async () => {
-                    const action = popup.onConfirm;
-                    closePopup();
-                    if (action) {
-                        await action();
-                    }
-                } : closePopup}
-                onClose={closePopup}
-            />
+                    ))}
+                </div>
+                <PopupMessage
+                    open={popup.open}
+                    type={popup.type}
+                    title={popup.title}
+                    message={popup.message}
+                    confirmText={popup.confirmText}
+                    cancelText={popup.cancelText}
+                    showCancel={popup.showCancel}
+                    onConfirm={popup.onConfirm ? async () => {
+                        const action = popup.onConfirm;
+                        closePopup();
+                        if (action) {
+                            await action();
+                        }
+                    } : closePopup}
+                    onClose={closePopup}
+                />
             </div>
         </div>
     );

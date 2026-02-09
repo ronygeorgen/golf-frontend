@@ -98,8 +98,8 @@ function AdminDashboard() {
                                                     </Badge>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
-                                                    {new Date(booking.start_time).toLocaleDateString()} {' '}
-                                                    {new Date(booking.start_time).toLocaleTimeString()}
+                                                    {new Date(booking.start_time).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })} {' '}
+                                                    {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
                                                     {booking.duration_minutes} min

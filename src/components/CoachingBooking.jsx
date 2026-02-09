@@ -1117,7 +1117,8 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                 <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                     {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                                         hour: '2-digit',
-                                                        minute: '2-digit'
+                                                        minute: '2-digit',
+                                                        timeZone: 'America/Halifax'
                                                     })}
                                                 </div>
                                                 <div className={`text-sm ${disabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
@@ -1162,7 +1163,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                                     <>
                                                                         <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
                                                                         <div className="mb-1">
-                                                                            Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                                                            Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })})
                                                                         </div>
                                                                         <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
                                                                     </>
@@ -1177,7 +1178,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                                 <>
                                                                     <div className="font-semibold mb-1">⚠️ Duration too long</div>
                                                                     <div className="mb-1">
-                                                                        Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                                        Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
                                                                     </div>
                                                                     <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} mins or less</div>
                                                                 </>
@@ -1223,10 +1224,10 @@ function CoachingBooking({ client, onBookingSuccess }) {
                             <h4 className="text-lg font-bold text-text-primary mb-4">Confirm Your Booking</h4>
                             <div className="space-y-2 mb-4">
                                 <p className="text-text-primary">
-                                    <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
+                                    <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                 </p>
                                 <p className="text-text-primary">
-                                    <span className="font-medium">Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    <span className="font-medium">Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
                                 </p>
                                 <p className="text-text-primary">
                                     <span className="font-medium">Duration:</span> {duration} minutes

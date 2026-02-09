@@ -89,8 +89,8 @@ function PopupMessage({
                             <Button
                                 key={index}
                                 type="button"
-                                onClick={() => {
-                                    if (action.onClick) action.onClick();
+                                onClick={async () => {
+                                    if (action.onClick) await action.onClick();
                                     if (action.shouldClose !== false) handleClose();
                                 }}
                                 variant={action.variant || 'primary'}

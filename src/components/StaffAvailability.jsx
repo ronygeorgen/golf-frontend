@@ -338,43 +338,7 @@ function StaffAvailability() {
         }
     };
 
-    const handleUpdateAvailability = async (availabilityId, field, value, isDaySpecific = false) => {
-        if (!selectedStaff) return;
 
-        if (isDaySpecific) {
-            const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
-            const updatedValue = (field === 'start_time' || field === 'end_time')
-                ? value
-                : value;
-
-            const updatedDayAvailability = dayAvailabilityArray.map(avail =>
-                avail.id === availabilityId
-                    ? { ...avail, [field]: updatedValue }
-                    : avail
-            );
-
-            await dispatch(updateStaffDayAvailability({
-                staffId: selectedStaff.id,
-                availabilityData: updatedDayAvailability
-            }));
-        } else {
-            const availabilityArray = Array.isArray(availability) ? availability : [];
-            const updatedValue = (field === 'start_time' || field === 'end_time')
-                ? value
-                : field === 'day_of_week' ? parseInt(value) : value;
-
-            const updatedAvailability = availabilityArray.map(avail =>
-                avail.id === availabilityId
-                    ? { ...avail, [field]: updatedValue }
-                    : avail
-            );
-
-            await dispatch(updateStaffAvailability({
-                staffId: selectedStaff.id,
-                availabilityData: updatedAvailability
-            }));
-        }
-    };
 
     const handleDeleteAvailability = async (availabilityId, isDaySpecific = false) => {
         if (!selectedStaff) return;
@@ -756,55 +720,31 @@ function StaffAvailability() {
                                                     {avail.type === 'weekly' ? 'Weekly' : 'Day-Specific'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                                                 {avail.type === 'weekly' ? (
-                                                    <select
-                                                        value={avail.day_of_week}
-                                                        onChange={(e) => handleUpdateAvailability(avail.id, 'day_of_week', e.target.value, false)}
-                                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                                                    >
-                                                        {DAYS_OF_WEEK.map(day => (
-                                                            <option key={day.value} value={day.value} className="text-gray-900">
-                                                                {day.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <div className="font-medium text-blue-900">
+                                                        {getDayName(avail.day_of_week)}
+                                                    </div>
                                                 ) : (
                                                     <div>
-                                                        <input
-                                                            type="date"
-                                                            value={avail.date}
-                                                            onChange={(e) => handleUpdateAvailability(avail.id, 'date', e.target.value, true)}
-                                                            min={new Date().toISOString().split('T')[0]}
-                                                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-white"
-                                                        />
-                                                        <div className="text-xs text-gray-500 mt-1">
+                                                        <div className="font-medium text-green-900">
                                                             {formatDate(avail.date)}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-1">
+                                                            {avail.date}
                                                         </div>
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <input
-                                                    type="time"
-                                                    value={avail.start_time || '09:00'}
-                                                    onChange={(e) => handleUpdateAvailability(avail.id, 'start_time', e.target.value, avail.type === 'day_specific')}
-                                                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${avail.type === 'weekly'
-                                                        ? 'focus:ring-blue-500'
-                                                        : 'focus:ring-green-500'
-                                                        }`}
-                                                />
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <div className="font-medium">
+                                                    {avail.start_time || '09:00'}
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <input
-                                                    type="time"
-                                                    value={avail.end_time || '17:00'}
-                                                    onChange={(e) => handleUpdateAvailability(avail.id, 'end_time', e.target.value, avail.type === 'day_specific')}
-                                                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-blue-500 ${avail.type === 'weekly'
-                                                        ? 'focus:ring-blue-500'
-                                                        : 'focus:ring-green-500'
-                                                        }`}
-                                                />
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <div className="font-medium">
+                                                    {avail.end_time || '17:00'}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <button
@@ -898,6 +838,7 @@ function StaffAvailability() {
                                                                     {
                                                                         label: 'Unblock',
                                                                         variant: 'primary',
+                                                                        shouldClose: false,
                                                                         onClick: async () => {
                                                                             const result = await dispatch(unblockStaffDate({
                                                                                 staffId: selectedStaff.id,
@@ -974,6 +915,7 @@ function StaffAvailability() {
                 confirmText={popup.confirmText}
                 cancelText={popup.cancelText}
                 showCancel={popup.showCancel}
+                customActions={popup.customActions}
                 onConfirm={popup.onConfirm ? async () => {
                     const action = popup.onConfirm;
                     closePopup();

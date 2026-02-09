@@ -11,7 +11,7 @@ import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getMySimul
 import usePopup from '../hooks/usePopup';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { utcTimeToLocal } from '../utils/timezone';
+import { utcTimeToLocal, utcToHalifaxDate } from '../utils/timezone';
 
 function ClientPortal() {
     const dispatch = useAppDispatch();
@@ -211,7 +211,7 @@ function ClientPortal() {
     };
 
     const openRescheduleModal = (booking) => {
-        const start = new Date(booking.start_time);
+        const start = utcToHalifaxDate(booking.start_time);
         setRescheduleTarget(booking);
         setRescheduleDate(formatDateForInput(start));
         setRescheduleTime(formatTimeForInput(start));
@@ -251,7 +251,7 @@ function ClientPortal() {
                 setRescheduleCheckingAvailability(false);
                 return;
             }
-            
+
             // Check for partial closures and show info (not blocking)
             if (closedDateResult.has_partial_closure && closedDateResult.partial_closures) {
                 const closureMessages = closedDateResult.partial_closures.map(closure => {
@@ -632,13 +632,13 @@ function ClientPortal() {
                                                             </h3>
                                                             <div className="mt-2 space-y-1">
                                                                 <p className="text-sm text-text-secondary">
-                                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Halifax' })}
                                                                 </p>
                                                                 <p className="text-sm text-text-secondary">
-                                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                                                                 </p>
                                                                 <p className="text-sm text-text-secondary">
-                                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                                                                 </p>
                                                                 <p className="text-sm text-text-secondary">
                                                                     <span className="font-medium">Duration:</span> {booking.duration_minutes >= 60 ? `${Math.floor(booking.duration_minutes / 60)}h ${booking.duration_minutes % 60 > 0 ? booking.duration_minutes % 60 + 'min' : ''}`.trim() : `${booking.duration_minutes}min`}
@@ -971,7 +971,8 @@ function ClientPortal() {
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                                                     hour: '2-digit',
-                                                                    minute: '2-digit'
+                                                                    minute: '2-digit',
+                                                                    timeZone: 'America/Halifax'
                                                                 })}
                                                             </div>
                                                             <div className="text-xs text-text-secondary">
@@ -1011,7 +1012,8 @@ function ClientPortal() {
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                                                     hour: '2-digit',
-                                                                    minute: '2-digit'
+                                                                    minute: '2-digit',
+                                                                    timeZone: 'America/Halifax'
                                                                 })}
                                                             </div>
                                                             <div className="text-xs text-text-secondary">
@@ -1056,10 +1058,10 @@ function ClientPortal() {
                                     <h5 className="font-semibold text-text-primary mb-2">Selected Time Slot</h5>
                                     <div className="space-y-1 text-sm">
                                         <p className="text-text-primary">
-                                            <span className="font-medium">Date:</span> {new Date(rescheduleSelectedSlot.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                            <span className="font-medium">Date:</span> {new Date(rescheduleSelectedSlot.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Halifax' })}
                                         </p>
                                         <p className="text-text-primary">
-                                            <span className="font-medium">Time:</span> {new Date(rescheduleSelectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - {new Date(rescheduleSelectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                            <span className="font-medium">Time:</span> {new Date(rescheduleSelectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })} - {new Date(rescheduleSelectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                                         </p>
                                         <p className="text-text-primary">
                                             <span className="font-medium">Duration:</span> {rescheduleTarget.duration_minutes || 60} minutes

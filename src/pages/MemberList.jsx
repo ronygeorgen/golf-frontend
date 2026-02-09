@@ -465,7 +465,7 @@ function MemberList() {
                                                     <div key={purchase.id} className="p-3 bg-background rounded-card border border-border">
                                                         <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                                         <p className="text-sm text-text-secondary">
-                                                            Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                            Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                         </p>
                                                     </div>
                                                 ))}
@@ -497,7 +497,7 @@ function MemberList() {
                                                         <div>
                                                             <span className="text-text-secondary">Purchased:</span>
                                                             <span className="ml-2 font-medium text-text-primary">
-                                                                {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -532,7 +532,7 @@ function MemberList() {
                                                         <div>
                                                             <span className="text-text-secondary">Purchased:</span>
                                                             <span className="ml-2 font-medium text-text-primary">
-                                                                {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -662,7 +662,7 @@ function MemberList() {
                                             <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                             {purchase.purchased_at && (
                                                 <p className="text-sm text-text-secondary mt-1">
-                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                 </p>
                                             )}
                                         </div>

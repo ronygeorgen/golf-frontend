@@ -95,15 +95,17 @@ function PackageUsageDetails({ purchase, isOpen, onClose }) {
                                                     <div key={idx} className="flex items-center justify-between p-2 bg-surface rounded-card text-sm">
                                                         <div>
                                                             <p className="text-text-primary">
-                                                                {new Date(booking.date).toLocaleDateString('en-US', { 
-                                                                    weekday: 'short', 
-                                                                    year: 'numeric', 
-                                                                    month: 'short', 
-                                                                    day: 'numeric' 
-                                                                })} at {new Date(booking.date).toLocaleTimeString('en-US', { 
-                                                                    hour: '2-digit', 
-                                                                    minute: '2-digit', 
-                                                                    hour12: true 
+                                                                {new Date(booking.date).toLocaleDateString('en-US', {
+                                                                    weekday: 'short',
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    timeZone: 'America/Halifax'
+                                                                })} at {new Date(booking.date).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    hour12: true,
+                                                                    timeZone: 'America/Halifax'
                                                                 })}
                                                             </p>
                                                             {booking.coach && (
@@ -112,9 +114,9 @@ function PackageUsageDetails({ purchase, isOpen, onClose }) {
                                                         </div>
                                                         <Badge status={
                                                             booking.status === 'confirmed' ? 'confirmed' :
-                                                            booking.status === 'completed' ? 'completed' :
-                                                            booking.status === 'cancelled' ? 'cancelled' :
-                                                            'no_show'
+                                                                booking.status === 'completed' ? 'completed' :
+                                                                    booking.status === 'cancelled' ? 'cancelled' :
+                                                                        'no_show'
                                                         }>
                                                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                                         </Badge>
@@ -148,15 +150,17 @@ function PackageUsageDetails({ purchase, isOpen, onClose }) {
                                                     <div key={idx} className="flex items-center justify-between p-2 bg-surface rounded-card text-sm">
                                                         <div>
                                                             <p className="text-text-primary">
-                                                                {new Date(booking.date).toLocaleDateString('en-US', { 
-                                                                    weekday: 'short', 
-                                                                    year: 'numeric', 
-                                                                    month: 'short', 
-                                                                    day: 'numeric' 
-                                                                })} at {new Date(booking.date).toLocaleTimeString('en-US', { 
-                                                                    hour: '2-digit', 
-                                                                    minute: '2-digit', 
-                                                                    hour12: true 
+                                                                {new Date(booking.date).toLocaleDateString('en-US', {
+                                                                    weekday: 'short',
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    timeZone: 'America/Halifax'
+                                                                })} at {new Date(booking.date).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    hour12: true,
+                                                                    timeZone: 'America/Halifax'
                                                                 })}
                                                             </p>
                                                             <p className="text-text-secondary text-xs">
@@ -166,9 +170,9 @@ function PackageUsageDetails({ purchase, isOpen, onClose }) {
                                                         </div>
                                                         <Badge status={
                                                             booking.status === 'confirmed' ? 'confirmed' :
-                                                            booking.status === 'completed' ? 'completed' :
-                                                            booking.status === 'cancelled' ? 'cancelled' :
-                                                            'no_show'
+                                                                booking.status === 'completed' ? 'completed' :
+                                                                    booking.status === 'cancelled' ? 'cancelled' :
+                                                                        'no_show'
                                                         }>
                                                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                                         </Badge>
@@ -182,12 +186,12 @@ function PackageUsageDetails({ purchase, isOpen, onClose }) {
                         )}
 
                         {/* No Usage Message */}
-                        {(!usageDetails.coaching_usage || usageDetails.coaching_usage.length === 0) && 
-                         (!usageDetails.simulator_usage || usageDetails.simulator_usage.length === 0) && (
-                            <div className="text-center py-8 text-text-secondary">
-                                <p>No usage recorded yet for this package.</p>
-                            </div>
-                        )}
+                        {(!usageDetails.coaching_usage || usageDetails.coaching_usage.length === 0) &&
+                            (!usageDetails.simulator_usage || usageDetails.simulator_usage.length === 0) && (
+                                <div className="text-center py-8 text-text-secondary">
+                                    <p>No usage recorded yet for this package.</p>
+                                </div>
+                            )}
                     </div>
                 ) : (
                     <div className="text-center py-8 text-text-secondary">

@@ -82,13 +82,13 @@ function StaffCoachingSessionsAdmin() {
                                                     <span className="font-medium">Client:</span> {booking.client_details?.first_name} {booking.client_details?.last_name} ({booking.client_details?.email})
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Halifax' })}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
                                                     <span className="font-medium">Duration:</span> {booking.duration_minutes >= 60 ? `${Math.floor(booking.duration_minutes / 60)}h ${booking.duration_minutes % 60 > 0 ? booking.duration_minutes % 60 + 'min' : ''}`.trim() : `${booking.duration_minutes}min`}
@@ -102,9 +102,9 @@ function StaffCoachingSessionsAdmin() {
                                                     <p className="text-sm">
                                                         <Badge status={
                                                             booking.purchase_type_label === 'Personal' ? 'personal' :
-                                                            booking.purchase_type_label === 'Gifted' ? 'pending' :
-                                                            booking.purchase_type_label === 'Organization' ? 'confirmed' :
-                                                            'pending'
+                                                                booking.purchase_type_label === 'Gifted' ? 'pending' :
+                                                                    booking.purchase_type_label === 'Organization' ? 'confirmed' :
+                                                                        'pending'
                                                         }>
                                                             {booking.purchase_type_label}
                                                         </Badge>
@@ -115,9 +115,9 @@ function StaffCoachingSessionsAdmin() {
                                         <div className="flex flex-col items-end gap-2 w-40">
                                             <Badge status={
                                                 booking.status === 'confirmed' ? 'confirmed' :
-                                                booking.status === 'pending' ? 'pending' :
-                                                booking.status === 'completed' ? 'completed' :
-                                                'no_show'
+                                                    booking.status === 'pending' ? 'pending' :
+                                                        booking.status === 'completed' ? 'completed' :
+                                                            'no_show'
                                             }>
                                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                             </Badge>

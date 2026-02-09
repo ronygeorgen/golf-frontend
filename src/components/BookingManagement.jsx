@@ -103,8 +103,8 @@ function BookingManagement() {
     const formatDateTime = (dateTimeStr) => {
         const date = new Date(dateTimeStr);
         return {
-            date: date.toLocaleDateString(),
-            time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            date: date.toLocaleDateString('en-US', { timeZone: 'America/Halifax' }),
+            time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })
         };
     };
 

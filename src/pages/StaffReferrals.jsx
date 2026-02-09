@@ -17,7 +17,7 @@ function StaffReferrals() {
     const dispatch = useAppDispatch();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { list: staffList, loading: staffListLoading } = useAppSelector((state) => state.admin.staff);
-    
+
     const [selectedStaffId, setSelectedStaffId] = useState(initialId || '');
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -55,18 +55,18 @@ function StaffReferrals() {
 
     const fetchReferrals = async (pageNum = 1) => {
         if (!selectedStaffId) return;
-        
+
         try {
             setLoading(true);
             // Clear previous data immediately to show loading state
             setMembers([]);
             setTotalReferrals(0);
             setTotalSales('0.00');
-            
+
             const params = {
                 page: pageNum
             };
-            
+
             // Add date filters if provided - convert to UTC
             if (dateRange.from_date) {
                 // Treat the selected date as UTC at start of day (00:00:00 UTC)
@@ -78,11 +78,11 @@ function StaffReferrals() {
                 // Format: YYYY-MM-DD -> YYYY-MM-DDTHH:mm:ss.sssZ
                 params.to_date = `${dateRange.to_date}T23:59:59.999Z`;
             }
-            
+
             const response = await apiClient.get(endpoints.admin.staff.referrals(selectedStaffId), {
                 params
             });
-            
+
             const data = response.data;
             // Always update state, even if empty - ensure we use the actual response data
             const membersList = Array.isArray(data.members) ? data.members : (Array.isArray(data.results) ? data.results : []);
@@ -95,7 +95,7 @@ function StaffReferrals() {
                 current_page: data.current_page !== undefined ? data.current_page : pageNum,
                 page_size: data.page_size !== undefined ? data.page_size : 10
             });
-            
+
             // Fetch staff details
             fetchStaffDetails();
         } catch (error) {
@@ -112,7 +112,7 @@ function StaffReferrals() {
 
     const fetchStaffDetails = async () => {
         if (!selectedStaffId) return;
-        
+
         try {
             const response = await apiClient.get(endpoints.admin.staff.detail(selectedStaffId));
             if (response.data) {
@@ -135,20 +135,20 @@ function StaffReferrals() {
     // Fetch when both dates are selected (no debounce needed since user completes selection)
     useEffect(() => {
         if (!selectedStaffId) return;
-        
+
         // Only fetch if both dates are provided
         if (dateRange.from_date && dateRange.to_date) {
             // Clear existing timeout
             if (dateFilterTimeoutRef.current) {
                 clearTimeout(dateFilterTimeoutRef.current);
             }
-            
+
             // Clear state immediately to show loading
             setLoading(true);
             setMembers([]);
             setTotalReferrals(0);
             setTotalSales('0.00');
-            
+
             // Fetch immediately when both dates are selected
             setPage(1);
             fetchReferrals(1);
@@ -218,7 +218,7 @@ function StaffReferrals() {
                             </h1>
                         </div>
                     </div>
-                    
+
                     {/* Staff Selector */}
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -292,90 +292,90 @@ function StaffReferrals() {
                                 )}
                             </div>
                         ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border">
-                                        <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Name</th>
-                                        <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Email</th>
-                                        <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Phone</th>
-                                        <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Staff Referred Packages</th>
-                                        <th className="text-right py-3 px-4 text-sm font-semibold text-text-primary">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {members.map((member) => (
-                                        <tr key={member.id} className="border-b border-border hover:bg-background transition-colors">
-                                            <td className="py-3 px-4 text-sm text-text-primary">
-                                                {member.first_name} {member.last_name}
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-text-primary">{member.email}</td>
-                                            <td className="py-3 px-4 text-sm text-text-primary">{member.phone}</td>
-                                            <td 
-                                                className="py-3 px-4 text-sm text-text-primary cursor-pointer hover:text-primary transition-colors"
-                                                onClick={() => handleViewPackages(member)}
-                                            >
-                                                {member.staff_referred_purchases && member.staff_referred_purchases.length > 0 ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="inline-block px-2 py-1 bg-primary-light/10 text-primary text-xs rounded-button">
-                                                            {member.staff_referred_purchases[0].purchase_name}
-                                                        </span>
-                                                        {member.staff_referred_purchases.length > 1 && (
-                                                            <span className="text-text-secondary">+{member.staff_referred_purchases.length - 1} more</span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-text-secondary">-</span>
-                                                )}
-                                            </td>
-                                            <td className="py-3 px-4 text-right">
-                                                <Button
-                                                    onClick={() => handleViewMember(member)}
-                                                    variant="secondary"
-                                                    className="px-3 py-1 text-sm"
-                                                >
-                                                    <Eye className="w-4 h-4 inline mr-1" />
-                                                    View
-                                                </Button>
-                                            </td>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Name</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Email</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Phone</th>
+                                            <th className="text-left py-3 px-4 text-sm font-semibold text-text-primary">Staff Referred Packages</th>
+                                            <th className="text-right py-3 px-4 text-sm font-semibold text-text-primary">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {/* Pagination Controls */}
-                    {!loading && members.length > 0 && (
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6 pt-6 border-t border-border">
-                            <p className="text-sm text-text-secondary">
-                                Showing{' '}
-                                {pagination.count === 0
-                                    ? '0'
-                                    : `${(page - 1) * pagination.page_size + 1} - ${Math.min(page * pagination.page_size, pagination.count)}`} of {pagination.count} referrals
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                                    disabled={page <= 1}
-                                    variant="secondary"
-                                    className="px-3 py-1"
-                                >
-                                    Previous
-                                </Button>
-                                <span className="text-sm font-medium text-text-primary">
-                                    Page {page} of {pagination.total_pages}
-                                </span>
-                                <Button
-                                    onClick={() => setPage((prev) => Math.min(pagination.total_pages, prev + 1))}
-                                    disabled={page >= pagination.total_pages}
-                                    variant="secondary"
-                                    className="px-3 py-1"
-                                >
-                                    Next
-                                </Button>
+                                    </thead>
+                                    <tbody>
+                                        {members.map((member) => (
+                                            <tr key={member.id} className="border-b border-border hover:bg-background transition-colors">
+                                                <td className="py-3 px-4 text-sm text-text-primary">
+                                                    {member.first_name} {member.last_name}
+                                                </td>
+                                                <td className="py-3 px-4 text-sm text-text-primary">{member.email}</td>
+                                                <td className="py-3 px-4 text-sm text-text-primary">{member.phone}</td>
+                                                <td
+                                                    className="py-3 px-4 text-sm text-text-primary cursor-pointer hover:text-primary transition-colors"
+                                                    onClick={() => handleViewPackages(member)}
+                                                >
+                                                    {member.staff_referred_purchases && member.staff_referred_purchases.length > 0 ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="inline-block px-2 py-1 bg-primary-light/10 text-primary text-xs rounded-button">
+                                                                {member.staff_referred_purchases[0].purchase_name}
+                                                            </span>
+                                                            {member.staff_referred_purchases.length > 1 && (
+                                                                <span className="text-text-secondary">+{member.staff_referred_purchases.length - 1} more</span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-text-secondary">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <Button
+                                                        onClick={() => handleViewMember(member)}
+                                                        variant="secondary"
+                                                        className="px-3 py-1 text-sm"
+                                                    >
+                                                        <Eye className="w-4 h-4 inline mr-1" />
+                                                        View
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        </div>
+                        )}
+
+                        {/* Pagination Controls */}
+                        {!loading && members.length > 0 && (
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6 pt-6 border-t border-border">
+                                <p className="text-sm text-text-secondary">
+                                    Showing{' '}
+                                    {pagination.count === 0
+                                        ? '0'
+                                        : `${(page - 1) * pagination.page_size + 1} - ${Math.min(page * pagination.page_size, pagination.count)}`} of {pagination.count} referrals
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                                        disabled={page <= 1}
+                                        variant="secondary"
+                                        className="px-3 py-1"
+                                    >
+                                        Previous
+                                    </Button>
+                                    <span className="text-sm font-medium text-text-primary">
+                                        Page {page} of {pagination.total_pages}
+                                    </span>
+                                    <Button
+                                        onClick={() => setPage((prev) => Math.min(pagination.total_pages, prev + 1))}
+                                        disabled={page >= pagination.total_pages}
+                                        variant="secondary"
+                                        className="px-3 py-1"
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -440,7 +440,7 @@ function StaffReferrals() {
                                                 <div key={purchase.id} className="p-3 bg-background rounded-card">
                                                     <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                                     <p className="text-sm text-text-secondary">
-                                                        Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                        Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                     </p>
                                                 </div>
                                             ))}
@@ -486,7 +486,7 @@ function StaffReferrals() {
                                             <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                             {purchase.purchased_at && (
                                                 <p className="text-sm text-text-secondary mt-1">
-                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                 </p>
                                             )}
                                         </div>

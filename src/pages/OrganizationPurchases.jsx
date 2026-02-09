@@ -124,7 +124,7 @@ function OrganizationPurchases() {
                                                     </Button>
                                                 </div>
                                                 <span className="text-xs text-text-secondary">
-                                                    Created on {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                    Created on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                 </span>
                                             </div>
                                         </div>

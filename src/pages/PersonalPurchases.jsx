@@ -7,12 +7,12 @@ import Badge from '../components/ui/Badge';
 
 function PersonalPurchases() {
     const dispatch = useAppDispatch();
-    const { 
-        purchases, 
+    const {
+        purchases,
         simulatorPurchases,
-        purchasesPagination, 
+        purchasesPagination,
         purchasesLoading,
-        simulatorPurchasesLoading 
+        simulatorPurchasesLoading
     } = useAppSelector((state) => state.coaching);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -28,7 +28,7 @@ function PersonalPurchases() {
             ...purchases.map(p => ({ ...p, purchaseType: 'coaching' })),
             ...(simulatorPurchases || []).map(p => ({ ...p, purchaseType: 'simulator' }))
         ];
-        
+
         // Sort by purchased_at date/time (most recent first)
         return combined.sort((a, b) => {
             const dateA = new Date(a.purchased_at);
@@ -87,10 +87,10 @@ function PersonalPurchases() {
                                 const isGift = purchase.purchase_type === 'gift';
                                 const owner = purchase.original_owner_details;
                                 const isSimulator = purchase.purchaseType === 'simulator';
-                                
+
                                 return (
-                                    <div 
-                                        key={isSimulator ? `sim-${purchase.id}` : purchase.id} 
+                                    <div
+                                        key={isSimulator ? `sim-${purchase.id}` : purchase.id}
                                         className={`rounded-card p-4 bg-background border border-border shadow-card ${isSimulator ? 'border-l-4 border-accent' : ''}`}
                                     >
                                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -111,7 +111,7 @@ function PersonalPurchases() {
                                                             expiryDate.setHours(0, 0, 0, 0);
                                                             const daysRemaining = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
                                                             const isExpired = daysRemaining < 0;
-                                                            
+
                                                             return (
                                                                 <p className={`text-sm mt-1 ${isExpired ? 'text-danger' : daysRemaining <= 7 ? 'text-accent' : 'text-text-secondary'}`}>
                                                                     {isExpired ? (
@@ -125,7 +125,7 @@ function PersonalPurchases() {
                                                                         <>
                                                                             <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining</span>
                                                                             <span className="ml-2 text-text-secondary">
-                                                                                (Expires: {expiryDate.toLocaleDateString()})
+                                                                                (Expires: {expiryDate.toLocaleDateString('en-US', { timeZone: 'America/Halifax' })})
                                                                             </span>
                                                                         </>
                                                                     )}
@@ -156,7 +156,7 @@ function PersonalPurchases() {
                                                     {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
                                                 </Badge>
                                                 <span className="text-xs text-text-secondary">
-                                                    Purchased on {new Date(purchase.purchased_at).toLocaleDateString()}
+                                                    Purchased on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                 </span>
                                             </div>
                                         </div>

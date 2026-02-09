@@ -11,7 +11,7 @@ function OrganizationMemberManagement({ isOpen, onClose, purchase }) {
     const { popup, openPopup, closePopup } = usePopup();
     const { memberManagementLoading } = useAppSelector((state) => state.coaching);
     const { user } = useAppSelector((state) => state.auth);
-    
+
     const [newMemberPhone, setNewMemberPhone] = useState('');
     const [members, setMembers] = useState([]);
 
@@ -67,9 +67,9 @@ function OrganizationMemberManagement({ isOpen, onClose, purchase }) {
                     message: 'Member has been added successfully.',
                 });
             } else {
-                const errorMsg = result.payload?.error || 
-                               result.payload?.detail ||
-                               'Unable to add member.';
+                const errorMsg = result.payload?.error ||
+                    result.payload?.detail ||
+                    'Unable to add member.';
                 openPopup({
                     type: 'error',
                     title: 'Error',
@@ -119,9 +119,9 @@ function OrganizationMemberManagement({ isOpen, onClose, purchase }) {
                         });
                         // No need to refresh - Redux state is already updated
                     } else {
-                        const errorMsg = result.payload?.error || 
-                                       result.payload?.detail ||
-                                       'Unable to remove member.';
+                        const errorMsg = result.payload?.error ||
+                            result.payload?.detail ||
+                            'Unable to remove member.';
                         openPopup({
                             type: 'error',
                             title: 'Error',
@@ -224,7 +224,7 @@ function OrganizationMemberManagement({ isOpen, onClose, purchase }) {
                                     {members.map((member, index) => {
                                         const isMemberPurchaser = member.phone === purchaserPhone;
                                         const isRegistered = member.user !== null;
-                                        
+
                                         return (
                                             <div
                                                 key={index}
@@ -260,7 +260,7 @@ function OrganizationMemberManagement({ isOpen, onClose, purchase }) {
                                                             </p>
                                                         )}
                                                         <p className="text-xs text-text-secondary mt-0.5">
-                                                            Added: {new Date(member.added_at).toLocaleDateString()}
+                                                            Added: {new Date(member.added_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                                                         </p>
                                                     </div>
                                                 </div>

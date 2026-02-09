@@ -11,7 +11,7 @@ import { utcTimeToLocal } from '../utils/timezone';
 function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
-    const { toast, showSuccess, showError, hideToast } = useToast();
+    const { toast, showSuccess, showError, showWarning, hideToast } = useToast();
     const { user } = useAppSelector((state) => state.auth);
     const {
         availability,
@@ -168,8 +168,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                             const endTime = utcTimeToLocal(closure.end_time);
                             return `${startTime} - ${endTime}`;
                         }).join(', ');
-                        // Note: Using a less intrusive info message instead of error
-                        console.info(`Partial closures on this date: ${closureMessages}`);
+                        showWarning(`Note: Facility will be closed ${closureMessages} on this date. These time slots will not be available.`);
                     } else {
                         setPartialClosures([]);
                     }
@@ -872,7 +871,8 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                     <div className={`text-lg font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                         {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                             hour: '2-digit',
-                                            minute: '2-digit'
+                                            minute: '2-digit',
+                                            timeZone: 'America/Halifax'
                                         })}
                                     </div>
                                     <div className={`text-sm ${isDisabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
@@ -918,7 +918,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                                         <>
                                                             <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
                                                             <div className="mb-1">
-                                                                Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                                                Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })})
                                                             </div>
                                                             <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
                                                         </>
@@ -933,7 +933,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                                     <>
                                                         <div className="font-semibold mb-1">⚠️ Duration too long</div>
                                                         <div className="mb-1">
-                                                            Simulator available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                            Simulator available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
                                                         </div>
                                                         <div className="text-yellow-300 font-medium">💡 Try {getSuggestedDuration(slot)} or less</div>
                                                     </>
@@ -1025,13 +1025,13 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                         <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
                         <div className="space-y-2 mb-4">
                             <p className="text-text-primary">
-                                <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString()}
+                                <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
                             </p>
                             <p className="text-text-primary">
-                                <span className="font-medium">Start Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                <span className="font-medium">Start Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                             </p>
                             <p className="text-text-primary">
-                                <span className="font-medium">End Time:</span> {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                <span className="font-medium">End Time:</span> {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
                             </p>
                             <p className="text-text-primary">
                                 <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}
