@@ -473,7 +473,7 @@ function UserLayout() {
             </header>
 
             {/* Running Banner */}
-            <div
+            {/* <div
                 onClick={() => navigate('/special-events')}
                 className="bg-blue-100 hover:bg-blue-200 text-blue-900 py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-blue-300/30 shadow-sm transition-colors"
             >
@@ -484,7 +484,7 @@ function UserLayout() {
                         </span>
                     ))}
                 </div>
-            </div>
+            </div> */}
 
             {/* Main Content */}
             <main className="pt-0">
