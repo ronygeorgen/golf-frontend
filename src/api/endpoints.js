@@ -97,6 +97,14 @@ export const endpoints = {
             delete: (id) => `/admin/liability-waiver/${id}/`,
             acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
         },
+        banners: {
+            list: '/banners/',
+            detail: (id) => `/banners/${id}/`,
+            create: '/banners/',
+            update: (id) => `/banners/${id}/`,
+            delete: (id) => `/banners/${id}/`,
+            active: '/banners/active/',
+        },
     },
 
     // Booking endpoints

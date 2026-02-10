@@ -23,6 +23,7 @@ import AdminLayout from './components/AdminLayout';
 import UserLayout from './components/UserLayout';
 import AdminOverrides from './components/AdminOverrides';
 import SpecialEventsManagement from './components/SpecialEventsManagement';
+import BannerManagement from './components/BannerManagement';
 import ClosedDaysManagement from './components/ClosedDaysManagement';
 import LiabilityWaiverManagement from './components/LiabilityWaiverManagement';
 import GHLLocationManagement from './components/GHLLocationManagement';
@@ -236,6 +237,7 @@ function AppContent() {
                 <Route path="simulator-packages" element={<SimulatorPackageManagement />} />
                 <Route path="special-events" element={<SpecialEventsManagement />} />
                 <Route path="special-events/:eventId/registrations" element={<EventRegistrations />} />
+                <Route path="banners" element={<BannerManagement />} />
                 <Route path="closed-days" element={<ClosedDaysManagement />} />
                 <Route path="liability-waiver" element={<LiabilityWaiverManagement />} />
                 <Route path="ghl-locations" element={<GHLLocationManagement />} />

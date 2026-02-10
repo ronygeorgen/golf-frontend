@@ -9,6 +9,8 @@ import LiabilityWaiverPopup from './LiabilityWaiverPopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import { getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
+import axios from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function UserLayout() {
     const navigate = useNavigate();
@@ -68,22 +70,22 @@ function UserLayout() {
     useEffect(() => {
         const checkWaiver = async () => {
             if (!user) return;
-            
+
             const waiverPopupShown = sessionStorage.getItem('waiverPopupShown');
             if (waiverPopupShown === 'true') return; // Already shown in this session
-            
+
             try {
                 // Get active waiver
                 const waiverResult = await dispatch(getActiveWaiver());
                 if (getActiveWaiver.fulfilled.match(waiverResult) && waiverResult.payload.waiver) {
                     const waiver = waiverResult.payload.waiver;
                     setActiveWaiver(waiver);
-                    
+
                     // Check if user has accepted
                     const acceptanceResult = await dispatch(checkWaiverAcceptance());
                     if (checkWaiverAcceptance.fulfilled.match(acceptanceResult)) {
                         const acceptance = acceptanceResult.payload;
-                        
+
                         // Show popup if waiver exists and user hasn't accepted or content changed
                         if (acceptance.waiver_exists && acceptance.needs_acceptance) {
                             const timer = setTimeout(() => {
@@ -98,7 +100,7 @@ function UserLayout() {
                 console.error('Error checking waiver:', error);
             }
         };
-        
+
         if (user && location.pathname !== '/profile') {
             checkWaiver();
         }
@@ -109,7 +111,7 @@ function UserLayout() {
     useEffect(() => {
         // Don't show DOB popup if waiver popup is showing
         if (showWaiverPopup) return;
-        
+
         // Check if we've already shown the popup in this session
         const dobPopupShown = sessionStorage.getItem('dobPopupShown');
 
@@ -143,6 +145,40 @@ function UserLayout() {
         if (path === '/coaching-sessions' || path.startsWith('/coaching-sessions')) return 'My Coaching Sessions';
         if (path === '/member-list') return 'Member List';
         return 'Dashboard';
+    };
+
+    const [activeBanner, setActiveBanner] = useState(null);
+
+    useEffect(() => {
+        const fetchActiveBanner = async () => {
+            try {
+                const response = await axios.get(endpoints.admin.banners.active);
+                if (response.data && (Object.keys(response.data).length > 0)) {
+                    setActiveBanner(response.data);
+                } else {
+                    setActiveBanner(null);
+                }
+            } catch (error) {
+                console.error('Failed to fetch banner', error);
+            }
+        };
+        fetchActiveBanner();
+
+        // Poll for updates every minute
+        const interval = setInterval(fetchActiveBanner, 60000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const getBannerStyles = (color) => {
+        switch (color) {
+            case 'red':
+                return "bg-red-100 text-red-900 border-red-300/30";
+            case 'yellow':
+                return "bg-yellow-100 text-yellow-900 border-yellow-300/30";
+            case 'blue':
+            default:
+                return "bg-blue-100 text-blue-900 border-blue-300/30";
+        }
     };
 
     return (
@@ -472,19 +508,25 @@ function UserLayout() {
                 </div>
             </header>
 
+
             {/* Running Banner */}
-            {/* <div
-                onClick={() => navigate('/special-events')}
-                className="bg-blue-100 hover:bg-blue-200 text-blue-900 py-1.5 cursor-pointer overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b border-blue-300/30 shadow-sm transition-colors"
-            >
-                <div className="animate-marquee-seamless">
-                    {[1, 2, 3, 4].map((i) => (
-                        <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap flex items-center justify-center gap-2">
-                            "Grand Opening on Saturday 6-9pm, come celebrate with us!"
-                        </span>
-                    ))}
+            {activeBanner && activeBanner.is_active && (
+                <div
+                    onClick={() => navigate('/special-events')}
+                    className={`${getBannerStyles(activeBanner.color)} py-1.5 overflow-hidden whitespace-nowrap sticky top-14 z-40 border-b shadow-sm transition-colors cursor-pointer`}
+                >
+                    <div
+                        className="animate-marquee-seamless"
+                        style={{ animationDuration: '30s' }}
+                    >
+                        {[...Array(20)].map((_, i) => (
+                            <span key={i} className="px-8 font-bold text-sm md:text-base uppercase tracking-wider whitespace-nowrap flex items-center justify-center gap-2">
+                                {activeBanner.text}
+                            </span>
+                        ))}
+                    </div>
                 </div>
-            </div> */}
+            )}
 
             {/* Main Content */}
             <main className="pt-0">
