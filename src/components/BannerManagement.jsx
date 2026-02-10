@@ -13,8 +13,65 @@ function BannerManagement() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [currentBanner, setCurrentBanner] = useState(null);
+    const [bannerToDelete, setBannerToDelete] = useState(null);
+    const { toast, showSuccess, showError, hideToast } = useToast();
 
-    // ... (inside handleSubmit function)
+    // Form state
+    const [formData, setFormData] = useState({
+        text: '',
+        color: 'blue',
+        is_active: true
+    });
+
+    const colors = [
+        { value: 'red', label: 'Red (Emergency)', class: 'bg-red-100 text-red-900 border-red-300' },
+        { value: 'yellow', label: 'Yellow (Alert)', class: 'bg-yellow-100 text-yellow-900 border-yellow-300' },
+        { value: 'blue', label: 'Blue (Information)', class: 'bg-blue-100 text-blue-900 border-blue-300' },
+    ];
+
+    useEffect(() => {
+        fetchBanners();
+    }, []);
+
+    const fetchBanners = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get(endpoints.admin.banners.list);
+            setBanners(response.data);
+            setError(null);
+        } catch (err) {
+            console.error('Error fetching banners:', err);
+            setError('Failed to load banners');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOpenModal = (banner = null) => {
+        if (banner) {
+            setCurrentBanner(banner);
+            setFormData({
+                text: banner.text,
+                color: banner.color,
+                is_active: banner.is_active
+            });
+        } else {
+            setCurrentBanner(null);
+            setFormData({
+                text: '',
+                color: 'blue',
+                is_active: true
+            });
+        }
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setCurrentBanner(null);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -35,28 +92,6 @@ function BannerManagement() {
             setIsSubmitting(false);
         }
     };
-
-    // ... (inside the form JSX return)
-    <div className="flex justify-end gap-3 mt-6">
-        <button
-            type="button"
-            onClick={handleCloseModal}
-            className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background-secondary rounded-lg transition-colors"
-            disabled={isSubmitting}
-        >
-            Cancel
-        </button>
-        <button
-            type="submit"
-            className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isSubmitting}
-        >
-            {isSubmitting ? 'Saving...' : (currentBanner ? 'Update Banner' : 'Create Banner')}
-        </button>
-    </div>
-                        </form >
-                    </div >
-
     const handleOpenDeleteModal = (banner) => {
         setBannerToDelete(banner);
         setIsDeleteModalOpen(true);
@@ -237,14 +272,16 @@ function BannerManagement() {
                                     type="button"
                                     onClick={handleCloseModal}
                                     className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background-secondary rounded-lg transition-colors"
+                                    disabled={isSubmitting}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors"
+                                    className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={isSubmitting}
                                 >
-                                    {currentBanner ? 'Update Banner' : 'Create Banner'}
+                                    {isSubmitting ? 'Saving...' : (currentBanner ? 'Update Banner' : 'Create Banner')}
                                 </button>
                             </div>
                         </form>
