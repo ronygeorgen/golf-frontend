@@ -5,7 +5,6 @@ export const endpoints = {
     // Auth endpoints
     auth: {
         signup: '/auth/signup/',
-        signupWithoutOTP: '/auth/signup-without-otp/',
         login: '/auth/login/',
         logout: '/auth/logout/',
         profile: '/auth/profile/',
@@ -15,11 +14,8 @@ export const endpoints = {
         ghlLocations: '/auth/ghl-locations/',
         updateDob: '/auth/update-dob/',
         memberList: '/auth/member-list/',
-        liabilityWaiver: '/auth/liability-waiver/',
-        checkWaiverAcceptance: '/auth/liability-waiver/check/',
-        acceptWaiver: '/auth/liability-waiver/accept/',
     },
-
+    
     // Admin endpoints
     admin: {
         dashboard: {
@@ -31,8 +27,6 @@ export const endpoints = {
             detail: (id) => `/admin/staff/${id}/`,
             availability: (id) => `/admin/staff/${id}/availability/`,
             dayAvailability: (id) => `/admin/staff/${id}/day-availability/`,
-            blockedDates: (id) => `/admin/staff/${id}/blocked-dates/`,
-            referrals: (id) => `/admin/staff/${id}/referrals/`,
         },
         simulators: {
             list: '/admin/simulators/',
@@ -89,24 +83,8 @@ export const endpoints = {
             checkDate: '/admin/closed-days/check-date/',
             checkDatetime: '/admin/closed-days/check-datetime/',
         },
-        liabilityWaiver: {
-            list: '/admin/liability-waiver/',
-            detail: (id) => `/admin/liability-waiver/${id}/`,
-            create: '/admin/liability-waiver/',
-            update: (id) => `/admin/liability-waiver/${id}/`,
-            delete: (id) => `/admin/liability-waiver/${id}/`,
-            acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
-        },
-        banners: {
-            list: '/banners/',
-            detail: (id) => `/banners/${id}/`,
-            create: '/banners/',
-            update: (id) => `/banners/${id}/`,
-            delete: (id) => `/banners/${id}/`,
-            active: '/banners/active/',
-        },
     },
-
+    
     // Booking endpoints
     bookings: {
         list: '/bookings/',
@@ -125,10 +103,8 @@ export const endpoints = {
         checkCoachingAvailability: '/bookings/check_coaching_availability/',
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
         availableSimulatorHours: '/bookings/available-simulator-hours/',
-        guestCreate: '/bookings/guest-create/',
-        staffDailySchedule: '/bookings/staff_daily_schedule/',
     },
-
+    
     // Simulator endpoints (public)
     simulators: {
         list: '/simulators/simulators/',
@@ -136,7 +112,7 @@ export const endpoints = {
         durationPrices: '/simulators/duration-prices/',
         credits: '/simulators/credits/',
     },
-
+    
     // Coaching endpoints (public)
     coaching: {
         packages: '/coaching/packages/',
@@ -144,7 +120,6 @@ export const endpoints = {
         purchases: '/coaching/purchases/',
         purchaseDetail: (id) => `/coaching/purchases/${id}/`,
         myPurchases: '/coaching/purchases/my/',
-        userPurchases: '/coaching/purchases/user_purchases/',
         transferablePurchases: '/coaching/purchases/transferable_purchases/',
         giftsPending: '/coaching/purchases/gifts_pending/',
         giftClaim: (token) => `/coaching/gifts/claim/${token}/`,
@@ -164,12 +139,10 @@ export const endpoints = {
         simulatorPurchases: '/coaching/simulator-purchases/',
         simulatorPurchaseDetail: (id) => `/coaching/simulator-purchases/${id}/`,
         mySimulatorPurchases: '/coaching/simulator-purchases/my/',
-        userSimulatorPurchases: '/coaching/simulator-purchases/user_purchases/',
         transferableSimulatorPurchases: '/coaching/simulator-purchases/transferable_purchases/',
         simulatorTransfers: '/coaching/simulator-transfers/',
         simulatorTransfersPending: '/coaching/simulator-transfers/pending/',
         simulatorTransferClaim: (id) => `/coaching/simulator-transfers/${id}/claim/`,
-        guestPackages: '/coaching/guest-packages/',
     },
 
     ghl: {
@@ -180,7 +153,7 @@ export const endpoints = {
             setCompanyName: '/ghlpage/admin/locations/set-company-name/',
         },
     },
-
+    
     // Special Events endpoints
     specialEvents: {
         list: '/special-events/events/',
@@ -194,13 +167,16 @@ export const endpoints = {
         cancelRegistration: (id) => `/special-events/events/${id}/cancel_registration/`,
         registrations: (id) => `/special-events/events/${id}/registrations/`,
         updateRegistrationStatus: (id) => `/special-events/events/${id}/update_registration_status/`,
-        removeRegistration: (id) => `/special-events/events/${id}/remove_registration/`,
         myRegistrations: '/special-events/registrations/',
-        eventsOnDate: '/special-events/events/events_on_date/',
-        calendarEvents: '/special-events/events/calendar-events/',
-        futureOccurrences: (id) => `/special-events/events/${id}/future_occurrences/`,
-        pauseOccurrences: (id) => `/special-events/events/${id}/pause_occurrences/`,
-        webhook: '/special-events/webhook/',
+    },
+
+    // Dashboard endpoints
+    dashboard: {
+        busyQuietTimes: '/dashboard/busy-quiet-times/',
+        topCustomers: '/dashboard/top-customers/',
+        staffSales: '/dashboard/staff-sales/',
+        tpiConversion: '/dashboard/tpi-conversion/',
+        kpiStats: '/dashboard/kpi-stats/',
     },
 };
 

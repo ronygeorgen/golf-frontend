@@ -27,6 +27,67 @@ export const getRecentBookings = createAsyncThunk(
     }
 );
 
+// New dashboard visualization thunks
+export const getBusyQuietTimes = createAsyncThunk(
+    'admin/getBusyQuietTimes',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.dashboard.busyQuietTimes, { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getTopCustomers = createAsyncThunk(
+    'admin/getTopCustomers',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.dashboard.topCustomers, { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getStaffSales = createAsyncThunk(
+    'admin/getStaffSales',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.dashboard.staffSales, { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getTpiConversion = createAsyncThunk(
+    'admin/getTpiConversion',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.dashboard.tpiConversion, { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
+export const getKpiStats = createAsyncThunk(
+    'admin/getKpiStats',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.get(endpoints.dashboard.kpiStats, { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Staff thunks
 export const getStaff = createAsyncThunk(
     'admin/getStaff',
@@ -478,6 +539,11 @@ const initialState = {
     dashboard: {
         stats: null,
         recentBookings: [],
+        busyQuietTimes: null,
+        topCustomers: null,
+        staffSales: null,
+        tpiConversion: null,
+        kpiStats: null,
         loading: false,
         error: null,
     },
@@ -598,6 +664,76 @@ const adminSlice = createSlice({
                 state.dashboard.recentBookings = action.payload;
             })
             .addCase(getRecentBookings.rejected, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.error = action.payload;
+            });
+
+        // Busy & Quiet Times
+        builder
+            .addCase(getBusyQuietTimes.pending, (state) => {
+                state.dashboard.loading = true;
+            })
+            .addCase(getBusyQuietTimes.fulfilled, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.busyQuietTimes = action.payload;
+            })
+            .addCase(getBusyQuietTimes.rejected, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.error = action.payload;
+            });
+
+        // Top Customers
+        builder
+            .addCase(getTopCustomers.pending, (state) => {
+                state.dashboard.loading = true;
+            })
+            .addCase(getTopCustomers.fulfilled, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.topCustomers = action.payload;
+            })
+            .addCase(getTopCustomers.rejected, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.error = action.payload;
+            });
+
+        // Staff Sales
+        builder
+            .addCase(getStaffSales.pending, (state) => {
+                state.dashboard.loading = true;
+            })
+            .addCase(getStaffSales.fulfilled, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.staffSales = action.payload;
+            })
+            .addCase(getStaffSales.rejected, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.error = action.payload;
+            });
+
+        // TPI Conversion
+        builder
+            .addCase(getTpiConversion.pending, (state) => {
+                state.dashboard.loading = true;
+            })
+            .addCase(getTpiConversion.fulfilled, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.tpiConversion = action.payload;
+            })
+            .addCase(getTpiConversion.rejected, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.error = action.payload;
+            });
+
+        // KPI Stats
+        builder
+            .addCase(getKpiStats.pending, (state) => {
+                state.dashboard.loading = true;
+            })
+            .addCase(getKpiStats.fulfilled, (state, action) => {
+                state.dashboard.loading = false;
+                state.dashboard.kpiStats = action.payload;
+            })
+            .addCase(getKpiStats.rejected, (state, action) => {
                 state.dashboard.loading = false;
                 state.dashboard.error = action.payload;
             });
