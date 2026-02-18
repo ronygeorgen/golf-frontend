@@ -305,7 +305,7 @@ function AdminDashboard() {
                 {/* Total Confirmed Bookings */}
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
                     <h3 className="text-sm md:text-base font-medium text-text-secondary mb-2">
-                        Confirmed Bookings
+                        Total Completed Bookings
                     </h3>
                     {loading ? (
                         <div className="space-y-2">
@@ -317,9 +317,7 @@ function AdminDashboard() {
                             <p className="text-2xl md:text-3xl font-bold text-text-primary">
                                 {kpiStats?.total_confirmed_bookings?.toLocaleString('en-US') || '0'}
                             </p>
-                            <p className="text-xs md:text-sm text-text-secondary mt-1">
-                                Pending completion
-                            </p>
+                            
                         </div>
                     )}
                 </div>
