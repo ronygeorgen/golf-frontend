@@ -180,7 +180,7 @@ function AdminDashboard() {
     };
 
     return (
-        <div className="space-y-4 md:space-y-6 px-2 md:px-0">
+        <div className="space-y-4 md:space-y-6">
             {/* Date Range Filter */}
             {showDateFilter ? (
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
@@ -317,7 +317,7 @@ function AdminDashboard() {
                             <p className="text-2xl md:text-3xl font-bold text-text-primary">
                                 {kpiStats?.total_confirmed_bookings?.toLocaleString('en-US') || '0'}
                             </p>
-                            
+
                         </div>
                     )}
                 </div>
@@ -328,71 +328,88 @@ function AdminDashboard() {
                 {/* Busy & Quiet Times Heatmap */}
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
                     <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4">
-                        Busy & Quiet Times 
+                        Busy & Quiet Times
                     </h2>
                     {loading ? (
                         <HeatmapSkeleton />
                     ) : heatmapData && heatmapData.length > 0 ? (
-                        <div className="overflow-x-auto -mx-4 md:mx-0">
-                            <div className="min-w-[800px] md:min-w-full px-4 md:px-0">
-                                <div className="grid grid-cols-[80px_repeat(24,minmax(20px,1fr))] md:grid-cols-[100px_repeat(24,1fr)] gap-1 mb-2">
-                                    <div className="text-xs font-medium text-text-secondary text-center py-2">
-                                        <span className="hidden md:inline">Day/Hour</span>
-                                        <span className="md:hidden">D/H</span>
-                                    </div>
-                                    {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
-                                        <div
-                                            key={hour}
-                                            className="text-xs font-medium text-text-secondary text-center py-1 md:py-2"
-                                        >
-                                            {hour}
-                                        </div>
+                        <div className="overflow-x-auto -mx-4 md:-mx-6">
+                            <table
+                                style={{ borderCollapse: 'separate', borderSpacing: '3px', tableLayout: 'fixed', minWidth: '520px' }}
+                                className="px-4 md:px-6 w-full"
+                            >
+                                <colgroup>
+                                    {/* Day label column */}
+                                    <col style={{ width: '36px' }} />
+                                    {/* 24 hour columns — equal width */}
+                                    {Array.from({ length: 24 }).map((_, i) => (
+                                        <col key={i} />
                                     ))}
-                                </div>
-                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(
-                                    (day) => (
-                                        <div key={day} className="grid grid-cols-[80px_repeat(24,minmax(20px,1fr))] md:grid-cols-[100px_repeat(24,1fr)] gap-1 mb-1">
-                                            <div className="text-xs font-medium text-text-primary py-2 px-1 md:px-2">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th className="text-xs font-medium text-text-secondary text-center pb-1 px-0">
+                                            D/H
+                                        </th>
+                                        {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                                            <th
+                                                key={hour}
+                                                className="text-xs font-medium text-text-secondary text-center pb-1 px-0"
+                                            >
+                                                {hour}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                                        <tr key={day}>
+                                            <td className="text-xs font-medium text-text-primary pr-1 py-0 whitespace-nowrap">
                                                 {day.substring(0, 3)}
-                                            </div>
+                                            </td>
                                             {Array.from({ length: 24 }, (_, i) => i).map((hour) => {
                                                 const dataPoint = heatmapData.find(
                                                     (d) => d.day === day && d.hourNum === hour
                                                 );
                                                 const value = dataPoint ? dataPoint.value : 0;
                                                 return (
-                                                    <div
-                                                        key={hour}
-                                                        className="aspect-square rounded flex items-center justify-center text-[10px] md:text-xs min-w-[20px] md:min-w-[30px]"
-                                                        style={{
-                                                            backgroundColor: getHeatmapColor(value),
-                                                            color: value > maxValue / 2 ? '#fff' : '#000'
-                                                        }}
-                                                        title={`${day} ${hour}:00 - ${value} bookings`}
-                                                    >
-                                                        {value > 0 ? value : ''}
-                                                    </div>
+                                                    <td key={hour} className="p-0" title={`${day} ${hour}:00 - ${value} bookings`}>
+                                                        <div
+                                                            className="rounded flex items-center justify-center text-[9px] font-medium mx-auto"
+                                                            style={{
+                                                                backgroundColor: getHeatmapColor(value),
+                                                                color: value > maxValue / 2 ? '#fff' : '#333',
+                                                                width: '100%',
+                                                                aspectRatio: '1',
+                                                                minWidth: '14px',
+                                                                minHeight: '14px',
+                                                            }}
+                                                        >
+                                                            {value > 0 ? value : ''}
+                                                        </div>
+                                                    </td>
                                                 );
                                             })}
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 md:gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 md:w-4 md:h-4 rounded" style={{ backgroundColor: '#f0f0f0' }}></div>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {/* Legend */}
+                            <div className="mt-4 px-4 md:px-6 flex flex-wrap items-center gap-3 md:gap-4">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f0f0f0' }}></div>
                                     <span className="text-xs text-text-secondary">0</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 md:w-4 md:h-4 rounded" style={{ backgroundColor: '#E6F4EA' }}></div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#E6F4EA' }}></div>
                                     <span className="text-xs text-text-secondary">Low</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 md:w-4 md:h-4 rounded" style={{ backgroundColor: '#6BA882' }}></div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#6BA882' }}></div>
                                     <span className="text-xs text-text-secondary">Medium</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 md:w-4 md:h-4 rounded" style={{ backgroundColor: '#134A34' }}></div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#134A34' }}></div>
                                     <span className="text-xs text-text-secondary">High</span>
                                 </div>
                             </div>

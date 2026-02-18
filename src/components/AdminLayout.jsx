@@ -169,7 +169,7 @@ function AdminLayout() {
                         )}
 
                         {/* Center - Main Navigation Links (Desktop) */}
-                        <nav className="hidden md:flex items-center space-x-1 flex-1 justify-center max-w-4xl mx-4">
+                        <nav className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-4xl mx-4">
                             {/* Dashboard */}
                             <button
                                 onClick={() => handleNavClick(navigationItems.dashboard.path)}
@@ -279,7 +279,7 @@ function AdminLayout() {
 
                         {/* Mobile Navigation - Show Dashboard only when in iframe */}
                         {isInIframe && (
-                            <nav className="md:hidden flex items-center flex-1 justify-center">
+                            <nav className="lg:hidden flex items-center flex-1 justify-center">
                                 <button
                                     onClick={() => handleNavClick(navigationItems.dashboard.path)}
                                     className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 ${isActive(navigationItems.dashboard.path)
@@ -306,7 +306,7 @@ function AdminLayout() {
                                                 {user?.first_name?.[0] || user?.email?.[0] || 'A'}
                                             </span>
                                         </div>
-                                        <div className="hidden md:flex flex-col items-start">
+                                        <div className="hidden lg:flex flex-col items-start">
                                             <span className="text-sm font-medium text-text-primary">
                                                 {user?.first_name || user?.username || 'Admin'}
                                             </span>
@@ -340,7 +340,7 @@ function AdminLayout() {
                                             </div>
 
                                             {/* Navigation Items - Mobile Only */}
-                                            <div className="md:hidden py-1 border-b border-border">
+                                            <div className="lg:hidden py-1 border-b border-border">
                                                 {/* Manage Section */}
                                                 <div className="px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wider">
                                                     {navigationItems.manage.label}
