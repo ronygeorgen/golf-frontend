@@ -33,8 +33,10 @@ function MemberList() {
     const [showPackagesListModal, setShowPackagesListModal] = useState(false);
     const [selectedMemberPackages, setSelectedMemberPackages] = useState([]);
     const [packages, setPackages] = useState([]);
+    const [simulatorPackages, setSimulatorPackages] = useState([]);
     const [packagesLoading, setPackagesLoading] = useState(false);
     const [purchasingPackageId, setPurchasingPackageId] = useState(null);
+    const [packageTypeFilter, setPackageTypeFilter] = useState('coaching'); // 'coaching' or 'simulator'
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({
         count: 0,
@@ -121,13 +123,23 @@ function MemberList() {
 
         try {
             setPackagesLoading(true);
-            const response = await apiClient.get('/coaching/packages/', {
-                params: {
-                    location_id: user.ghl_location_id,
-                    is_active: true
-                }
-            });
-            setPackages(response.data || []);
+            // Fetch both coaching and simulator packages in parallel
+            const [coachingResponse, simulatorResponse] = await Promise.all([
+                apiClient.get('/coaching/packages/', {
+                    params: {
+                        location_id: user.ghl_location_id,
+                        is_active: true
+                    }
+                }),
+                apiClient.get('/coaching/simulator-packages/', {
+                    params: {
+                        location_id: user.ghl_location_id,
+                        is_active: true
+                    }
+                })
+            ]);
+            setPackages(coachingResponse.data || []);
+            setSimulatorPackages(simulatorResponse.data || []);
         } catch (error) {
             console.error('Error fetching packages:', error);
             showError('Failed to load packages');
@@ -153,10 +165,11 @@ function MemberList() {
 
     const handleAddPackage = () => {
         setShowPackageModal(true);
+        setPackageTypeFilter('coaching'); // Reset to coaching by default
         fetchPackages();
     };
 
-    const handlePurchasePackage = async (packageId) => {
+    const handlePurchasePackage = async (packageId, packageType = 'coaching') => {
         if (!selectedMember) return;
 
         try {
@@ -167,7 +180,7 @@ function MemberList() {
                 package_id: packageId,
                 buyer_phone: selectedMember.phone,
                 purchase_type: 'normal',
-                package_type: 'coaching',
+                package_type: packageType, // 'coaching' or 'simulator'
                 referral_id: user.id  // Staff user ID
             });
 
@@ -178,7 +191,7 @@ function MemberList() {
                 url.searchParams.set('package_id', packageId.toString());
                 url.searchParams.set('purchase_type', 'normal');
                 url.searchParams.set('recipient_phone', response.data.temp_id); // recipient_phone contains temp_id
-                url.searchParams.set('package_type', 'coaching');
+                url.searchParams.set('package_type', packageType);
                 if (user.id) {
                     url.searchParams.set('referral_id', user.id.toString());
                 }
@@ -590,51 +603,119 @@ function MemberList() {
                                 </button>
                             </div>
 
+                            {/* Package Type Filter Tabs */}
+                            <div className="flex border-b border-border mb-4">
+                                <button
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                        packageTypeFilter === 'coaching'
+                                            ? 'border-primary text-primary'
+                                            : 'border-transparent text-text-secondary hover:text-text-primary'
+                                    }`}
+                                    onClick={() => setPackageTypeFilter('coaching')}
+                                >
+                                    Coaching Packages ({packages.length})
+                                </button>
+                                <button
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                        packageTypeFilter === 'simulator'
+                                            ? 'border-primary text-primary'
+                                            : 'border-transparent text-text-secondary hover:text-text-primary'
+                                    }`}
+                                    onClick={() => setPackageTypeFilter('simulator')}
+                                >
+                                    Simulator Packages ({simulatorPackages.length})
+                                </button>
+                            </div>
+
                             {packagesLoading ? (
                                 <div className="text-center py-8">
                                     <p className="text-text-secondary">Loading packages...</p>
                                 </div>
-                            ) : packages.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <p className="text-text-secondary">No packages available</p>
-                                </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {packages.map((pkg) => (
-                                        <div
-                                            key={pkg.id}
-                                            className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
-                                        >
-                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
-                                                    <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
-                                                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                                                        <span className="text-text-secondary">
-                                                            Sessions: <span className="font-medium text-text-primary">{pkg.session_count}</span>
-                                                        </span>
-                                                        {pkg.simulator_hours > 0 && (
-                                                            <span className="text-text-secondary">
-                                                                Simulator Hours: <span className="font-medium text-text-primary">{pkg.simulator_hours}</span>
-                                                            </span>
-                                                        )}
-                                                        <span className="font-bold text-primary text-base">
-                                                            ${pkg.price}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    onClick={() => handlePurchasePackage(pkg.id)}
-                                                    variant="primary"
-                                                    disabled={purchasingPackageId === pkg.id}
-                                                    className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
-                                                >
-                                                    {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
-                                                </Button>
+                                <>
+                                    {packageTypeFilter === 'coaching' ? (
+                                        packages.length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <p className="text-text-secondary">No coaching packages available</p>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {packages.map((pkg) => (
+                                                    <div
+                                                        key={pkg.id}
+                                                        className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
+                                                    >
+                                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                                                            <div className="flex-1">
+                                                                <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
+                                                                <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
+                                                                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                                                                    <span className="text-text-secondary">
+                                                                        Sessions: <span className="font-medium text-text-primary">{pkg.session_count}</span>
+                                                                    </span>
+                                                                    {pkg.simulator_hours > 0 && (
+                                                                        <span className="text-text-secondary">
+                                                                            Simulator Hours: <span className="font-medium text-text-primary">{pkg.simulator_hours}</span>
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="font-bold text-primary text-base">
+                                                                        ${pkg.price}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                onClick={() => handlePurchasePackage(pkg.id, 'coaching')}
+                                                                variant="primary"
+                                                                disabled={purchasingPackageId === pkg.id}
+                                                                className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
+                                                            >
+                                                                {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    ) : (
+                                        simulatorPackages.length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <p className="text-text-secondary">No simulator packages available</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {simulatorPackages.map((pkg) => (
+                                                    <div
+                                                        key={pkg.id}
+                                                        className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
+                                                    >
+                                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                                                            <div className="flex-1">
+                                                                <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
+                                                                <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
+                                                                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                                                                    <span className="text-text-secondary">
+                                                                        Hours: <span className="font-medium text-text-primary">{pkg.hours_total}</span>
+                                                                    </span>
+                                                                    <span className="font-bold text-primary text-base">
+                                                                        ${pkg.price}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                onClick={() => handlePurchasePackage(pkg.id, 'simulator')}
+                                                                variant="primary"
+                                                                disabled={purchasingPackageId === pkg.id}
+                                                                className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
+                                                            >
+                                                                {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -703,6 +784,7 @@ function MemberList() {
 }
 
 export default MemberList;
+
 
 
 
