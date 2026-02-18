@@ -103,6 +103,7 @@ export const endpoints = {
         checkCoachingAvailability: '/bookings/check_coaching_availability/',
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
         availableSimulatorHours: '/bookings/available-simulator-hours/',
+        staffDailySchedule: '/bookings/staff-daily-schedule/',
     },
     
     // Simulator endpoints (public)
