@@ -180,6 +180,7 @@ export const endpoints = {
         update: (id) => `/special-events/events/${id}/`,
         delete: (id) => `/special-events/events/${id}/`,
         upcoming: '/special-events/events/upcoming/',
+        calendarEvents: '/special-events/events/calendar-events/',
         register: (id) => `/special-events/events/${id}/register/`,
         registerUser: (id) => `/special-events/events/${id}/register_user/`,
         cancelRegistration: (id) => `/special-events/events/${id}/cancel_registration/`,
