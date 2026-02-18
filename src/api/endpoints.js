@@ -83,6 +83,21 @@ export const endpoints = {
             checkDate: '/admin/closed-days/check-date/',
             checkDatetime: '/admin/closed-days/check-datetime/',
         },
+        banners: {
+            list: '/banners/',
+            detail: (id) => `/banners/${id}/`,
+            create: '/banners/',
+            update: (id) => `/banners/${id}/`,
+            delete: (id) => `/banners/${id}/`,
+        },
+        liabilityWaiver: {
+            list: '/admin/liability-waiver/',
+            detail: (id) => `/admin/liability-waiver/${id}/`,
+            create: '/admin/liability-waiver/',
+            update: (id) => `/admin/liability-waiver/${id}/`,
+            delete: (id) => `/admin/liability-waiver/${id}/`,
+            acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
+        },
     },
     
     // Booking endpoints
