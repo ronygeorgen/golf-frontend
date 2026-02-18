@@ -179,4 +179,3 @@ export const endpoints = {
         kpiStats: '/dashboard/kpi-stats/',
     },
 };
-
