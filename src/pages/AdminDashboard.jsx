@@ -235,7 +235,7 @@ function AdminDashboard() {
             )}
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 min-w-0">
                 {/* Total Revenue of Completed Sessions */}
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
                     <h3 className="text-sm md:text-base font-medium text-text-secondary mb-2">
@@ -324,9 +324,9 @@ function AdminDashboard() {
             </div>
 
             {/* Busy & Quiet Times Heatmap and Staff Sales Performance */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
                 {/* Busy & Quiet Times Heatmap */}
-                <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 min-w-0">
                     <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4">
                         Busy & Quiet Times
                     </h2>
@@ -422,7 +422,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* Staff Sales Performance */}
-                <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 min-w-0">
                     <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4">Staff Sales Performance</h2>
                     {loading ? (
                         <StaffSalesSkeleton />
@@ -457,9 +457,9 @@ function AdminDashboard() {
             </div>
 
             {/* Top Customers and TPI Conversion - Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
                 {/* Top Customers */}
-                <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 min-w-0">
                     <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4">Top Customers</h2>
                     {loading ? (
                         <TopCustomersSkeleton />
@@ -528,7 +528,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* TPI Conversion */}
-                <div className="bg-surface rounded-card shadow-card p-4 md:p-6">
+                <div className="bg-surface rounded-card shadow-card p-4 md:p-6 min-w-0">
                     <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4">TPI Conversion Rate</h2>
                     {loading ? (
                         <PieChartSkeleton />
