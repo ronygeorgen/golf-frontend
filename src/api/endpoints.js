@@ -14,6 +14,10 @@ export const endpoints = {
         ghlLocations: '/auth/ghl-locations/',
         updateDob: '/auth/update-dob/',
         memberList: '/auth/member-list/',
+        signupWithoutOTP: '/auth/signup-without-otp/',
+        liabilityWaiver: '/auth/liability-waiver/',
+        checkWaiverAcceptance: '/auth/liability-waiver/check/',
+        acceptWaiver: '/auth/liability-waiver/accept/',
     },
     
     // Admin endpoints
@@ -65,6 +69,7 @@ export const endpoints = {
             upcoming: '/admin/bookings/upcoming/',
             calendarEvents: '/admin/bookings/calendar_events/',
             stats: '/admin/bookings/stats/',
+            
         },
         overrides: {
             coachingSessions: '/admin/overrides/coaching-sessions/',
@@ -91,6 +96,7 @@ export const endpoints = {
             create: '/banners/',
             update: (id) => `/banners/${id}/`,
             delete: (id) => `/banners/${id}/`,
+            active: '/banners/active/',
         },
         liabilityWaiver: {
             list: '/admin/liability-waiver/',
@@ -121,6 +127,7 @@ export const endpoints = {
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
         availableSimulatorHours: '/bookings/available-simulator-hours/',
         staffDailySchedule: '/bookings/staff-daily-schedule/',
+        guestCreate: '/bookings/guest-create/',
     },
     
     // Simulator endpoints (public)
@@ -163,6 +170,7 @@ export const endpoints = {
         simulatorTransfers: '/coaching/simulator-transfers/',
         simulatorTransfersPending: '/coaching/simulator-transfers/pending/',
         simulatorTransferClaim: (id) => `/coaching/simulator-transfers/${id}/claim/`,
+        guestPackages: '/coaching/guest-packages/',
     },
 
     ghl: {
@@ -189,6 +197,11 @@ export const endpoints = {
         registrations: (id) => `/special-events/events/${id}/registrations/`,
         updateRegistrationStatus: (id) => `/special-events/events/${id}/update_registration_status/`,
         myRegistrations: '/special-events/registrations/',
+        eventsOnDate: '/special-events/events/events_on_date/',
+        futureOccurrences: (id) => `/special-events/events/${id}/future_occurrences/`,
+        pauseOccurrences: (id) => `/special-events/events/${id}/pause_occurrences/`,
+        webhook: '/special-events/webhook/',
+        removeRegistration: (id) => `/special-events/events/${id}/remove_registration/`,
     },
 
     // Dashboard endpoints
