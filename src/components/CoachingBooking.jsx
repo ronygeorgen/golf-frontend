@@ -180,12 +180,12 @@ function CoachingBooking({ client, onBookingSuccess }) {
     if (!isAdminOrStaff) {
         minDate.setDate(minDate.getDate() + 1);
     }
-    const minDateString = minDate.toISOString().split('T')[0];
+    const minDateString = `${minDate.getFullYear()}-${String(minDate.getMonth() + 1).padStart(2, '0')}-${String(minDate.getDate()).padStart(2, '0')}`;
 
     // Calculate max date (30 days from today)
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 30);
-    const maxDateString = maxDate.toISOString().split('T')[0];
+    const maxDateString = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
 
     useEffect(() => {
         // Load active coaching packages
