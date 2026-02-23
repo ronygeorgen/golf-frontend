@@ -10,6 +10,7 @@ import SessionTransfer from '../components/SessionTransfer';
 import { getGiftsPending, getTransfersPending, getMyPackagePurchases, getMySimulatorPurchases, getOrganizationPackages, getActiveCoachingPackages } from '../store/slices/coachingSlice';
 import usePopup from '../hooks/usePopup';
 import Button from '../components/ui/Button';
+import DateInput from '../components/ui/DateInput';
 import Badge from '../components/ui/Badge';
 import { utcTimeToLocal, utcToHalifaxDate } from '../utils/timezone';
 
@@ -920,15 +921,13 @@ function ClientPortal() {
                         <form className="space-y-4" onSubmit={handleRescheduleSubmit}>
                             <div>
                                 <label className="block text-sm font-medium text-text-primary mb-1">New Date</label>
-                                <input
-                                    type="date"
+                                <DateInput
                                     value={rescheduleDate}
-                                    onChange={(e) => setRescheduleDate(e.target.value)}
+                                    onChange={setRescheduleDate}
                                     min={minDateString}
                                     max={maxDateString}
+                                    placeholder="Select new date"
                                     required
-                                    className="w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface"
-                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                 />
                                 <p className="text-xs text-text-secondary mt-1">
                                     Availability will be checked automatically when you select a date.

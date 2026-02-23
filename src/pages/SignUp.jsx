@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, verifyOTP, requestOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
+import DateInput from '../components/ui/DateInput';
 import LiabilityWaiverPopup from '../components/LiabilityWaiverPopup';
 import { X } from 'lucide-react';
 import apiClient from '../api/axios';
@@ -265,13 +266,11 @@ function SignUp() {
                             <label className="block text-sm font-medium text-text-primary mb-2">
                                 Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 value={formData.date_of_birth}
-                                onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                                onChange={(val) => setFormData({ ...formData, date_of_birth: val })}
                                 max={new Date().toISOString().split('T')[0]}
-                                className="w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface transition-colors"
-                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                placeholder="Select date of birth"
                             />
                         </div>
 

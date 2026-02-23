@@ -9,6 +9,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 import { Edit, Trash2, CalendarOff } from 'lucide-react';
 
@@ -509,12 +510,11 @@ function ClosedDaysManagement() {
                                     <label className="block text-sm font-medium text-text-primary mb-2">
                                         Start Date <span className="text-danger">*</span>
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={formData.start_date}
-                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                                        style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                        onChange={(val) => setFormData({ ...formData, start_date: val })}
+                                        placeholder="Start date"
+                                        className="px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                                         required
                                     />
                                 </div>
@@ -522,12 +522,11 @@ function ClosedDaysManagement() {
                                     <label className="block text-sm font-medium text-text-primary mb-2">
                                         End Date <span className="text-danger">*</span>
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={formData.end_date}
-                                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                                        style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                        onChange={(val) => setFormData({ ...formData, end_date: val })}
+                                        placeholder="End date"
+                                        className="px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                                         required
                                     />
                                     <p className="text-xs text-text-secondary mt-1">Same as start date for single day</p>

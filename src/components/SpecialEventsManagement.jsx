@@ -9,6 +9,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 import { localTimeToUTC, utcTimeToLocal } from '../utils/timezone';
 import { Edit, Trash2, PauseCircle } from 'lucide-react';
@@ -521,13 +522,12 @@ function SpecialEventsManagement() {
                                     <label className="block text-sm font-medium text-text-primary mb-1">
                                         {formData.event_type === 'one_time' ? 'Date *' : 'Start Date *'}
                                     </label>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         required
                                         value={formData.date}
-                                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
-                                        style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                        onChange={(val) => setFormData({ ...formData, date: val })}
+                                        placeholder="Select date"
+                                        className="px-3 py-2 border border-border rounded-button bg-background"
                                     />
                                 </div>
 
@@ -537,14 +537,12 @@ function SpecialEventsManagement() {
                                         <label className="block text-sm font-medium text-text-primary mb-1">
                                             Recurring End Date
                                         </label>
-                                        <input
-                                            type="date"
+                                        <DateInput
                                             value={formData.recurring_end_date}
-                                            onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
+                                            onChange={(val) => setFormData({ ...formData, recurring_end_date: val })}
                                             min={formData.date || undefined}
-                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
-                                            style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                             placeholder="Optional - leave empty for no end date"
+                                            className="px-3 py-2 border border-border rounded-button bg-background"
                                         />
                                         <p className="text-xs text-text-secondary mt-1">
                                             Optional. Recurring occurrences will stop on this date. Leave empty for no end date.

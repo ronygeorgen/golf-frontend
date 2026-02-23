@@ -10,6 +10,7 @@ import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { utcTimeToLocal, utcToHalifaxDate } from '../utils/timezone';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import BookForClientModal from './BookForClientModal';
 import { UserPlus } from 'lucide-react';
 
@@ -1158,13 +1159,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1">Select New Date</label>
-                                <input
-                                    type="date"
+                                <DateInput
                                     value={rescheduleState.date}
                                     min={moment().format('YYYY-MM-DD')}
-                                    onChange={(e) => setRescheduleState(prev => ({ ...prev, date: e.target.value, selectedSlot: null }))}
-                                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text-primary"
-                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                    onChange={(val) => setRescheduleState(prev => ({ ...prev, date: val, selectedSlot: null }))}
+                                    placeholder="Select new date"
+                                    className="px-3 py-2 border border-border rounded-lg bg-background"
                                 />
                             </div>
 

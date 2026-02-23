@@ -6,6 +6,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import { utcTimeToLocal } from '../utils/timezone';
 
 function SimulatorBooking({ client, onBookingSuccess }) {
@@ -684,18 +685,13 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                             <label className="block text-sm font-medium text-text-primary mb-2">
                                 Date
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 value={date}
-                                onChange={(e) => setDate(e.target.value)}
+                                onChange={setDate}
                                 min={minDateString}
                                 max={maxDateString}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onKeyPress={(e) => e.preventDefault()}
-                                onPaste={(e) => e.preventDefault()}
-                                onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                                className="w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface cursor-pointer"
-                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                placeholder="Select date"
+                                className="cursor-pointer"
                             />
                         </div>
 

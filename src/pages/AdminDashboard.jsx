@@ -27,6 +27,7 @@ import {
     PieChartSkeleton
 } from '../components/skeletons/SkeletonLoader';
 import { Filter } from 'lucide-react';
+import DateInput from '../components/ui/DateInput';
 
 function AdminDashboard() {
     const dispatch = useAppDispatch();
@@ -201,24 +202,22 @@ function AdminDashboard() {
                             <label className="block text-sm font-medium text-text-secondary mb-2">
                                 Start Date
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 value={dateRange.start_date}
-                                onChange={(e) => handleDateChange('start_date', e.target.value)}
-                                className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer"
-                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                onChange={(val) => handleDateChange('start_date', val)}
+                                placeholder="Start date"
+                                className="px-4 py-2 border border-border rounded-button bg-background cursor-pointer"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-2">
                                 End Date
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 value={dateRange.end_date}
-                                onChange={(e) => handleDateChange('end_date', e.target.value)}
-                                className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer"
-                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                onChange={(val) => handleDateChange('end_date', val)}
+                                placeholder="End date"
+                                className="px-4 py-2 border border-border rounded-button bg-background cursor-pointer"
                             />
                         </div>
                     </div>

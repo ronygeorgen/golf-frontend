@@ -8,6 +8,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 import { Edit, Trash2, Calendar, Users, UserCheck } from 'lucide-react';
 import apiClient from '../api/axios';
@@ -332,13 +333,11 @@ function StaffManagement() {
                                         <label className="block text-sm font-medium text-text-primary mb-2">
                                             Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
                                         </label>
-                                        <input
-                                            type="date"
+                                        <DateInput
                                             value={formData.date_of_birth}
-                                            onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                                            onChange={(val) => setFormData({ ...formData, date_of_birth: val })}
                                             max={new Date().toISOString().split('T')[0]}
-                                            className="w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface"
-                                            style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                            placeholder="Select date of birth"
                                         />
                                     </div>
                                     <div className="flex gap-4 pt-4">

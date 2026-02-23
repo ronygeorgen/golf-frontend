@@ -7,6 +7,7 @@ import { utcTimeToLocal } from '../utils/timezone';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
+import DateInput from './ui/DateInput';
 
 const DAYS_OF_WEEK = [
     { value: 0, label: 'Monday' },
@@ -542,13 +543,12 @@ function StaffAvailability() {
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 Date to Block
                                             </label>
-                                            <input
-                                                type="date"
+                                            <DateInput
                                                 value={blockDateData.date}
-                                                onChange={(e) => setBlockDateData({ ...blockDateData, date: e.target.value })}
+                                                onChange={(val) => setBlockDateData({ ...blockDateData, date: val })}
                                                 min={new Date().toISOString().split('T')[0]}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
-                                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                                placeholder="Select date"
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
                                             />
                                         </div>
                                         <div>
@@ -613,13 +613,12 @@ function StaffAvailability() {
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Date
                                                 </label>
-                                                <input
-                                                    type="date"
+                                                <DateInput
                                                     value={newAvailability.date}
-                                                    onChange={(e) => setNewAvailability({ ...newAvailability, date: e.target.value })}
+                                                    onChange={(val) => setNewAvailability({ ...newAvailability, date: val })}
                                                     min={new Date().toISOString().split('T')[0]}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-white"
-                                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                                    placeholder="Select date"
+                                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-white"
                                                 />
                                             </div>
                                         )}

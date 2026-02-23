@@ -7,6 +7,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 import { Edit, Power, PowerOff, Trash2, X, FileText, Plus, Calendar, Clock, CalendarDays } from 'lucide-react';
 
@@ -515,13 +516,12 @@ function SimulatorPackageManagement() {
                                                             <label className="block text-sm font-medium text-text-primary mb-1">
                                                                 Specific Date *
                                                             </label>
-                                                            <input
-                                                                type="date"
+                                                            <DateInput
                                                                 value={restriction.date || ''}
-                                                                onChange={(e) => updateTimeRestriction(index, 'date', e.target.value)}
+                                                                onChange={(val) => updateTimeRestriction(index, 'date', val)}
                                                                 required
-                                                                className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
-                                                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                                                placeholder="Select date"
+                                                                className="px-3 py-2 border border-border rounded-button bg-background"
                                                             />
                                                         </div>
                                                     )}

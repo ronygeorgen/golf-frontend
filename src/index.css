@@ -183,3 +183,23 @@
 .animate-marquee-seamless:hover {
     animation-play-state: paused;
 }
+
+/* Shared DateInput (react-datepicker): one UI on all devices, left-aligned, responsive */
+.react-datepicker-wrapper {
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.date-input-custom {
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+.react-datepicker__input-container input {
+    text-align: left !important;
+}

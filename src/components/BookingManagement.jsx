@@ -5,6 +5,7 @@ import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 
 function BookingManagement() {
@@ -172,39 +173,23 @@ function BookingManagement() {
 
                     {/* Date Range and Apply Button - Third */}
                     <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                        <input
-                            type="date"
+                        <DateInput
                             value={dateRange.start_date}
-                            onChange={(e) => {
-                                setDateRange({ ...dateRange, start_date: e.target.value });
+                            onChange={(val) => {
+                                setDateRange({ ...dateRange, start_date: val });
                                 setPage(1);
-                            }}
-                            onClick={(e) => {
-                                try {
-                                    e.target.showPicker?.();
-                                } catch (error) {
-                                    // Fallback for browsers that don't support showPicker
-                                }
                             }}
                             placeholder="Start Date"
-                            className="px-4 py-2 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary cursor-pointer"
+                            className="px-4 py-2 border border-border rounded-button bg-background cursor-pointer"
                         />
-                        <input
-                            type="date"
+                        <DateInput
                             value={dateRange.end_date}
-                            onChange={(e) => {
-                                setDateRange({ ...dateRange, end_date: e.target.value });
+                            onChange={(val) => {
+                                setDateRange({ ...dateRange, end_date: val });
                                 setPage(1);
                             }}
-                            onClick={(e) => {
-                                try {
-                                    e.target.showPicker?.();
-                                } catch (error) {
-                                    // Fallback for browsers that don't support showPicker
-                                }
-                            }}
                             placeholder="End Date"
-                            className="px-4 py-2 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary cursor-pointer"
+                            className="px-4 py-2 border border-border rounded-button bg-background cursor-pointer"
                         />
                     </div>
                 </div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppDispatch } from '../store/hooks';
 import { updateDob } from '../store/slices/authSlice';
 import Button from './ui/Button';
+import DateInput from './ui/DateInput';
 import Toast from './ui/Toast';
 import useToast from '../hooks/useToast';
 import { X, Loader2 } from 'lucide-react';
@@ -124,17 +125,15 @@ function DOBPopup({ isOpen, onClose, onSkip }) {
                                 <label className="block text-sm font-medium text-text-primary mb-2">
                                     Date of Birth
                                 </label>
-                                <input
-                                    type="date"
+                                <DateInput
                                     value={dateOfBirth}
-                                    onChange={(e) => {
-                                        setDateOfBirth(e.target.value);
+                                    onChange={(val) => {
+                                        setDateOfBirth(val);
                                         setError('');
                                     }}
-                                    onKeyDown={handleKeyDown}
                                     max={new Date().toISOString().split('T')[0]}
-                                    className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
-                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                    placeholder="Select date of birth"
+                                    className="px-4 py-3 border border-border rounded-button"
                                 />
                                 {error && (
                                     <p className="text-sm text-danger mt-1">{error}</p>

@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getProfile, updateProfile, logout } from '../store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
+import DateInput from '../components/ui/DateInput';
 import Toast from '../components/ui/Toast';
 import useToast from '../hooks/useToast';
 import { FormSkeleton } from '../components/skeletons/SkeletonLoader';
@@ -241,13 +242,12 @@ function Profile() {
                             <label className="block text-sm font-medium text-text-primary mb-2">
                                 Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 value={formData.date_of_birth}
-                                onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
-                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
-                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
+                                onChange={(val) => setFormData({...formData, date_of_birth: val})}
                                 max={new Date().toISOString().split('T')[0]}
+                                placeholder="Select date of birth"
+                                className="px-4 py-3 border border-border rounded-button"
                             />
                         </div>
                         
