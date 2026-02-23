@@ -110,6 +110,9 @@
         min-width: 0;
         max-width: 100%;
         box-sizing: border-box;
+        min-height: 44px;
+        line-height: normal;
+        color-scheme: light; /* Ensures iOS Safari renders the date value text correctly */
     }
 }
 
@@ -171,9 +174,13 @@
     input[type="datetime-local"] {
         width: 100%;
         min-width: 0;
+        min-height: 44px; /* Apple touch target minimum — also forces enough height for the date value to render */
         padding-left: 0.75rem;
         padding-right: 0.75rem;
         font-size: 16px; /* Prevents iOS zoom on focus and helps value fit */
+        color-scheme: light; /* Ensures iOS Safari renders the date value text and calendar icon correctly */
+        display: flex;
+        align-items: center;
     }
 }
 

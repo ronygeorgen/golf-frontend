@@ -270,7 +270,6 @@ function SignUp() {
                             value={formData.date_of_birth}
                             onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
                             max={new Date().toISOString().split('T')[0]}
-                            className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
                         />
                     </div>
                     
