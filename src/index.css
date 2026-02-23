@@ -102,6 +102,15 @@
     textarea:disabled {
         @apply bg-background text-text-secondary cursor-not-allowed;
     }
+
+    /* Date/time inputs: prevent overflow and fit on mobile */
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"] {
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
 }
 
 @keyframes slide-in-right {
@@ -152,6 +161,19 @@
 @media (max-width: 768px) {
     .animate-marquee-seamless {
         animation-duration: 15s;
+    }
+}
+
+/* Mobile: date fields fit within viewport and don't overflow */
+@media (max-width: 640px) {
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"] {
+        width: 100%;
+        min-width: 0;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        font-size: 16px; /* Prevents iOS zoom on focus and helps value fit */
     }
 }
 
