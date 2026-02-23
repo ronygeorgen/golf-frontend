@@ -116,19 +116,6 @@
         /* Ensures iOS Safari renders the date value text correctly */
     }
 
-    /* DateInput component: hide native calendar icon when field is empty.
-       The .date-input-empty class is applied by the DateInput component only
-       when value=''. The invisible indicator still covers the full input so
-       tapping anywhere still opens the native picker. */
-    input[type="date"].date-input-empty::-webkit-calendar-picker-indicator {
-        opacity: 0;
-        width: 100%;
-        height: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        cursor: pointer;
-    }
 }
 
 @keyframes slide-in-right {
