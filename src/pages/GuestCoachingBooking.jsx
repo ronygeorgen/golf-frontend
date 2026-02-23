@@ -7,6 +7,7 @@ import usePopup from '../hooks/usePopup';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
 import Button from '../components/ui/Button';
+import DateInput from '../components/ui/DateInput';
 import { BookingSlotsSkeleton, FormSkeleton } from '../components/skeletons/SkeletonLoader';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
@@ -481,14 +482,12 @@ function GuestCoachingBooking() {
                                                 <label className="block text-sm font-medium text-text-primary mb-2">
                                                     Select Date <span className="text-danger">*</span>
                                                 </label>
-                                                <input
-                                                    type="date"
+                                                <DateInput
                                                     value={date}
                                                     onChange={(e) => setDate(e.target.value)}
                                                     min={minDateString}
                                                     max={maxDateString}
-                                                    className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
-                                                    required
+                                                    placeholder="Select a date"
                                                 />
                                             </div>
 

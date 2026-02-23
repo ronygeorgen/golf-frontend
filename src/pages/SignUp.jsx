@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, verifyOTP, requestOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
 import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
+import DateInput from '../components/ui/DateInput';
 import LiabilityWaiverPopup from '../components/LiabilityWaiverPopup';
 import { X } from 'lucide-react';
 import apiClient from '../api/axios';
@@ -12,10 +13,10 @@ import { endpoints } from '../api/endpoints';
 function SignUp() {
     const dispatch = useAppDispatch();
     const { loading, error, otpSent, otpMessage, user } = useAppSelector((state) => state.auth);
-    
+
     const [showWaiverPopup, setShowWaiverPopup] = useState(false);
     const [activeWaiver, setActiveWaiver] = useState(null);
-    
+
     const [formData, setFormData] = useState({
         email: '',
         phone: '',
@@ -25,13 +26,13 @@ function SignUp() {
         ghl_location_id: '',
         date_of_birth: ''
     });
-    
+
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState('signup'); // 'signup' or 'otp'
     const [toast, setToast] = useState({ show: false, messages: [] });
     const [locations, setLocations] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(true);
-    
+
     const navigate = useNavigate();
 
     // Fetch GHL locations on component mount
@@ -56,15 +57,15 @@ function SignUp() {
     // Helper function to parse error messages from API response
     const parseErrorMessages = (error) => {
         if (!error) return [];
-        
+
         // If error is a string, return it as is
         if (typeof error === 'string') {
             return [error];
         }
-        
+
         // If error is an object, extract all messages
         const messages = [];
-        
+
         // Handle nested error objects like { password: ["error1", "error2"] }
         for (const [key, value] of Object.entries(error)) {
             if (Array.isArray(value)) {
@@ -82,7 +83,7 @@ function SignUp() {
                 messages.push(...nestedMessages);
             }
         }
-        
+
         return messages.length > 0 ? messages : ['An error occurred during signup'];
     };
 
@@ -112,22 +113,22 @@ function SignUp() {
         e.preventDefault();
         dispatch(clearError());
         setToast({ show: false, messages: [] });
-        
+
         // Validate that location is selected (mandatory)
         if (!formData.ghl_location_id) {
-            setToast({ 
-                show: true, 
-                messages: ['Please select a location'] 
+            setToast({
+                show: true,
+                messages: ['Please select a location']
             });
             return;
         }
-        
+
         // Prepare data - convert empty string to null for date_of_birth
         const submitData = {
             ...formData,
             date_of_birth: formData.date_of_birth || null
         };
-        
+
         const result = await dispatch(signup(submitData));
         if (signup.fulfilled.match(result)) {
             // After successful signup, show OTP input
@@ -143,19 +144,19 @@ function SignUp() {
             // Clear the popup flags on new signup
             sessionStorage.removeItem('dobPopupShown');
             sessionStorage.removeItem('waiverPopupShown');
-            
+
             // Check for waiver first
             try {
                 const waiverResult = await dispatch(getActiveWaiver());
                 if (getActiveWaiver.fulfilled.match(waiverResult) && waiverResult.payload.waiver) {
                     const waiver = waiverResult.payload.waiver;
                     setActiveWaiver(waiver);
-                    
+
                     // Check if user has accepted
                     const acceptanceResult = await dispatch(checkWaiverAcceptance());
                     if (checkWaiverAcceptance.fulfilled.match(acceptanceResult)) {
                         const acceptance = acceptanceResult.payload;
-                        
+
                         // Show waiver popup if needed
                         if (acceptance.waiver_exists && acceptance.needs_acceptance) {
                             setShowWaiverPopup(true);
@@ -167,7 +168,7 @@ function SignUp() {
             } catch (error) {
                 console.error('Error checking waiver:', error);
             }
-            
+
             // If no waiver needed, redirect to booking page
             navigate('/booking');
         }
@@ -177,111 +178,111 @@ function SignUp() {
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
             <div className="bg-surface rounded-card shadow-card w-full max-w-md p-6 md:p-8">
                 <div className="flex justify-center mb-6">
-                    <img 
-                        src={logo} 
-                        alt="Hole 9 Golf Logo" 
+                    <img
+                        src={logo}
+                        alt="Hole 9 Golf Logo"
                         className="h-16 w-auto object-contain"
                     />
                 </div>
                 <h2 className="text-2xl md:text-3xl font-bold text-text-primary mb-6 text-center">
                     Sign Up
                 </h2>
-                
+
                 {step === 'signup' && (
-                <form onSubmit={handleSignupSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                First Name
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.first_name}
-                                onChange={(e) => setFormData({...formData, first_name: e.target.value})}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                Last Name
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.last_name}
-                                onChange={(e) => setFormData({...formData, last_name: e.target.value})}
-                            />
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => setFormData({...formData, email: e.target.value})}
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Phone
-                        </label>
-                        <input
-                            type="tel"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Select Location <span className="text-danger">*</span>
-                        </label>
-                        {loadingLocations ? (
-                            <div className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary text-center">
-                                Loading locations...
+                    <form onSubmit={handleSignupSubmit} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                    First Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.first_name}
+                                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                                />
                             </div>
-                        ) : (
-                            <select
-                                value={formData.ghl_location_id}
-                                onChange={(e) => setFormData({...formData, ghl_location_id: e.target.value})}
-                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                    Last Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.last_name}
+                                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 required
-                            >
-                                <option value="">Select a location</option>
-                                {locations.map((location) => (
-                                    <option key={location.location_id} value={location.location_id}>
-                                        {location.display_name}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-text-primary mb-2">
-                            Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
-                        </label>
-                        <input
-                            type="date"
-                            value={formData.date_of_birth}
-                            onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
-                            max={new Date().toISOString().split('T')[0]}
-                        />
-                    </div>
-                    
-                    <Button 
-                        type="submit" 
-                        disabled={loading}
-                        variant="primary"
-                        className="w-full py-3"
-                    >
-                        {loading ? 'Creating Account...' : 'Sign Up'}
-                    </Button>
-                </form>
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Phone
+                            </label>
+                            <input
+                                type="tel"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Select Location <span className="text-danger">*</span>
+                            </label>
+                            {loadingLocations ? (
+                                <div className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary text-center">
+                                    Loading locations...
+                                </div>
+                            ) : (
+                                <select
+                                    value={formData.ghl_location_id}
+                                    onChange={(e) => setFormData({ ...formData, ghl_location_id: e.target.value })}
+                                    className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                    required
+                                >
+                                    <option value="">Select a location</option>
+                                    {locations.map((location) => (
+                                        <option key={location.location_id} value={location.location_id}>
+                                            {location.display_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                Date of Birth <span className="text-text-secondary text-xs">(Optional)</span>
+                            </label>
+                            <DateInput
+                                value={formData.date_of_birth}
+                                onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                                max={new Date().toISOString().split('T')[0]}
+                                placeholder="Select date of birth"
+                            />
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            variant="primary"
+                            className="w-full py-3"
+                        >
+                            {loading ? 'Creating Account...' : 'Sign Up'}
+                        </Button>
+                    </form>
                 )}
 
                 {step === 'otp' && (
@@ -303,8 +304,8 @@ function SignUp() {
                                 required
                             />
                         </div>
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             disabled={loading}
                             variant="primary"
                             className="w-full py-3"
@@ -313,8 +314,8 @@ function SignUp() {
                         </Button>
                         <p className="text-sm text-center text-text-secondary">
                             Didn't receive OTP?{' '}
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 className="text-primary hover:text-primary-light font-medium transition-colors"
                                 onClick={() => {
                                     dispatch(clearError());
@@ -332,7 +333,7 @@ function SignUp() {
                         <p className="text-sm text-status-confirmed-text text-center">{otpMessage}</p>
                     </div>
                 )}
-                
+
                 {/* Toast Notification */}
                 {toast.show && toast.messages.length > 0 && (
                     <div className="fixed top-4 right-4 z-50 animate-slide-in-right max-w-md">
@@ -364,7 +365,7 @@ function SignUp() {
                         </div>
                     </div>
                 )}
-                
+
                 <p className="mt-6 text-sm text-center text-text-secondary">
                     Already have an account?{' '}
                     <Link to="/signin" className="text-primary hover:text-primary-light font-medium transition-colors">
@@ -372,7 +373,7 @@ function SignUp() {
                     </Link>
                 </p>
             </div>
-            
+
             <LiabilityWaiverPopup
                 isOpen={showWaiverPopup}
                 onClose={() => {
