@@ -206,6 +206,7 @@ function AdminDashboard() {
                                 value={dateRange.start_date}
                                 onChange={(e) => handleDateChange('start_date', e.target.value)}
                                 className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer"
+                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                             />
                         </div>
                         <div>
@@ -217,6 +218,7 @@ function AdminDashboard() {
                                 value={dateRange.end_date}
                                 onChange={(e) => handleDateChange('end_date', e.target.value)}
                                 className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:ring-2 focus:ring-primary focus:border-primary cursor-pointer"
+                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                             />
                         </div>
                     </div>

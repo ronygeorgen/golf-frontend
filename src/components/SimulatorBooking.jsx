@@ -694,7 +694,8 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                 onKeyPress={(e) => e.preventDefault()}
                                 onPaste={(e) => e.preventDefault()}
                                 onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                                className="w-full cursor-pointer"
+                                className="w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface cursor-pointer"
+                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                             />
                         </div>
 

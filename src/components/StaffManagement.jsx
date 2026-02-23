@@ -337,6 +337,8 @@ function StaffManagement() {
                                             value={formData.date_of_birth}
                                             onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
                                             max={new Date().toISOString().split('T')[0]}
+                                            className="w-full px-4 py-2 border-2 border-border rounded-[10px] focus:ring-2 focus:ring-primary focus:border-primary text-text-primary bg-surface"
+                                            style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                         />
                                     </div>
                                     <div className="flex gap-4 pt-4">

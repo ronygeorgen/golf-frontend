@@ -548,6 +548,7 @@ function StaffAvailability() {
                                                 onChange={(e) => setBlockDateData({ ...blockDateData, date: e.target.value })}
                                                 min={new Date().toISOString().split('T')[0]}
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
+                                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                             />
                                         </div>
                                         <div>
@@ -618,6 +619,7 @@ function StaffAvailability() {
                                                     onChange={(e) => setNewAvailability({ ...newAvailability, date: e.target.value })}
                                                     min={new Date().toISOString().split('T')[0]}
                                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-white"
+                                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                                 />
                                             </div>
                                         )}

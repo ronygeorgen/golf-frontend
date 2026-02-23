@@ -521,6 +521,7 @@ function SimulatorPackageManagement() {
                                                                 onChange={(e) => updateTimeRestriction(index, 'date', e.target.value)}
                                                                 required
                                                                 className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                                                style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                                             />
                                                         </div>
                                                     )}

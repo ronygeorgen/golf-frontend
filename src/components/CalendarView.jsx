@@ -1164,6 +1164,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     min={moment().format('YYYY-MM-DD')}
                                     onChange={(e) => setRescheduleState(prev => ({ ...prev, date: e.target.value, selectedSlot: null }))}
                                     className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text-primary"
+                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                 />
                             </div>
 

@@ -527,6 +527,7 @@ function SpecialEventsManagement() {
                                         value={formData.date}
                                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                                         className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                     />
                                 </div>
 
@@ -542,6 +543,7 @@ function SpecialEventsManagement() {
                                             onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
                                             min={formData.date || undefined}
                                             className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                            style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                             placeholder="Optional - leave empty for no end date"
                                         />
                                         <p className="text-xs text-text-secondary mt-1">

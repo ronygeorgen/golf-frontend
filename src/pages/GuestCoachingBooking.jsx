@@ -488,6 +488,7 @@ function GuestCoachingBooking() {
                                                     min={minDateString}
                                                     max={maxDateString}
                                                     className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, fontSize: 16 }}
                                                     required
                                                 />
                                             </div>
