@@ -12,7 +12,6 @@ import { getActiveCoachingPackages, getMyPackagePurchases, getOrganizationPackag
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
-import DateInput from './ui/DateInput';
 import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
 import { utcTimeToLocal, halifaxDateTimeToUTC } from '../utils/timezone';
 import StaffDailySchedule from './StaffDailySchedule';
@@ -753,7 +752,8 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                 <label className="block text-sm font-medium text-text-primary mb-2">
                                     Date
                                 </label>
-                                <DateInput
+                                <input
+                                    type="date"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
                                     min={minDateString}
@@ -761,8 +761,8 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                     onKeyDown={(e) => e.preventDefault()}
                                     onKeyPress={(e) => e.preventDefault()}
                                     onPaste={(e) => e.preventDefault()}
-                                    className="cursor-pointer"
-                                    placeholder="Select a date"
+                                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                                    className="w-full cursor-pointer"
                                 />
                                 {isAdminOrStaff && date && (
                                     <div className="mt-2 text-right">
