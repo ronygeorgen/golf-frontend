@@ -49,7 +49,16 @@ function DateInput({
     const isEmpty = !value;
 
     return (
-        <div className="relative w-full" style={{ minHeight: 44 }}>
+        <div
+            className="relative"
+            style={{
+                /* Match sibling inputs exactly — no extra width, no overflow */
+                display: 'block',
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+            }}
+        >
             {/* Native date input — always rendered for picker functionality */}
             <input
                 ref={inputRef}
@@ -109,24 +118,7 @@ function DateInput({
                 </div>
             )}
 
-            {/* CSS to fully hide the native calendar picker indicator when empty.
-                We target via an inline <style> so no global stylesheet changes
-                are needed. The ::-webkit-calendar-picker-indicator trick hides
-                the icon but the clickable area under the full-width input still
-                triggers the picker normally. */}
-            {isEmpty && (
-                <style>{`
-                    input[type="date"].date-input-empty::-webkit-calendar-picker-indicator {
-                        opacity: 0;
-                        width: 100%;
-                        height: 100%;
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        cursor: pointer;
-                    }
-                `}</style>
-            )}
+
         </div>
     );
 }
