@@ -13,7 +13,6 @@ import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
 function GuestLanding() {
-    // testing git push
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const { toast, showSuccess, showError, hideToast } = useToast();
