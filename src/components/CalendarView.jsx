@@ -1152,7 +1152,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 <label className="block text-sm font-medium text-text-secondary mb-1">Select New Date</label>
                                 <DateInput
                                     value={rescheduleState.date}
-                                    min={moment().format('YYYY-MM-DD')}
+                                    min={getTodayInTimezone(tz)}
                                     onChange={(val) => setRescheduleState(prev => ({ ...prev, date: val, selectedSlot: null }))}
                                     placeholder="Select new date"
                                     className="px-3 py-2 border border-border rounded-lg bg-background"
@@ -1185,7 +1185,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                             : 'bg-background text-text-primary border-border hover:border-primary'
                                                         }`}
                                                 >
-                                                    {moment(slot.start_time).format('h:mm a')}
+                                                    {formatLocalTime(slot.start_time, tz)}
                                                     {conflict && (
                                                         <div className="text-xs text-red-500 font-bold block mt-1">
                                                             {conflict.title}

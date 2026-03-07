@@ -12,6 +12,8 @@ import { BookingSlotsSkeleton, FormSkeleton } from '../components/skeletons/Skel
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import logo from '../assets/hole9golf-logo.png';
+import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
+import { useAppSelector } from '../store/hooks';
 
 function GuestCoachingBooking() {
     const dispatch = useAppDispatch();
@@ -25,16 +27,18 @@ function GuestCoachingBooking() {
     const [purchases, setPurchases] = useState([]);
     const [loadingPackages, setLoadingPackages] = useState(true);
     const [locationId, setLocationId] = useState(null);
+    const tz = 'America/Halifax'; // Can be made dynamic if guest APIs return location tz
 
     const DEFAULT_DURATION = 60;
 
     // Calculate min date (Tomorrow -> 24h ahead restriction)
-    const minDate = new Date();
+    const todayStr = getTodayInTimezone(tz);
+    const minDate = new Date(todayStr);
     minDate.setDate(minDate.getDate() + 1);
     const minDateString = minDate.toISOString().split('T')[0];
 
     // Calculate max date (30 days from today)
-    const maxDate = new Date();
+    const maxDate = new Date(todayStr);
     maxDate.setDate(maxDate.getDate() + 30);
     const maxDateString = maxDate.toISOString().split('T')[0];
     const [date, setDate] = useState('');
@@ -560,11 +564,7 @@ function GuestCoachingBooking() {
                                                     </div>
                                                 )}
                                                 <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
-                                                    {new Date(slot.start_time).toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        timeZone: 'America/Halifax'
-                                                    })}
+                                                    {formatLocalTime(slot.start_time, tz)}
                                                 </div>
                                                 <div className="text-sm text-text-secondary">
                                                     {slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available
@@ -580,7 +580,7 @@ function GuestCoachingBooking() {
                                                         <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg max-w-xs">
                                                             <div className="font-semibold mb-1">⚠️ Duration too long</div>
                                                             <div className="mb-1">
-                                                                Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
+                                                                Coach available until {formatLocalTime(slot.availability_end_time || slot.end_time, tz)}
                                                             </div>
                                                             <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} or less</div>
                                                             <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
@@ -614,27 +614,13 @@ function GuestCoachingBooking() {
                                 <div>
                                     <p className="text-sm text-text-secondary">Date</p>
                                     <p className="font-semibold text-text-primary">
-                                        {new Date(selectedSlot.start_time).toLocaleDateString('en-US', {
-                                            weekday: 'long',
-                                            year: 'numeric',
-                                            month: 'long',
-                                            day: 'numeric',
-                                            timeZone: 'America/Halifax'
-                                        })}
+                                        {formatLocalDate(selectedSlot.start_time, tz)}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-text-secondary">Time</p>
                                     <p className="font-semibold text-text-primary">
-                                        {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            timeZone: 'America/Halifax'
-                                        })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            timeZone: 'America/Halifax'
-                                        })}
+                                        {formatLocalTime(selectedSlot.start_time, tz)} - {formatLocalTime(selectedSlot.end_time, tz)}
                                     </p>
                                 </div>
                                 <div>
