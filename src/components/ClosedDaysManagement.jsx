@@ -105,8 +105,17 @@ function ClosedDaysManagement() {
      */
     const convertUTCDateTimeToLocal = (utcDate, utcTime) => {
         if (!utcDate || !utcTime) return { date: utcDate || '', time: utcTime || '' };
-        const utcIso = `${utcDate}T${utcTime}:00Z`;
+
+        // Ensure time has seconds for valid ISO string
+        const timePart = utcTime.split(':').length === 2 ? `${utcTime}:00` : utcTime;
+        const utcIso = `${utcDate}T${timePart}Z`;
+
         const dt = new Date(utcIso);
+
+        if (isNaN(dt.getTime())) {
+            console.error("Invalid UTC datetime constructed:", utcIso);
+            return { date: utcDate, time: utcTime?.slice(0, 5) || '' };
+        }
         const formatter = new Intl.DateTimeFormat('en-CA', {
             timeZone: tz,
             year: 'numeric', month: '2-digit', day: '2-digit',
@@ -298,7 +307,8 @@ function ClosedDaysManagement() {
      */
     const formatTime = (utcTimeString, utcDateString) => {
         if (!utcTimeString || !utcDateString) return '';
-        const utcIso = `${utcDateString}T${utcTimeString}:00Z`;
+        const timePart = utcTimeString.split(':').length === 2 ? `${utcTimeString}:00` : utcTimeString;
+        const utcIso = `${utcDateString}T${timePart}Z`;
         return formatLocalTime(utcIso, tz, { hour: '2-digit', minute: '2-digit', hour12: false });
     };
 
@@ -380,7 +390,7 @@ function ClosedDaysManagement() {
                                                                 <span className="text-text-secondary">Full Day</span>
                                                             ) : (
                                                                 <>
-                                                                    {formatLocalTime(`${closedDay.start_date}T${closedDay.start_time}Z`, tz)} - {formatLocalTime(`${endDateForDisplay}T${closedDay.end_time}Z`, tz)}
+                                                                    {formatLocalTime(`${closedDay.start_date}T${closedDay.start_time.split(':').length === 2 ? closedDay.start_time + ':00' : closedDay.start_time}Z`, tz)} - {formatLocalTime(`${endDateForDisplay}T${closedDay.end_time.split(':').length === 2 ? closedDay.end_time + ':00' : closedDay.end_time}Z`, tz)}
                                                                 </>
                                                             )}
                                                         </div>
