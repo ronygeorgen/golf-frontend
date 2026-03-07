@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
@@ -12,6 +12,7 @@ import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 import { Edit, Trash2, CalendarOff } from 'lucide-react';
+import { localToUTCIso, formatLocalTime, formatLocalDate } from '../utils/timezoneUtils';
 
 const RECURRENCE_TYPES = [
     { value: 'one_time', label: 'One Time (Specific Date Only)' },
@@ -24,6 +25,8 @@ function ClosedDaysManagement() {
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
+    const { locationTimezone } = useAppSelector((state) => state.auth);
+    const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const modalRef = useRef(null);
 
     const [closedDays, setClosedDays] = useState([]);
@@ -83,53 +86,37 @@ function ClosedDaysManagement() {
     };
 
     /**
-     * Convert Halifax date and time to UTC for storage
-     * Handles date shift when time crosses midnight in UTC
+     * Convert center local date + time to UTC for storage.
+     * Uses DST-aware Intl API via localToUTCIso — NO fixed offsets.
      */
-    const convertHalifaxDateTimeToUTC = (date, time) => {
+    const convertLocalDateTimeToUTC = (date, time) => {
         if (!date || !time) return { date: date || '', time: time || '' };
-
-        const [year, month, day] = date.split('-').map(Number);
-        const [hours, minutes] = time.split(':').map(Number);
-
-        // Halifax timezone: AST = UTC-4 (4 hours behind UTC)
-        const HALIFAX_OFFSET_HOURS = -4;
-
-        // Create UTC date with Halifax time values
-        const halifaxDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-
-        // Convert Halifax time to UTC by subtracting the offset
-        // Example: 8PM Halifax (20:00) + 4 hours = 00:00 UTC (next day)
-        const utcDateTime = new Date(halifaxDateTime.getTime() - (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
-
+        const utcIso = localToUTCIso(date, time, tz);
+        if (!utcIso) return { date, time };
+        const utcDt = new Date(utcIso);
         return {
-            date: utcDateTime.toISOString().split('T')[0],
-            time: `${utcDateTime.getUTCHours().toString().padStart(2, '0')}:${utcDateTime.getUTCMinutes().toString().padStart(2, '0')}`
+            date: utcDt.toISOString().split('T')[0],
+            time: `${String(utcDt.getUTCHours()).padStart(2, '0')}:${String(utcDt.getUTCMinutes()).padStart(2, '0')}`
         };
     };
 
     /**
-     * Convert UTC date and time back to Halifax for display/editing
+     * Convert UTC date + time back to center local timezone for display/editing.
      */
-    const convertUTCDateTimeToHalifax = (utcDate, utcTime) => {
+    const convertUTCDateTimeToLocal = (utcDate, utcTime) => {
         if (!utcDate || !utcTime) return { date: utcDate || '', time: utcTime || '' };
-
-        const [year, month, day] = utcDate.split('-').map(Number);
-        const [hours, minutes] = utcTime.split(':').map(Number);
-
-        // Halifax timezone: AST = UTC-4
-        const HALIFAX_OFFSET_HOURS = -4;
-
-        // Create UTC datetime
-        const utcDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-
-        // Convert UTC to Halifax time by adding the offset
-        // Example: 00:00 UTC - 4 hours = 20:00 previous day (Halifax)
-        const halifaxDateTime = new Date(utcDateTime.getTime() + (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
-
+        const utcIso = `${utcDate}T${utcTime}:00Z`;
+        const dt = new Date(utcIso);
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+        });
+        const parts = formatter.formatToParts(dt);
+        const get = (type) => parts.find(p => p.type === type)?.value || '00';
         return {
-            date: `${halifaxDateTime.getUTCFullYear()}-${String(halifaxDateTime.getUTCMonth() + 1).padStart(2, '0')}-${String(halifaxDateTime.getUTCDate()).padStart(2, '0')}`,
-            time: `${String(halifaxDateTime.getUTCHours()).padStart(2, '0')}:${String(halifaxDateTime.getUTCMinutes()).padStart(2, '0')}`
+            date: `${get('year')}-${get('month')}-${get('day')}`,
+            time: `${get('hour').replace('24', '00')}:${get('minute')}`
         };
     };
 
@@ -145,35 +132,26 @@ function ClosedDaysManagement() {
 
         // Only include time fields if not full day closure
         if (!fullDayClosure && formData.start_time && formData.end_time) {
-            // Convert start time from Halifax to UTC
-            const startUTC = convertHalifaxDateTimeToUTC(formData.start_date, formData.start_time);
+            // Convert start time from center local tz to UTC (DST-aware)
+            const startUTC = convertLocalDateTimeToUTC(formData.start_date, formData.start_time);
             startDateUTC = startUTC.date;
             submitData.start_time = startUTC.time;
 
-            // Convert end time from Halifax to UTC
-            // Use start_date for end time conversion if end_date is same as start_date
+            // Convert end time from center local tz to UTC
             const endDateForConversion = formData.end_date || formData.start_date;
-            const endUTC = convertHalifaxDateTimeToUTC(endDateForConversion, formData.end_time);
+            const endUTC = convertLocalDateTimeToUTC(endDateForConversion, formData.end_time);
             endDateUTC = endUTC.date;
             submitData.end_time = endUTC.time;
         } else {
-            // For full day closures, we still need to convert to UTC
-            // A full day in Halifax (00:00-23:59) = 04:00 UTC to 03:59 UTC next day
-            // We store it as a time range (00:00-23:59) in UTC to ensure accurate blocking
-            // Convert start of day (00:00 Halifax) to UTC
-            const startOfDayUTC = convertHalifaxDateTimeToUTC(formData.start_date, '00:00');
+            // For full day closures, convert 00:00 and 23:59 local time to UTC
+            const startOfDayUTC = convertLocalDateTimeToUTC(formData.start_date, '00:00');
             startDateUTC = startOfDayUTC.date;
             submitData.start_time = startOfDayUTC.time;
-            
-            // Convert end of day (23:59 Halifax) to UTC
+
             const endDateForConversion = formData.end_date || formData.start_date;
-            const endOfDayUTC = convertHalifaxDateTimeToUTC(endDateForConversion, '23:59');
+            const endOfDayUTC = convertLocalDateTimeToUTC(endDateForConversion, '23:59');
             endDateUTC = endOfDayUTC.date;
             submitData.end_time = endOfDayUTC.time;
-            
-            // Note: Even though it's a "full day" closure from user's perspective,
-            // we store it with times in UTC so the backend can accurately check
-            // if a booking datetime falls within the closed period
         }
 
         submitData.start_date = startDateUTC;
@@ -236,7 +214,7 @@ function ClosedDaysManagement() {
 
     const handleEdit = (closedDay) => {
         setEditingClosedDay(closedDay);
-        
+
         // Convert UTC dates/times back to Halifax for editing
         let startDateHalifax = closedDay.start_date || '';
         let endDateHalifax = closedDay.end_date || closedDay.start_date || '';
@@ -245,21 +223,19 @@ function ClosedDaysManagement() {
         let isFullDay = false;
 
         if (closedDay.start_time && closedDay.end_time) {
-            // Convert start time from UTC to Halifax
-            const startHalifax = convertUTCDateTimeToHalifax(closedDay.start_date, closedDay.start_time);
-            startDateHalifax = startHalifax.date;
-            startTimeHalifax = startHalifax.time;
+            // Convert start time from UTC to center local timezone
+            const startLocal = convertUTCDateTimeToLocal(closedDay.start_date, closedDay.start_time);
+            startDateHalifax = startLocal.date;
+            startTimeHalifax = startLocal.time;
 
-            // Convert end time from UTC to Halifax
+            // Convert end time from UTC to center local timezone
             const endDateForConversion = closedDay.end_date || closedDay.start_date;
-            const endHalifax = convertUTCDateTimeToHalifax(endDateForConversion, closedDay.end_time);
-            endDateHalifax = endHalifax.date;
-            endTimeHalifax = endHalifax.time;
-            
-            // Check if this represents a full day in Halifax (00:00 to 23:59)
-            // Note: The dates might be different if it crosses midnight in UTC
-            // But in Halifax, if times are 00:00 and 23:59, it's a full day
-            if (startTimeHalifax === '00:00' && endTimeHalifax === '23:59' && 
+            const endLocal = convertUTCDateTimeToLocal(endDateForConversion, closedDay.end_time);
+            endDateHalifax = endLocal.date;
+            endTimeHalifax = endLocal.time;
+
+            // Check if this represents a full day in local tz (00:00 to 23:59)
+            if (startTimeHalifax === '00:00' && endTimeHalifax === '23:59' &&
                 startDateHalifax === endDateHalifax) {
                 isFullDay = true;
             }
@@ -267,7 +243,7 @@ function ClosedDaysManagement() {
             // Old format: no times stored, definitely a full day closure
             isFullDay = true;
         }
-        
+
         setFullDayClosure(isFullDay);
 
         setFormData({
@@ -318,24 +294,12 @@ function ClosedDaysManagement() {
     };
 
     /**
-     * Format UTC time to display in Halifax timezone
+     * Format UTC time to display in center's local timezone (DST-aware)
      */
     const formatTime = (utcTimeString, utcDateString) => {
         if (!utcTimeString || !utcDateString) return '';
-        
-        const [year, month, day] = utcDateString.split('-').map(Number);
-        const [hours, minutes] = utcTimeString.split(':').map(Number);
-        
-        // Create UTC datetime
-        const utcDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-        
-        // Format in Halifax timezone
-        return utcDateTime.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            hour12: false,
-            timeZone: 'America/Halifax' 
-        });
+        const utcIso = `${utcDateString}T${utcTimeString}:00Z`;
+        return formatLocalTime(utcIso, tz, { hour: '2-digit', minute: '2-digit', hour12: false });
     };
 
     const formatRecurrence = (recurrence) => {
@@ -388,47 +352,42 @@ function ClosedDaysManagement() {
                             ) : (
                                 closedDays.map((closedDay) => (
                                     <tr key={closedDay.id} className="hover:bg-background transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-text-primary">{closedDay.title}</div>
-                                            {closedDay.description && (
-                                                <div className="text-xs text-text-secondary mt-1">{closedDay.description}</div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-text-primary">
-                                                {formatDate(closedDay.start_date)}
-                                                {closedDay.end_date && closedDay.end_date !== closedDay.start_date && (
-                                                    <> - {formatDate(closedDay.end_date)}</>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-text-primary">
-                                                {closedDay.start_time && closedDay.end_time ? (
-                                                    (() => {
-                                                        // Convert to Halifax to check if it's a full day
-                                                        const startHalifax = convertUTCDateTimeToHalifax(closedDay.start_date, closedDay.start_time);
-                                                        const endDateForCheck = closedDay.end_date || closedDay.start_date;
-                                                        const endHalifax = convertUTCDateTimeToHalifax(endDateForCheck, closedDay.end_time);
-                                                        
-                                                        // If it's 00:00 to 23:59 on the same Halifax date, show as "Full Day"
-                                                        if (startHalifax.time === '00:00' && endHalifax.time === '23:59' && 
-                                                            startHalifax.date === endHalifax.date) {
-                                                            return <span className="text-text-secondary">Full Day</span>;
-                                                        }
-                                                        
-                                                        // Otherwise show the time range in Halifax
-                                                        return (
-                                                            <>
-                                                                {formatTime(closedDay.start_time, closedDay.start_date)} - {formatTime(closedDay.end_time, endDateForCheck)}
-                                                            </>
-                                                        );
-                                                    })()
-                                                ) : (
-                                                    <span className="text-text-secondary">Full Day</span>
-                                                )}
-                                            </div>
-                                        </td>
+                                        {(() => {
+                                            const startLocal = convertUTCDateTimeToLocal(closedDay.start_date, closedDay.start_time || '00:00');
+                                            const endDateForDisplay = closedDay.end_date || closedDay.start_date;
+                                            const endLocal = convertUTCDateTimeToLocal(endDateForDisplay, closedDay.end_time || '23:59');
+                                            const isFullDay = startLocal.time === '00:00' && endLocal.time === '23:59' && startLocal.date === endLocal.date;
+
+                                            return (
+                                                <>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="text-sm font-medium text-text-primary">{closedDay.title}</div>
+                                                        {closedDay.description && (
+                                                            <div className="text-xs text-text-secondary mt-1">{closedDay.description}</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="text-sm text-text-primary">
+                                                            {formatLocalDate(new Date(`${startLocal.date}T12:00:00`), tz)}
+                                                            {startLocal.date !== endLocal.date && (
+                                                                <> - {formatLocalDate(new Date(`${endLocal.date}T12:00:00`), tz)}</>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="text-sm text-text-primary">
+                                                            {isFullDay ? (
+                                                                <span className="text-text-secondary">Full Day</span>
+                                                            ) : (
+                                                                <>
+                                                                    {formatLocalTime(`${closedDay.start_date}T${closedDay.start_time}Z`, tz)} - {formatLocalTime(`${endDateForDisplay}T${closedDay.end_time}Z`, tz)}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            );
+                                        })()}
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-text-primary">{formatRecurrence(closedDay.recurrence)}</div>
                                         </td>

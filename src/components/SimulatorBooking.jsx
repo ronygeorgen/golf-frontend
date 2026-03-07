@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import moment from 'moment-timezone';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkSimulatorAvailability, createBooking, clearAvailability, getSimulatorCredits, getAvailableSimulatorHours, checkSpecialEventsOnDate, checkClosedDate } from '../store/slices/bookingSlice';
 import PopupMessage from './PopupMessage';
@@ -7,13 +8,14 @@ import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
-import { utcTimeToLocal } from '../utils/timezone';
+import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
 
 function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, showWarning, hideToast } = useToast();
-    const { user } = useAppSelector((state) => state.auth);
+    const { user, locationTimezone } = useAppSelector((state) => state.auth);
+    const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const {
         availability,
         loading: bookingLoading,
@@ -52,15 +54,12 @@ function SimulatorBooking({ client, onBookingSuccess }) {
     // Check if user is staff or admin
     const isStaffOrAdmin = user?.role === 'staff' || user?.role === 'admin' || user?.is_superuser;
 
-    // Calculate min date
-    // Allow all users (including clients/guests) to book starting from today for simulators
-    const minDate = new Date();
-    const minDateString = minDate.toISOString().split('T')[0];
+    // Calculate center's "today"
+    const todayStr = getTodayInTimezone(tz);
+    const minDateString = todayStr;
 
-    // Calculate max date (30 days from today)
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 30);
-    const maxDateString = maxDate.toISOString().split('T')[0];
+    // Calculate max date (30 days from today in center timezone)
+    const maxDateString = moment.tz(todayStr, tz).add(30, 'days').format('YYYY-MM-DD');
 
     useEffect(() => {
         const params = { use_organization: true };
@@ -165,8 +164,8 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                         setPartialClosures(result.partial_closures);
                         // Show informational message about partial closures
                         const closureMessages = result.partial_closures.map(closure => {
-                            const startTime = utcTimeToLocal(closure.start_time);
-                            const endTime = utcTimeToLocal(closure.end_time);
+                            const startTime = formatLocalTime(closure.start_time, tz);
+                            const endTime = formatLocalTime(closure.end_time, tz);
                             return `${startTime} - ${endTime}`;
                         }).join(', ');
                         showWarning(`Note: Facility will be closed ${closureMessages} on this date. These time slots will not be available.`);
@@ -829,7 +828,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                     <div className="mb-4 text-sm text-text-secondary flex flex-wrap items-center gap-2">
                         <span className="font-medium">Book simulator sessions for</span>
                         <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
-                            {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
+                            {date ? formatLocalDate(date, tz) : 'Select date'}
                         </span>
                         <span className="text-text-secondary/50">|</span>
                         <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
@@ -869,7 +868,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                         {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                             hour: '2-digit',
                                             minute: '2-digit',
-                                            timeZone: 'America/Halifax'
+                                            timeZone: tz
                                         })}
                                     </div>
                                     <div className={`text-sm ${isDisabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
@@ -915,7 +914,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                                         <>
                                                             <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
                                                             <div className="mb-1">
-                                                                Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })})
+                                                                Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz })})
                                                             </div>
                                                             <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
                                                         </>
@@ -930,7 +929,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                                     <>
                                                         <div className="font-semibold mb-1">⚠️ Duration too long</div>
                                                         <div className="mb-1">
-                                                            Simulator available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
+                                                            Simulator available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: tz })}
                                                         </div>
                                                         <div className="text-yellow-300 font-medium">💡 Try {getSuggestedDuration(slot)} or less</div>
                                                     </>
@@ -1022,13 +1021,13 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                         <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
                         <div className="space-y-2 mb-4">
                             <p className="text-text-primary">
-                                <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                <span className="font-medium">Date:</span> {formatLocalDate(selectedSlot.start_time, tz)}
                             </p>
                             <p className="text-text-primary">
-                                <span className="font-medium">Start Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
+                                <span className="font-medium">Start Time:</span> {formatLocalTime(selectedSlot.start_time, tz)}
                             </p>
                             <p className="text-text-primary">
-                                <span className="font-medium">End Time:</span> {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
+                                <span className="font-medium">End Time:</span> {formatLocalTime(selectedSlot.end_time, tz)}
                             </p>
                             <p className="text-text-primary">
                                 <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? duration % 60 + 'min' : ''}`.trim() : `${duration}min`}

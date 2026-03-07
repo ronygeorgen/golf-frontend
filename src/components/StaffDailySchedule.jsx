@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { Loader2 } from 'lucide-react';
+import { useAppSelector } from '../store/hooks';
+import { formatLocalTime } from '../utils/timezoneUtils';
 
 export default function StaffDailySchedule({ date }) {
+    const { locationTimezone } = useAppSelector((state) => state.auth);
+    const tz = locationTimezone || 'America/Halifax';
     const [staffSchedules, setStaffSchedules] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -66,7 +70,7 @@ export default function StaffDailySchedule({ date }) {
                                 {staff.bookings.map((booking) => (
                                     <div key={booking.id} className="text-xs bg-blue-50 text-blue-800 p-1 rounded flex justify-between">
                                         <span>
-                                            {booking.start_time.slice(11, 16)} - {booking.end_time.slice(11, 16)}
+                                            {formatLocalTime(booking.start_time, tz)} - {formatLocalTime(booking.end_time, tz)}
                                         </span>
                                         <span>{booking.client_name}</span>
                                     </div>

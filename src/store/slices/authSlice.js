@@ -210,16 +210,20 @@ const getInitialState = () => {
     const user = JSON.parse(localStorage.getItem('user')) || null;
     let locationId = user?.ghl_location_id || localStorage.getItem('locationId') || null;
     locationId = trimLocationId(locationId);
-    
+
     // Update localStorage with trimmed location_id if it exists
     if (locationId) {
         localStorage.setItem('locationId', locationId);
     }
-    
+
     return {
         user: user,
         token: localStorage.getItem('token') || null,
         locationId: locationId,
+        // IANA timezone string for the user's golf center (e.g. 'America/Halifax').
+        // Used by all components to display times in the correct local timezone.
+        // DST transitions are handled automatically by date-fns-tz / Intl using IANA names.
+        locationTimezone: localStorage.getItem('locationTimezone') || 'America/Halifax',
         loading: false,
         error: null,
         otpSent: false,
@@ -313,6 +317,11 @@ const authSlice = createSlice({
                     state.locationId = action.payload.user.ghl_location_id;
                     localStorage.setItem('locationId', action.payload.user.ghl_location_id);
                 }
+                // Store center timezone for DST-aware time display
+                if (action.payload.location_timezone) {
+                    state.locationTimezone = action.payload.location_timezone;
+                    localStorage.setItem('locationTimezone', action.payload.location_timezone);
+                }
                 // Clear DOB popup flag on login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -352,6 +361,11 @@ const authSlice = createSlice({
                 if (action.payload.user?.ghl_location_id) {
                     state.locationId = action.payload.user.ghl_location_id;
                     localStorage.setItem('locationId', action.payload.user.ghl_location_id);
+                }
+                // Store center timezone for DST-aware time display
+                if (action.payload.location_timezone) {
+                    state.locationTimezone = action.payload.location_timezone;
+                    localStorage.setItem('locationTimezone', action.payload.location_timezone);
                 }
                 // Clear DOB popup flag on new login
                 sessionStorage.removeItem('dobPopupShown');
@@ -439,6 +453,11 @@ const authSlice = createSlice({
                     state.locationId = action.payload.user.ghl_location_id;
                     localStorage.setItem('locationId', action.payload.user.ghl_location_id);
                 }
+                // Store center timezone for DST-aware time display
+                if (action.payload.location_timezone) {
+                    state.locationTimezone = action.payload.location_timezone;
+                    localStorage.setItem('locationTimezone', action.payload.location_timezone);
+                }
                 // Clear DOB popup flag on auto-login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -453,12 +472,14 @@ const authSlice = createSlice({
                 state.user = null;
                 state.token = null;
                 state.locationId = null;
+                state.locationTimezone = 'America/Halifax'; // reset to default
                 state.error = null;
                 state.otpSent = false;
                 state.otpMessage = null;
                 state.activeWaiver = null;
                 state.waiverAcceptance = null;
                 localStorage.removeItem('locationId');
+                localStorage.removeItem('locationTimezone');
             });
 
         // Get Active Waiver

@@ -7,11 +7,14 @@ import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
+import { formatLocalTime, formatLocalDate } from '../utils/timezoneUtils';
 
 function BookingManagement() {
     const dispatch = useAppDispatch();
     const { popup, openPopup, closePopup } = usePopup();
     const { list: bookings, loading, pagination } = useAppSelector((state) => state.admin.bookings);
+    const { locationTimezone } = useAppSelector((state) => state.auth);
+    const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
 
     const [filter, setFilter] = useState('all');
     const [dateRange, setDateRange] = useState({
@@ -102,10 +105,11 @@ function BookingManagement() {
 
 
     const formatDateTime = (dateTimeStr) => {
+        if (!dateTimeStr) return { date: '—', time: '—' };
         const date = new Date(dateTimeStr);
         return {
-            date: date.toLocaleDateString('en-US', { timeZone: 'America/Halifax' }),
-            time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })
+            date: formatLocalDate(dateTimeStr, tz, { year: 'numeric', month: 'short', day: 'numeric' }),
+            time: formatLocalTime(dateTimeStr, tz)
         };
     };
 

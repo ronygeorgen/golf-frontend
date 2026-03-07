@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
-import moment from 'moment';
+import moment from 'moment-timezone';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getCalendarBookings, checkClosedDate, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -8,7 +8,7 @@ import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
-import { utcTimeToLocal, utcToHalifaxDate } from '../utils/timezone';
+import { formatLocalTime, formatLocalDate, getTimezoneAbbreviation, getTodayInTimezone } from '../utils/timezoneUtils';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import BookForClientModal from './BookForClientModal';
@@ -19,11 +19,18 @@ const localizer = momentLocalizer(moment);
 function CalendarView({ isUserView = false, coachId = null, staffName = null }) {
     const dispatch = useAppDispatch();
     const { calendarEvents: events, loading: bookingsLoading, availability } = useAppSelector((state) => state.admin?.bookings?.list ? { calendarEvents: [], ...state.booking } : state.booking); // Handle potential state structure mismatch if needed, but existing code uses state.booking
-    const { user } = useAppSelector((state) => state.auth);
+    const { user, locationTimezone } = useAppSelector((state) => state.auth);
+    const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const { popup, openPopup, closePopup } = usePopup();
 
+
+
     const [view, setView] = useState('month'); // Default to month view
-    const [date, setDate] = useState(new Date());
+    const [date, setDate] = useState(() => {
+        // Initialize with center's today so users in different timezones see the correct "today"
+        const todayStr = getTodayInTimezone(locationTimezone || 'America/Halifax');
+        return moment.tz(todayStr, locationTimezone || 'America/Halifax').toDate();
+    });
     const [calendarType, setCalendarType] = useState('all'); // 'all', 'simulator', 'coaching', or 'special_event'
     const [showCancelledOnly, setShowCancelledOnly] = useState(false); // New state to toggle cancelled bookings
 
@@ -92,22 +99,26 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     }, []);
 
     useEffect(() => {
-        // Calculate date range based on current view
+        // Calculate date range based on current view using the center's timezone boundaries
+        const y = date.getFullYear();
+        const m = date.getMonth();
+        const d = date.getDate();
+
         let startDate, endDate;
 
         if (view === 'month') {
             // For month view, get start and end of the month
-            startDate = moment(date).startOf('month').toDate();
-            endDate = moment(date).endOf('month').toDate();
+            startDate = moment.tz([y, m], tz).toDate();
+            endDate = moment.tz([y, m], tz).endOf('month').toDate();
         }
         else if (view === 'day') {
             // For day view, get start and end of the day
-            startDate = moment(date).startOf('day').toDate();
-            endDate = moment(date).endOf('day').toDate();
+            startDate = moment.tz([y, m, d], tz).toDate();
+            endDate = moment.tz([y, m, d], tz).endOf('day').toDate();
         } else {
             // Default to month if view is unknown
-            startDate = moment(date).startOf('month').toDate();
-            endDate = moment(date).endOf('month').toDate();
+            startDate = moment.tz([y, m], tz).toDate();
+            endDate = moment.tz([y, m], tz).endOf('month').toDate();
         }
 
         if (calendarType === 'special_event' || calendarType === 'all') {
@@ -159,8 +170,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             // Check for partial closures and show info (not blocking)
             if (closedDateResult.has_partial_closure && closedDateResult.partial_closures) {
                 const closureMessages = closedDateResult.partial_closures.map(closure => {
-                    const startTime = utcTimeToLocal(closure.start_time);
-                    const endTime = utcTimeToLocal(closure.end_time);
+                    const startTime = formatLocalTime(closure.start_time, tz);
+                    const endTime = formatLocalTime(closure.end_time, tz);
                     return `${startTime} - ${endTime}`;
                 }).join(', ');
                 // Set as info message (not error) - slots will still be filtered by availability check
@@ -684,20 +695,14 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             }
         })
         .map(booking => {
-            // Convert UTC booking times to Halifax timezone
-            const startTime = utcToHalifaxDate(booking.start_time);
-            const endTime = utcToHalifaxDate(booking.end_time);
+            // Convert UTC booking times to center's local timezone "fake local" for display
+            // This ensures vertical positioning works correctly in the browser's grid
+            const startTimeMoment = moment.tz(booking.start_time, tz);
+            const endTimeMoment = moment.tz(booking.end_time, tz);
 
-            console.log('🔄 Converting Booking:', {
-                id: booking.id,
-                client: `${booking.client_details?.first_name} ${booking.client_details?.last_name}`,
-                type: booking.booking_type,
-                status: booking.status,
-                utc_start: booking.start_time,
-                halifax_start: startTime,
-                utc_end: booking.end_time,
-                halifax_end: endTime
-            });
+            // Create Date objects that represent the "Halifax" time in the BROWSER's local zone
+            const startTime = new Date(startTimeMoment.format('YYYY-MM-DDTHH:mm:ss'));
+            const endTime = new Date(endTimeMoment.format('YYYY-MM-DDTHH:mm:ss'));
 
             // Enhanced Title Logic
             let title;
@@ -765,9 +770,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             utcEnd = new Date(utcEnd.getTime() + 24 * 60 * 60 * 1000);
         }
 
-        // Convert to Halifax timezone
-        const halifaxStart = utcToHalifaxDate(utcStart.toISOString());
-        const halifaxEnd = utcToHalifaxDate(utcEnd.toISOString());
+        // Create "fake local" datetime for correct browser grid positioning
+        const halifaxStart = new Date(moment.tz(utcStart, tz).format('YYYY-MM-DDTHH:mm:ss'));
+        const halifaxEnd = new Date(moment.tz(utcEnd, tz).format('YYYY-MM-DDTHH:mm:ss'));
 
         const baseEvent = {
             id: `special-${event.display_id}`,
@@ -885,27 +890,6 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     font-size: 0.75rem;
                     letter-spacing: 0.05em;
                 }
-
-                /* Force events to take proper width in day view to prevent overlapping */
-                .rbc-day-slot .rbc-event {
-                    width: 98% !important;
-                    margin: 0 auto !important;
-                }
-                
-                /* Ensure events in the same time slot are properly spaced */
-                .rbc-time-slot .rbc-event-content {
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    padding: 2px 4px;
-                }
-                
-                /* Ensure proper positioning for overlapping events */
-                .rbc-day-slot .rbc-events-container {
-                    display: flex;
-                    flex-direction: column;
-                }
-
                 /* Resource Column Borders */
                 .rbc-time-header-content > .rbc-row.rbc-time-header-cell {
                     border-left: 1px solid #e2e8f0;
@@ -916,11 +900,18 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             `}</style>
             <div className="w-full">
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                        <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-4 md:mb-0">
-                            {staffName ? `${staffName}'s Coaching Sessions Calendar` : isUserView ? 'My Bookings Calendar' : 'Bookings Calendar'}
-                        </h1>
-                        <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-1">
+                                {staffName ? `${staffName}'s Coaching Sessions Calendar` : isUserView ? 'My Bookings Calendar' : 'Bookings Calendar'}
+                            </h1>
+                            {tz && (
+                                <p className="text-sm font-medium text-text-muted mt-1 bg-surface-light inline-block px-2 py-1 rounded-md border border-border/50">
+                                    <span className="mr-1">🕒</span> All times shown in {getTimezoneAbbreviation(tz)} Time
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto justify-end mt-4 md:mt-0">
                             {canBookForClients && (
                                 <Button
                                     onClick={() => setShowBookForClientModal(true)}
@@ -1029,8 +1020,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             eventPropGetter={eventStyleGetter}
                             step={30}
                             timeslots={2}
-                            min={new Date(0, 0, 0, 0, 0, 0)}
-                            max={new Date(0, 0, 0, 23, 59, 0)}
+                            min={moment(date).set({ hour: 5, minute: 0 }).toDate()} // Start view at 5 AM for better focus
+                            max={moment(date).set({ hour: 23, minute: 59 }).toDate()}
                             views={['month', 'day']} // Allow month and day views - week view is disabled
                             resources={resources}
                             messages={{

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import moment from 'moment-timezone';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
     checkCoachingAvailability,
@@ -14,11 +15,12 @@ import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
-import { utcTimeToLocal, halifaxDateTimeToUTC } from '../utils/timezone';
+import { formatLocalTime, formatLocalDate, localToUTCIso, getTodayInTimezone } from '../utils/timezoneUtils';
 import StaffDailySchedule from './StaffDailySchedule';
 
 function CoachingBooking({ client, onBookingSuccess }) {
-    const { user: reduxUser } = useAppSelector((state) => state.auth);
+    const { user: reduxUser, locationTimezone } = useAppSelector((state) => state.auth);
+    const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const user = reduxUser || JSON.parse(localStorage.getItem('user')) || {};
 
     // Align role detection with ProtectedRoute logic in App.jsx
@@ -72,10 +74,10 @@ function CoachingBooking({ client, onBookingSuccess }) {
             return;
         }
 
-        // CRITICAL: Convert Halifax time to UTC
-        // Admin enters date/time in Halifax timezone (e.g., 2026-02-05 14:00 Halifax)
+        // CRITICAL: Convert center local time to UTC
+        // Admin enters date/time in center's local timezone (e.g., 2026-02-05 14:00 Halifax)
         // We need to convert this to UTC for storage in the database
-        const utcStartTime = halifaxDateTimeToUTC(date, manualTime);
+        const utcStartTime = localToUTCIso(date, manualTime, tz);
         const startDateUTC = new Date(utcStartTime);
         const endDateUTC = new Date(startDateUTC.getTime() + duration * 60000);
 
@@ -174,19 +176,20 @@ function CoachingBooking({ client, onBookingSuccess }) {
     const hasSessions = selectedPackage ? (packageType === 'organization' ? organizationSessionsRemaining > 0 : personalSessionsRemaining > 0) : false;
     const packageSessionDuration = selectedPackageData?.session_duration_minutes || DEFAULT_DURATION;
 
+    // Calculate center's "today"
+    const todayStr = getTodayInTimezone(tz);
+
     // Calculate min date
     // specific rule: clients/guests cannot book today (must book 24h ahead -> tomorrow)
     // Staff/Admins can book today
-    const minDate = new Date();
+    let minDateString = todayStr;
     if (!isAdminOrStaff) {
-        minDate.setDate(minDate.getDate() + 1);
+        // Use moment for easy date manipulation while respecting the timezone
+        minDateString = moment.tz(todayStr, tz).add(1, 'days').format('YYYY-MM-DD');
     }
-    const minDateString = `${minDate.getFullYear()}-${String(minDate.getMonth() + 1).padStart(2, '0')}-${String(minDate.getDate()).padStart(2, '0')}`;
 
-    // Calculate max date (30 days from today)
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 30);
-    const maxDateString = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
+    // Calculate max date (30 days from today in center timezone)
+    const maxDateString = moment.tz(todayStr, tz).add(30, 'days').format('YYYY-MM-DD');
 
     useEffect(() => {
         // Load active coaching packages
@@ -285,8 +288,8 @@ function CoachingBooking({ client, onBookingSuccess }) {
                         setPartialClosures(result.partial_closures);
                         // Show informational message about partial closures
                         const closureMessages = result.partial_closures.map(closure => {
-                            const startTime = utcTimeToLocal(closure.start_time);
-                            const endTime = utcTimeToLocal(closure.end_time);
+                            const startTime = formatLocalTime(closure.start_time, tz);
+                            const endTime = formatLocalTime(closure.end_time, tz);
                             return `${startTime} - ${endTime}`;
                         }).join(', ');
                         setToast({
@@ -1065,7 +1068,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                     <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
                                         <span className="font-medium">Book coaching sessions for</span>
                                         <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
-                                            {date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select date'}
+                                            {date ? formatLocalDate(date, tz) : 'Select date'}
                                         </span>
                                         <span className="text-text-secondary/50">|</span>
                                         <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
@@ -1112,11 +1115,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                 onClick={() => !disabled && handleSlotSelect(slot)}
                                             >
                                                 <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
-                                                    {new Date(slot.start_time).toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        timeZone: 'America/Halifax'
-                                                    })}
+                                                    {formatLocalTime(slot.start_time, tz)}
                                                 </div>
                                                 <div className={`text-sm ${disabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
                                                     {duration} minutes
@@ -1160,7 +1159,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                                     <>
                                                                         <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
                                                                         <div className="mb-1">
-                                                                            Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })})
+                                                                            Session overlaps with {specialEvent.title} (Starts {formatLocalTime(eventStartTime.toISOString(), tz)})
                                                                         </div>
                                                                         <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
                                                                     </>
@@ -1175,7 +1174,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                                 <>
                                                                     <div className="font-semibold mb-1">⚠️ Duration too long</div>
                                                                     <div className="mb-1">
-                                                                        Coach available until {new Date(slot.availability_end_time || slot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
+                                                                        Coach available until {formatLocalTime(slot.availability_end_time || slot.end_time, tz)}
                                                                     </div>
                                                                     <div className="text-yellow-300 font-medium">💡 Try {suggestedDuration} mins or less</div>
                                                                 </>
@@ -1221,10 +1220,10 @@ function CoachingBooking({ client, onBookingSuccess }) {
                             <h4 className="text-lg font-bold text-text-primary mb-4">Confirm Your Booking</h4>
                             <div className="space-y-2 mb-4">
                                 <p className="text-text-primary">
-                                    <span className="font-medium">Date:</span> {new Date(selectedSlot.start_time).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                    <span className="font-medium">Date:</span> {formatLocalDate(selectedSlot.start_time, tz)}
                                 </p>
                                 <p className="text-text-primary">
-                                    <span className="font-medium">Time:</span> {new Date(selectedSlot.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })} - {new Date(selectedSlot.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Halifax' })}
+                                    <span className="font-medium">Time:</span> {formatLocalTime(selectedSlot.start_time, tz)} - {formatLocalTime(selectedSlot.end_time, tz)}
                                 </p>
                                 <p className="text-text-primary">
                                     <span className="font-medium">Duration:</span> {duration} minutes
