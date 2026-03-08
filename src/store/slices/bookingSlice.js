@@ -506,7 +506,9 @@ const bookingSlice = createSlice({
             })
             .addCase(getCalendarBookings.fulfilled, (state, action) => {
                 state.loading = false;
-                state.calendarEvents = action.payload;
+                state.calendarEvents = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getCalendarBookings.rejected, (state, action) => {
                 state.loading = false;

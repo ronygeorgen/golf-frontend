@@ -453,7 +453,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     end_date: endDateStr
                 }
             });
-            setSpecialEvents(response.data);
+            const data = response.data;
+            setSpecialEvents(Array.isArray(data) ? data : data?.results || []);
         } catch (error) {
             console.error("Failed to fetch special events", error);
         } finally {
