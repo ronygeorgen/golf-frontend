@@ -86,7 +86,9 @@ function ClosedDaysManagement() {
         setLoading(true);
         try {
             const response = await axios.get(endpoints.admin.closedDays.list);
-            setClosedDays(response.data);
+            // Guard against paginated responses ({count, results:[...]}) vs plain arrays
+            const data = response.data;
+            setClosedDays(Array.isArray(data) ? data : data?.results || []);
         } catch (error) {
             console.error('Error fetching closed days:', error);
             showError('Failed to load closed days');

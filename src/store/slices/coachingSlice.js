@@ -451,7 +451,9 @@ const coachingSlice = createSlice({
             })
             .addCase(getPackages.fulfilled, (state, action) => {
                 state.loading = false;
-                state.packages = action.payload;
+                state.packages = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getPackages.rejected, (state, action) => {
                 state.loading = false;
@@ -544,7 +546,9 @@ const coachingSlice = createSlice({
             })
             .addCase(getGiftsPending.fulfilled, (state, action) => {
                 state.giftsLoading = false;
-                state.giftsPending = action.payload;
+                state.giftsPending = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getGiftsPending.rejected, (state, action) => {
                 state.giftsLoading = false;
@@ -664,7 +668,9 @@ const coachingSlice = createSlice({
             })
             .addCase(getTransfersPending.fulfilled, (state, action) => {
                 state.transfersLoading = false;
-                state.transfersPending = action.payload;
+                state.transfersPending = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getTransfersPending.rejected, (state, action) => {
                 state.transfersLoading = false;

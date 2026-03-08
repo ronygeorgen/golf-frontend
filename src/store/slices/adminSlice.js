@@ -746,7 +746,9 @@ const adminSlice = createSlice({
             })
             .addCase(getStaff.fulfilled, (state, action) => {
                 state.staff.loading = false;
-                state.staff.list = action.payload;
+                state.staff.list = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getStaff.rejected, (state, action) => {
                 state.staff.loading = false;
@@ -881,7 +883,9 @@ const adminSlice = createSlice({
             })
             .addCase(getSimulators.fulfilled, (state, action) => {
                 state.simulators.loading = false;
-                state.simulators.list = action.payload;
+                state.simulators.list = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getSimulators.rejected, (state, action) => {
                 state.simulators.loading = false;
@@ -932,7 +936,9 @@ const adminSlice = createSlice({
             })
             .addCase(getPackages.fulfilled, (state, action) => {
                 state.packages.loading = false;
-                state.packages.list = action.payload;
+                state.packages.list = Array.isArray(action.payload)
+                    ? action.payload
+                    : action.payload?.results || [];
             })
             .addCase(getPackages.rejected, (state, action) => {
                 state.packages.loading = false;
