@@ -12,7 +12,7 @@ import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
 import { Edit, Trash2, CalendarOff } from 'lucide-react';
-import { localToUTCIso, formatLocalTime, formatLocalDate } from '../utils/timezoneUtils';
+import { formatLocalDate, formatLocalTime } from '../utils/timezoneUtils';
 
 const RECURRENCE_TYPES = [
     { value: 'one_time', label: 'One Time (Specific Date Only)' },
@@ -25,7 +25,7 @@ function ClosedDaysManagement() {
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
-    const { locationTimezone } = useAppSelector((state) => state.auth);
+    const { locationTimezone, locationId } = useAppSelector((state) => state.auth);
     const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const modalRef = useRef(null);
 
@@ -47,6 +47,16 @@ function ClosedDaysManagement() {
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [fullDayClosure, setFullDayClosure] = useState(true);
+
+    // Conflict modal (when creating closed day has conflicts)
+    const [conflictModalOpen, setConflictModalOpen] = useState(false);
+    const [conflictMessage, setConflictMessage] = useState('');
+    const [conflictSubmitData, setConflictSubmitData] = useState(null);
+    const [conflictPreviewData, setConflictPreviewData] = useState(null);
+    const [loadingPreview, setLoadingPreview] = useState(false);
+    const [showDetailedView, setShowDetailedView] = useState(false);
+    const [showSimulatorBookings, setShowSimulatorBookings] = useState(true);
+    const [showCoachingBookings, setShowCoachingBookings] = useState(true);
 
     useEffect(() => {
         fetchClosedDays();
@@ -86,86 +96,28 @@ function ClosedDaysManagement() {
     };
 
     /**
-     * Convert center local date + time to UTC for storage.
-     * Uses DST-aware Intl API via localToUTCIso — NO fixed offsets.
+     * ClosedDay stores date + time as LOCAL wall-clock (center's timezone).
+     * We send local values to the backend - NO conversion. The backend interprets
+     * these as center-local times and converts to UTC only when comparing with bookings.
      */
-    const convertLocalDateTimeToUTC = (date, time) => {
-        if (!date || !time) return { date: date || '', time: time || '' };
-        const utcIso = localToUTCIso(date, time, tz);
-        if (!utcIso) return { date, time };
-        const utcDt = new Date(utcIso);
-        return {
-            date: utcDt.toISOString().split('T')[0],
-            time: `${String(utcDt.getUTCHours()).padStart(2, '0')}:${String(utcDt.getUTCMinutes()).padStart(2, '0')}`
-        };
-    };
-
-    /**
-     * Convert UTC date + time back to center local timezone for display/editing.
-     */
-    const convertUTCDateTimeToLocal = (utcDate, utcTime) => {
-        if (!utcDate || !utcTime) return { date: utcDate || '', time: utcTime || '' };
-
-        // Ensure time has seconds for valid ISO string
-        const timeStr = typeof utcTime === 'string' ? utcTime : String(utcTime || '');
-        const timePart = timeStr.split(':').length === 2 ? `${timeStr}:00` : timeStr;
-        const utcIso = `${utcDate}T${timePart}Z`;
-
-        const dt = new Date(utcIso);
-
-        if (isNaN(dt.getTime())) {
-            console.error("Invalid UTC datetime constructed:", utcIso);
-            return { date: utcDate, time: utcTime?.slice(0, 5) || '' };
-        }
-        const formatter = new Intl.DateTimeFormat('en-CA', {
-            timeZone: tz,
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', hour12: false,
-        });
-        const parts = formatter.formatToParts(dt);
-        const get = (type) => parts.find(p => p.type === type)?.value || '00';
-        return {
-            date: `${get('year')}-${get('month')}-${get('day')}`,
-            time: `${get('hour').replace('24', '00')}:${get('minute')}`
-        };
-    };
-
     const handleSubmit = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
 
         const submitData = {
             ...formData,
+            start_date: formData.start_date,
+            end_date: formData.end_date || formData.start_date,
+            // Always send location_id so backend uses correct timezone for UTC conversion
+            location_id: locationId || undefined,
         };
 
-        let startDateUTC = formData.start_date;
-        let endDateUTC = formData.end_date || formData.start_date;
-
-        // Only include time fields if not full day closure
         if (!fullDayClosure && formData.start_time && formData.end_time) {
-            // Convert start time from center local tz to UTC (DST-aware)
-            const startUTC = convertLocalDateTimeToUTC(formData.start_date, formData.start_time);
-            startDateUTC = startUTC.date;
-            submitData.start_time = startUTC.time;
-
-            // Convert end time from center local tz to UTC
-            const endDateForConversion = formData.end_date || formData.start_date;
-            const endUTC = convertLocalDateTimeToUTC(endDateForConversion, formData.end_time);
-            endDateUTC = endUTC.date;
-            submitData.end_time = endUTC.time;
+            submitData.start_time = formData.start_time;
+            submitData.end_time = formData.end_time;
         } else {
-            // For full day closures, convert 00:00 and 23:59 local time to UTC
-            const startOfDayUTC = convertLocalDateTimeToUTC(formData.start_date, '00:00');
-            startDateUTC = startOfDayUTC.date;
-            submitData.start_time = startOfDayUTC.time;
-
-            const endDateForConversion = formData.end_date || formData.start_date;
-            const endOfDayUTC = convertLocalDateTimeToUTC(endDateForConversion, '23:59');
-            endDateUTC = endOfDayUTC.date;
-            submitData.end_time = endOfDayUTC.time;
+            submitData.start_time = null;
+            submitData.end_time = null;
         }
-
-        submitData.start_date = startDateUTC;
-        submitData.end_date = endDateUTC;
 
         await processSubmission(submitData);
     };
@@ -199,21 +151,15 @@ function ClosedDaysManagement() {
             const hasConflicts = error.response?.data?.conflicts === true ||
                 (Array.isArray(error.response?.data?.conflicts) && (error.response?.data?.conflicts[0] === true || error.response?.data?.conflicts[0] === 'True'));
 
-            // Show error in a popup if it's a detailed conflict message (contains newlines) or a conflict flag
+            // Show conflict modal if it's a detailed conflict message (with Force Override option)
             if (hasConflicts || conflictMessage.includes('\n') || conflictMessage.includes('•')) {
-                openPopup({
-                    type: hasConflicts ? 'warning' : 'error',
-                    title: hasConflicts ? 'Conflicts Detected' : 'Cannot Create Closed Day',
-                    message: conflictMessage,
-                    showCancel: hasConflicts,
-                    confirmText: hasConflicts ? 'Force Override' : 'OK',
-                    cancelText: 'Cancel',
-                    onConfirm: hasConflicts ? () => {
-                        // Retry with force_override
-                        closePopup();
-                        processSubmission({ ...data, force_override: true });
-                    } : closePopup,
-                });
+                setConflictMessage(conflictMessage);
+                setConflictSubmitData(data);
+                setConflictPreviewData(null);
+                setShowDetailedView(false);
+                setShowSimulatorBookings(true);
+                setShowCoachingBookings(true);
+                setConflictModalOpen(true);
             } else {
                 showError(conflictMessage);
             }
@@ -225,33 +171,15 @@ function ClosedDaysManagement() {
     const handleEdit = (closedDay) => {
         setEditingClosedDay(closedDay);
 
-        // Convert UTC dates/times back to Halifax for editing
-        let startDateHalifax = closedDay.start_date || '';
-        let endDateHalifax = closedDay.end_date || closedDay.start_date || '';
-        let startTimeHalifax = '';
-        let endTimeHalifax = '';
-        let isFullDay = false;
+        // Backend returns LOCAL wall-clock date/time (center's timezone) - use as-is
+        const startDateLocal = closedDay.start_date || '';
+        const endDateLocal = closedDay.end_date || closedDay.start_date || '';
+        let startTimeLocal = closedDay.start_time ? String(closedDay.start_time).slice(0, 5) : '';
+        let endTimeLocal = closedDay.end_time ? String(closedDay.end_time).slice(0, 5) : '';
+        let isFullDay = true;
 
         if (closedDay.start_time && closedDay.end_time) {
-            // Convert start time from UTC to center local timezone
-            const startLocal = convertUTCDateTimeToLocal(closedDay.start_date, closedDay.start_time);
-            startDateHalifax = startLocal.date;
-            startTimeHalifax = startLocal.time;
-
-            // Convert end time from UTC to center local timezone
-            const endDateForConversion = closedDay.end_date || closedDay.start_date;
-            const endLocal = convertUTCDateTimeToLocal(endDateForConversion, closedDay.end_time);
-            endDateHalifax = endLocal.date;
-            endTimeHalifax = endLocal.time;
-
-            // Check if this represents a full day in local tz (00:00 to 23:59)
-            if (startTimeHalifax === '00:00' && endTimeHalifax === '23:59' &&
-                startDateHalifax === endDateHalifax) {
-                isFullDay = true;
-            }
-        } else {
-            // Old format: no times stored, definitely a full day closure
-            isFullDay = true;
+            isFullDay = false;
         }
 
         setFullDayClosure(isFullDay);
@@ -259,10 +187,10 @@ function ClosedDaysManagement() {
         setFormData({
             title: closedDay.title || '',
             description: closedDay.description || '',
-            start_date: startDateHalifax,
-            end_date: endDateHalifax,
-            start_time: startTimeHalifax,
-            end_time: endTimeHalifax,
+            start_date: startDateLocal,
+            end_date: endDateLocal,
+            start_time: startTimeLocal,
+            end_time: endTimeLocal,
             recurrence: closedDay.recurrence || 'one_time',
             is_active: closedDay.is_active !== undefined ? closedDay.is_active : true,
         });
@@ -303,20 +231,48 @@ function ClosedDaysManagement() {
         return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
-    /**
-     * Format UTC time to display in center's local timezone (DST-aware)
-     */
-    const formatTime = (utcTimeString, utcDateString) => {
-        if (!utcTimeString || !utcDateString) return '';
-        const timeStr = typeof utcTimeString === 'string' ? utcTimeString : String(utcTimeString || '');
-        const timePart = timeStr.split(':').length === 2 ? `${timeStr}:00` : timeStr;
-        const utcIso = `${utcDateString}T${timePart}Z`;
-        return formatLocalTime(utcIso, tz, { hour: '2-digit', minute: '2-digit', hour12: false });
-    };
-
     const formatRecurrence = (recurrence) => {
         const type = RECURRENCE_TYPES.find(t => t.value === recurrence);
         return type ? type.label : recurrence;
+    };
+
+    const fetchConflictPreview = async () => {
+        if (!conflictSubmitData) return;
+        setLoadingPreview(true);
+        try {
+            const payload = {
+                start_date: conflictSubmitData.start_date,
+                end_date: conflictSubmitData.end_date || conflictSubmitData.start_date,
+                // Send closure times only when it's a partial closure
+                start_time: conflictSubmitData.start_time || null,
+                end_time: conflictSubmitData.end_time || null,
+                // Always include location_id for correct timezone resolution
+                location_id: conflictSubmitData.location_id || locationId || undefined,
+            };
+            const res = await axios.post(endpoints.admin.closedDays.previewCancellations, payload);
+            setConflictPreviewData(res.data);
+            setShowDetailedView(true);
+        } catch (err) {
+            console.error('Failed to fetch conflict preview:', err);
+            showError('Failed to load booking details');
+        } finally {
+            setLoadingPreview(false);
+        }
+    };
+
+    const handleForceOverride = () => {
+        setConflictModalOpen(false);
+        if (conflictSubmitData) {
+            processSubmission({ ...conflictSubmitData, force_override: true });
+        }
+    };
+
+    const closeConflictModal = () => {
+        setConflictModalOpen(false);
+        setConflictMessage('');
+        setConflictSubmitData(null);
+        setConflictPreviewData(null);
+        setShowDetailedView(false);
     };
 
     if (loading) {
@@ -362,74 +318,69 @@ function ClosedDaysManagement() {
                                     </td>
                                 </tr>
                             ) : (
-                                closedDays.map((closedDay) => (
-                                    <tr key={closedDay.id} className="hover:bg-background transition-colors">
-                                        {(() => {
-                                            const startLocal = convertUTCDateTimeToLocal(closedDay.start_date, closedDay.start_time || '00:00');
-                                            const endDateForDisplay = closedDay.end_date || closedDay.start_date;
-                                            const endLocal = convertUTCDateTimeToLocal(endDateForDisplay, closedDay.end_time || '23:59');
-                                            const isFullDay = startLocal.time === '00:00' && endLocal.time === '23:59' && startLocal.date === endLocal.date;
+                                closedDays.map((closedDay) => {
+                                    const startDate = closedDay.start_date || '';
+                                    const endDate = closedDay.end_date || closedDay.start_date || '';
+                                    const startTime = closedDay.start_time ? String(closedDay.start_time).slice(0, 5) : '';
+                                    const endTime = closedDay.end_time ? String(closedDay.end_time).slice(0, 5) : '';
+                                    const isFullDay = !startTime || !endTime;
 
-                                            return (
-                                                <>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-medium text-text-primary">{closedDay.title}</div>
-                                                        {closedDay.description && (
-                                                            <div className="text-xs text-text-secondary mt-1">{closedDay.description}</div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-text-primary">
-                                                            {formatLocalDate(new Date(`${startLocal.date}T12:00:00`), tz)}
-                                                            {startLocal.date !== endLocal.date && (
-                                                                <> - {formatLocalDate(new Date(`${endLocal.date}T12:00:00`), tz)}</>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-text-primary">
-                                                            {isFullDay ? (
-                                                                <span className="text-text-secondary">Full Day</span>
-                                                            ) : (
-                                                                <>
-                                                                    {formatLocalTime(`${closedDay.start_date}T${(closedDay.start_time || '00:00').split(':').length === 2 ? (closedDay.start_time || '00:00') + ':00' : (closedDay.start_time || '00:00')}Z`, tz)} - {formatLocalTime(`${endDateForDisplay}T${(closedDay.end_time || '23:59').split(':').length === 2 ? (closedDay.end_time || '23:59') + ':00' : (closedDay.end_time || '23:59')}Z`, tz)}
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </>
-                                            );
-                                        })()}
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-text-primary">{formatRecurrence(closedDay.recurrence)}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <Badge
-                                                variant={closedDay.is_active ? 'danger' : 'secondary'}
-                                            >
-                                                {closedDay.is_active ? 'Active' : 'Inactive'}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleEdit(closedDay)}
-                                                    className="text-primary hover:text-primary-light transition-colors p-1 rounded-md hover:bg-background"
-                                                    title="Edit"
+                                    return (
+                                        <tr key={closedDay.id} className="hover:bg-background transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm font-medium text-text-primary">{closedDay.title}</div>
+                                                {closedDay.description && (
+                                                    <div className="text-xs text-text-secondary mt-1">{closedDay.description}</div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-text-primary">
+                                                    {formatLocalDate(new Date(`${startDate}T12:00:00`), tz)}
+                                                    {startDate !== endDate && (
+                                                        <> - {formatLocalDate(new Date(`${endDate}T12:00:00`), tz)}</>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-text-primary">
+                                                    {isFullDay ? (
+                                                        <span className="text-text-secondary">Full Day</span>
+                                                    ) : (
+                                                        <>{startTime} - {endTime}</>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-text-primary">{formatRecurrence(closedDay.recurrence)}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <Badge
+                                                    variant={closedDay.is_active ? 'danger' : 'secondary'}
                                                 >
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(closedDay)}
-                                                    className="text-danger hover:text-danger-dark transition-colors p-1 rounded-md hover:bg-background"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                                    {closedDay.is_active ? 'Active' : 'Inactive'}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleEdit(closedDay)}
+                                                        className="text-primary hover:text-primary-light transition-colors p-1 rounded-md hover:bg-background"
+                                                        title="Edit"
+                                                    >
+                                                        <Edit className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(closedDay)}
+                                                        className="text-danger hover:text-danger-dark transition-colors p-1 rounded-md hover:bg-background"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -606,6 +557,117 @@ function ClosedDaysManagement() {
                                 </Button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Conflict Modal (Force Override + Detailed View) */}
+            {conflictModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={closeConflictModal} />
+                    <div className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl bg-surface shadow-2xl">
+                        <div className="p-6 border-b border-border flex-shrink-0">
+                            <h3 className="text-lg font-semibold text-text-primary">Conflicts Detected</h3>
+                            <p className="mt-2 text-sm text-text-secondary whitespace-pre-line">{conflictMessage}</p>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={fetchConflictPreview}
+                                    disabled={loadingPreview}
+                                >
+                                    {loadingPreview ? 'Loading...' : 'Detailed View'}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {showDetailedView && conflictPreviewData?.bookings_by_date && (
+                            <div className="flex-1 overflow-y-auto p-6 border-t border-border space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={showSimulatorBookings}
+                                            onChange={(e) => setShowSimulatorBookings(e.target.checked)}
+                                            className="rounded border-border text-primary focus:ring-primary"
+                                        />
+                                        <span className="text-sm font-medium text-text-primary">Simulator Bookings</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={showCoachingBookings}
+                                            onChange={(e) => setShowCoachingBookings(e.target.checked)}
+                                            className="rounded border-border text-primary focus:ring-primary"
+                                        />
+                                        <span className="text-sm font-medium text-text-primary">Coaching Sessions</span>
+                                    </label>
+                                </div>
+
+                                {Object.entries(conflictPreviewData.bookings_by_date)
+                                    .sort(([a], [b]) => a.localeCompare(b))
+                                    .map(([dateStr, types]) => {
+                                        const simList = types.simulator || [];
+                                        const coachList = types.coaching || [];
+                                        const hasAny = (showSimulatorBookings && simList.length) || (showCoachingBookings && coachList.length);
+                                        if (!hasAny) return null;
+
+                                        return (
+                                            <div key={dateStr} className="border border-border rounded-lg overflow-hidden">
+                                                <div className="bg-background px-4 py-2 font-medium text-text-primary">
+                                                    {formatLocalDate(new Date(`${dateStr}T12:00:00`), tz)}
+                                                </div>
+                                                <div className="divide-y divide-border">
+                                                    {showSimulatorBookings && simList.length > 0 && (
+                                                        <>
+                                                            <div className="px-4 py-2 bg-background/50 text-xs font-medium text-text-secondary uppercase">
+                                                                Simulator ({simList.length})
+                                                            </div>
+                                                            {simList.map((b) => (
+                                                                <div key={b.id} className="px-4 py-2 flex justify-between items-center text-sm">
+                                                                    <span className="text-text-primary">{b.client_name}</span>
+                                                                    <span className="text-text-secondary">
+                                                                        {formatLocalTime(b.start_time, tz, { hour12: false })} - {formatLocalTime(b.end_time, tz, { hour12: false })}
+                                                                        {b.simulator_name && ` • ${b.simulator_name}`}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                    {showCoachingBookings && coachList.length > 0 && (
+                                                        <>
+                                                            <div className="px-4 py-2 bg-background/50 text-xs font-medium text-text-secondary uppercase">
+                                                                Coaching ({coachList.length})
+                                                            </div>
+                                                            {coachList.map((b) => (
+                                                                <div key={b.id} className="px-4 py-2 flex justify-between items-center text-sm">
+                                                                    <span className="text-text-primary">{b.client_name}</span>
+                                                                    <span className="text-text-secondary">
+                                                                        {formatLocalTime(b.start_time, tz, { hour12: false })} - {formatLocalTime(b.end_time, tz, { hour12: false })}
+                                                                        {b.coach_name && ` • ${b.coach_name}`}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                {Object.keys(conflictPreviewData.bookings_by_date).length === 0 && (
+                                    <p className="text-sm text-text-secondary">No bookings would be cancelled.</p>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="p-6 border-t border-border flex justify-end gap-3 flex-shrink-0">
+                            <Button variant="secondary" onClick={closeConflictModal}>
+                                Cancel
+                            </Button>
+                            <Button variant="accent" onClick={handleForceOverride}>
+                                Force Override
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

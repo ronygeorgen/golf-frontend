@@ -89,6 +89,7 @@ export const endpoints = {
             delete: (id) => `/admin/closed-days/${id}/`,
             checkDate: '/admin/closed-days/check-date/',
             checkDatetime: '/admin/closed-days/check-datetime/',
+            previewCancellations: '/admin/closed-days/preview-cancellations/',
         },
         banners: {
             list: '/banners/',
