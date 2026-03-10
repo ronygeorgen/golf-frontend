@@ -754,26 +754,21 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             };
         });
 
-    // Transform Special Events - convert UTC to Halifax timezone
-    // Ensures events display on the correct Halifax date and time
+    // Transform Special Events - they are already naive local strings
+    // Create accurate local datetime objects without shifting
     const transformedSpecialEvents = specialEvents.flatMap(event => {
-        // Combine UTC date and time, then convert to Halifax timezone
         const [year, month, day] = event.date.split('-').map(Number);
         const [startHours, startMinutes] = event.start_time.split(':').map(Number);
         const [endHours, endMinutes] = event.end_time.split(':').map(Number);
 
-        // Create UTC datetime
-        const utcStart = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes));
-        let utcEnd = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes));
+        // Create browser-local dates that perfectly match the intended wall-clock time
+        const localStart = new Date(year, month - 1, day, startHours, startMinutes);
+        let localEnd = new Date(year, month - 1, day, endHours, endMinutes);
 
-        // Handle midnight crossover in UTC
-        if (utcEnd <= utcStart) {
-            utcEnd = new Date(utcEnd.getTime() + 24 * 60 * 60 * 1000);
+        // Handle midnight crossover
+        if (localEnd <= localStart) {
+            localEnd = new Date(localEnd.getTime() + 24 * 60 * 60 * 1000);
         }
-
-        // Create "fake local" datetime for correct browser grid positioning
-        const halifaxStart = new Date(moment.tz(utcStart, tz).format('YYYY-MM-DDTHH:mm:ss'));
-        const halifaxEnd = new Date(moment.tz(utcEnd, tz).format('YYYY-MM-DDTHH:mm:ss'));
 
         const baseEvent = {
             id: `special-${event.display_id}`,
@@ -787,30 +782,30 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         };
 
         // Check if event crosses midnight (date part of start != date part of end)
-        if (halifaxStart.getDate() !== halifaxEnd.getDate()) {
+        if (localStart.getDate() !== localEnd.getDate()) {
             const splitEvents = [];
 
             // Part 1: Start to End of Day 1 (23:59:59)
-            const endOfDay1 = new Date(halifaxStart);
+            const endOfDay1 = new Date(localStart);
             endOfDay1.setHours(23, 59, 59, 999);
 
             splitEvents.push({
                 ...baseEvent,
-                start: halifaxStart,
+                start: localStart,
                 end: endOfDay1,
             });
 
             // Part 2: Start of Day 2 (00:00:00) to End
-            const startOfDay2 = new Date(halifaxEnd);
+            const startOfDay2 = new Date(localEnd);
             startOfDay2.setHours(0, 0, 0, 0);
 
             // Only add part 2 if it has duration
-            if (halifaxEnd > startOfDay2) {
+            if (localEnd > startOfDay2) {
                 splitEvents.push({
                     ...baseEvent,
                     id: `${baseEvent.id}-part2`, // Unique ID for the second part
                     start: startOfDay2,
-                    end: halifaxEnd,
+                    end: localEnd,
                 });
             }
 
@@ -820,8 +815,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         // No split needed
         return [{
             ...baseEvent,
-            start: halifaxStart,
-            end: halifaxEnd,
+            start: localStart,
+            end: localEnd,
         }];
     });
 

@@ -112,22 +112,7 @@ function SpecialEvents() {
     const formatDate = (dateString, timeString) => {
         if (!dateString) return '';
 
-        // CRITICAL FIX: Combine UTC date and time to get the correct local date
-        // Example: Event stored as "2026-02-03" at "00:00:00" UTC 
-        // should display as "February 2, 2026" in Halifax (not February 3)
-        if (timeString) {
-            const localDate = utcDateTimeToLocalDate(dateString, timeString);
-            if (localDate) {
-                return localDate.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-            }
-        }
-
-        // Fallback: if no time provided, just format the date as-is
+        // Safely parse local date straight
         const [year, month, day] = dateString.split('-').map(Number);
         const date = new Date(year, month - 1, day);
         return date.toLocaleDateString('en-US', {
@@ -217,7 +202,7 @@ function SpecialEvents() {
                                                 <Clock className="w-5 h-5" />
                                                 <span className="font-medium">Time:</span>
                                                 <span>
-                                                    {utcTimeToLocal(event.start_time)} - {utcTimeToLocal(event.end_time)}
+                                                    {event.start_time} - {event.end_time}
                                                 </span>
                                             </div>
                                             {event.show_price && event.price && (

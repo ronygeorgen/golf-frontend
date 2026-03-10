@@ -163,35 +163,13 @@ function SpecialEventsManagement() {
      * This ensures events are created correctly regardless of admin's location
      */
     const convertLocalDateTimeToUTC = (date, startTime, endTime) => {
-        const [year, month, day] = date.split('-').map(Number);
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        const [endHours, endMinutes] = endTime.split(':').map(Number);
-
-        // Halifax timezone: AST = UTC-4 (4 hours behind UTC)
-        const HALIFAX_OFFSET_HOURS = -4;
-
-        // Create UTC date with Halifax time values
-        const halifaxStart = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes));
-
-        // Convert Halifax time to UTC by subtracting the offset
-        // Example: 8PM Halifax (20:00) + 4 hours = 00:00 UTC (next day)
-        const utcStart = new Date(halifaxStart.getTime() - (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
-
-        // Handle end time
-        let halifaxEnd = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes));
-
-        // Handle midnight crossover in Halifax time
-        if (endHours < startHours || (endHours === 0 && startHours !== 0)) {
-            halifaxEnd = new Date(Date.UTC(year, month - 1, day + 1, endHours, endMinutes));
-        }
-
-        const utcEnd = new Date(halifaxEnd.getTime() - (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
-
+        // Backend now expects naive local dates and times
         return {
-            date: utcStart.toISOString().split('T')[0],
-            start_time: `${utcStart.getUTCHours().toString().padStart(2, '0')}:${utcStart.getUTCMinutes().toString().padStart(2, '0')}`,
-            end_time: `${utcEnd.getUTCHours().toString().padStart(2, '0')}:${utcEnd.getUTCMinutes().toString().padStart(2, '0')}`
+            date: date,
+            start_time: startTime,
+            end_time: endTime
         };
+
     };
 
     const handleSubmit = async (e) => {
@@ -237,32 +215,13 @@ function SpecialEventsManagement() {
      * IMPORTANT: Always uses Halifax (AST = UTC-4) timezone
      */
     const convertUTCDateTimeToLocal = (utcDate, utcStartTime, utcEndTime) => {
-        const [year, month, day] = utcDate.split('-').map(Number);
-        const [startHours, startMinutes] = utcStartTime.split(':').map(Number);
-        const [endHours, endMinutes] = utcEndTime.split(':').map(Number);
-
-        // Halifax timezone: AST = UTC-4
-        const HALIFAX_OFFSET_HOURS = -4;
-
-        // Create UTC datetimes
-        const utcStart = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes));
-        const utcEnd = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes));
-
-        // Handle midnight crossover in UTC
-        if (endHours < startHours) {
-            utcEnd.setUTCDate(utcEnd.getUTCDate() + 1);
-        }
-
-        // Convert UTC to Halifax time by adding the offset
-        // Example: 00:00 UTC - 4 hours = 20:00 previous day (Halifax)
-        const halifaxStart = new Date(utcStart.getTime() + (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
-        const halifaxEnd = new Date(utcEnd.getTime() + (HALIFAX_OFFSET_HOURS * 60 * 60 * 1000));
-
+        // Backend now returns naive local dates and times
         return {
-            date: `${halifaxStart.getUTCFullYear()}-${String(halifaxStart.getUTCMonth() + 1).padStart(2, '0')}-${String(halifaxStart.getUTCDate()).padStart(2, '0')}`,
-            start_time: `${String(halifaxStart.getUTCHours()).padStart(2, '0')}:${String(halifaxStart.getUTCMinutes()).padStart(2, '0')}`,
-            end_time: `${String(halifaxEnd.getUTCHours()).padStart(2, '0')}:${String(halifaxEnd.getUTCMinutes()).padStart(2, '0')}`
+            date: utcDate,
+            start_time: utcStartTime,
+            end_time: utcEndTime
         };
+
     };
 
     const handleEdit = (event) => {
@@ -399,7 +358,7 @@ function SpecialEventsManagement() {
                                         </td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">{event.date}</td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">
-                                            {utcTimeToLocal(event.start_time)} - {utcTimeToLocal(event.end_time)}
+                                            {event.start_time} - {event.end_time}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">{event.max_capacity}</td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">
