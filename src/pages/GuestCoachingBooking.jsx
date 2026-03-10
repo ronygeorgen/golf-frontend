@@ -215,7 +215,7 @@ function GuestCoachingBooking() {
                     openPopup({
                         type: 'info',
                         title: 'No slots available',
-                        message: response.data.message || 'No available time slots for this date.',
+                        message: response.data.special_event_message || response.data.message || 'No available time slots for this date.',
                     });
                 } else {
                     setCurrentStep('slots');

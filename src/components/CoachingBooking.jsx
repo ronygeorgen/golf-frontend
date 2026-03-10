@@ -500,14 +500,14 @@ function CoachingBooking({ client, onBookingSuccess }) {
 
             const [year, month, day] = dateToUse.split('-').map(Number);
 
-            // Construct event start/end times in UTC
-            const eventStart = new Date(Date.UTC(year, month - 1, day, startH, startM, startS || 0));
+            // Construct event start/end times in local browser time matching the nominal local time
+            const eventStart = new Date(year, month - 1, day, startH, startM, startS || 0);
 
-            let eventEnd = new Date(Date.UTC(year, month - 1, day, endH, endM, endS || 0));
+            let eventEnd = new Date(year, month - 1, day, endH, endM, endS || 0);
 
             // Handle event crossing midnight: increment day for end time if it's earlier than or equal to start
             if (eventEnd <= eventStart) {
-                eventEnd.setUTCDate(eventEnd.getUTCDate() + 1);
+                eventEnd.setDate(eventEnd.getDate() + 1);
             }
 
             // Check for overlap:
