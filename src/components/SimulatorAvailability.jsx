@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getSimulators, getSimulatorAvailability, updateSimulatorAvailability, setSelectedSimulator } from '../store/slices/adminSlice';
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
-import { localTimeToUTC, utcTimeToLocal } from '../utils/timezone';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -26,10 +25,10 @@ function SimulatorAvailability() {
     const { list: simulators, loading } = useAppSelector((state) => state.admin.simulators);
     const { selectedSimulator, availability } = useAppSelector((state) => state.admin.simulators);
     const [showAddDay, setShowAddDay] = useState(false);
-    const [newAvailability, setNewAvailability] = useState({ 
-        day_of_week: '', 
-        start_time: '09:00', 
-        end_time: '17:00' 
+    const [newAvailability, setNewAvailability] = useState({
+        day_of_week: '',
+        start_time: '09:00',
+        end_time: '17:00'
     });
 
     useEffect(() => {
@@ -79,7 +78,7 @@ function SimulatorAvailability() {
 
     const handleAddAvailability = async () => {
         if (!selectedSimulator) return;
-        
+
         if (newAvailability.day_of_week === '') {
             openPopup({
                 type: 'warning',
@@ -89,16 +88,16 @@ function SimulatorAvailability() {
             return;
         }
 
-        const availabilityArray = selectedSimulator.id in availability 
-            ? availability[selectedSimulator.id] 
+        const availabilityArray = selectedSimulator.id in availability
+            ? availability[selectedSimulator.id]
             : [];
-        
+
         // Check if this day and start_time already exists
-        const exists = availabilityArray.some(avail => 
-            avail.day_of_week === parseInt(newAvailability.day_of_week) && 
-            avail.start_time === localTimeToUTC(newAvailability.start_time)
+        const exists = availabilityArray.some(avail =>
+            avail.day_of_week === parseInt(newAvailability.day_of_week) &&
+            avail.start_time === newAvailability.start_time
         );
-        
+
         if (exists) {
             openPopup({
                 type: 'warning',
@@ -108,57 +107,55 @@ function SimulatorAvailability() {
             return;
         }
 
-        // Convert local times to UTC before sending
+        // Send local times as-is (wall-clock time)
         const updatedAvailability = [
             ...availabilityArray,
             {
                 day_of_week: parseInt(newAvailability.day_of_week),
-                start_time: localTimeToUTC(newAvailability.start_time),
-                end_time: localTimeToUTC(newAvailability.end_time)
+                start_time: newAvailability.start_time,
+                end_time: newAvailability.end_time
             }
         ];
-        
-        await dispatch(updateSimulatorAvailability({ 
-            simulatorId: selectedSimulator.id, 
-            availabilityData: updatedAvailability 
+
+        await dispatch(updateSimulatorAvailability({
+            simulatorId: selectedSimulator.id,
+            availabilityData: updatedAvailability
         }));
 
         // Reset form
-        setNewAvailability({ 
-            day_of_week: '', 
-            start_time: '09:00', 
-            end_time: '17:00' 
+        setNewAvailability({
+            day_of_week: '',
+            start_time: '09:00',
+            end_time: '17:00'
         });
         setShowAddDay(false);
     };
 
     const handleUpdateAvailability = async (availabilityId, field, value) => {
         if (!selectedSimulator) return;
-        
-        const availabilityArray = selectedSimulator.id in availability 
-            ? availability[selectedSimulator.id] 
+
+        const availabilityArray = selectedSimulator.id in availability
+            ? availability[selectedSimulator.id]
             : [];
-        
-        // Convert local time to UTC if it's a time field
-        const updatedValue = (field === 'start_time' || field === 'end_time') 
-            ? localTimeToUTC(value) 
-            : field === 'day_of_week' ? parseInt(value) : value;
-        
-        const updatedAvailability = availabilityArray.map(avail => 
+
+        // Use time value as-is (wall-clock time)
+        const updatedValue = field === 'day_of_week' ? parseInt(value) : value;
+
+        const updatedAvailability = availabilityArray.map(avail =>
             avail.id === availabilityId
                 ? { ...avail, [field]: updatedValue }
                 : avail
         );
-        
-        await dispatch(updateSimulatorAvailability({ 
-            simulatorId: selectedSimulator.id, 
-            availabilityData: updatedAvailability 
+
+        await dispatch(updateSimulatorAvailability({
+            simulatorId: selectedSimulator.id,
+            availabilityData: updatedAvailability
         }));
     };
 
     const handleDeleteAvailability = async (availabilityId) => {
         if (!selectedSimulator) return;
-        
+
         openPopup({
             type: 'warning',
             title: 'Delete availability?',
@@ -167,14 +164,14 @@ function SimulatorAvailability() {
             cancelText: 'Cancel',
             showCancel: true,
             onConfirm: async () => {
-                const availabilityArray = selectedSimulator.id in availability 
-                    ? availability[selectedSimulator.id] 
+                const availabilityArray = selectedSimulator.id in availability
+                    ? availability[selectedSimulator.id]
                     : [];
                 const updatedAvailability = availabilityArray.filter(avail => avail.id !== availabilityId);
-                
-                await dispatch(updateSimulatorAvailability({ 
-                    simulatorId: selectedSimulator.id, 
-                    availabilityData: updatedAvailability 
+
+                await dispatch(updateSimulatorAvailability({
+                    simulatorId: selectedSimulator.id,
+                    availabilityData: updatedAvailability
                 }));
             },
         });
@@ -183,7 +180,7 @@ function SimulatorAvailability() {
     const availabilityArray = selectedSimulator && selectedSimulator.id in availability
         ? availability[selectedSimulator.id]
         : [];
-    
+
     // Sort by day_of_week, then by start_time
     const sortedAvailability = [...availabilityArray].sort((a, b) => {
         if (a.day_of_week !== b.day_of_week) {
@@ -208,7 +205,7 @@ function SimulatorAvailability() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Select Simulator:
                     </label>
-                    <select 
+                    <select
                         onChange={(e) => {
                             const simulatorId = parseInt(e.target.value);
                             handleSimulatorSelect(simulatorId);
@@ -361,7 +358,7 @@ function SimulatorAvailability() {
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <input
                                                     type="time"
-                                                    value={utcTimeToLocal(avail.start_time) || '09:00'}
+                                                    value={avail.start_time || '09:00'}
                                                     onChange={(e) => handleUpdateAvailability(avail.id, 'start_time', e.target.value)}
                                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 />
@@ -369,7 +366,7 @@ function SimulatorAvailability() {
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <input
                                                     type="time"
-                                                    value={utcTimeToLocal(avail.end_time) || '17:00'}
+                                                    value={avail.end_time || '17:00'}
                                                     onChange={(e) => handleUpdateAvailability(avail.id, 'end_time', e.target.value)}
                                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 />
