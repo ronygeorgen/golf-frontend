@@ -8,6 +8,10 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 
 function OrganizationPurchases() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const dispatch = useAppDispatch();
     const { organizationPurchases, organizationPurchasesPagination, organizationPurchasesLoading } = useAppSelector((state) => state.coaching);
     const [currentPage, setCurrentPage] = useState(1);
@@ -124,7 +128,7 @@ function OrganizationPurchases() {
                                                     </Button>
                                                 </div>
                                                 <span className="text-xs text-text-secondary">
-                                                    Created on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                    Created on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                 </span>
                                             </div>
                                         </div>

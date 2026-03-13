@@ -7,6 +7,10 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 
 function StaffCoachingSessionsAdmin() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { id } = useParams();
@@ -82,13 +86,13 @@ function StaffCoachingSessionsAdmin() {
                                                     <span className="font-medium">Client:</span> {booking.client_details?.first_name} {booking.client_details?.last_name} ({booking.client_details?.email})
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Halifax' })}
+                                                    <span className="font-medium">Date:</span> {new Date(booking.start_time).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: tz })}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
+                                                    <span className="font-medium">Start:</span> {new Date(booking.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: tz })}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
-                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Halifax' })}
+                                                    <span className="font-medium">End:</span> {new Date(booking.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: tz })}
                                                 </p>
                                                 <p className="text-sm text-text-secondary">
                                                     <span className="font-medium">Duration:</span> {booking.duration_minutes >= 60 ? `${Math.floor(booking.duration_minutes / 60)}h ${booking.duration_minutes % 60 > 0 ? booking.duration_minutes % 60 + 'min' : ''}`.trim() : `${booking.duration_minutes}min`}

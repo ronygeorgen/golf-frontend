@@ -12,6 +12,10 @@ import Badge from '../components/ui/Badge';
 import { ArrowLeft, CheckCircle, UserPlus, X, Search, Trash2 } from 'lucide-react';
 
 function EventRegistrations() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const { eventId } = useParams();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -352,7 +356,7 @@ function EventRegistrations() {
                                             {reg.user_details?.phone || 'N/A'}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">
-                                            {new Date(reg.registered_at).toLocaleString('en-US', { timeZone: 'America/Halifax' })}
+                                            {new Date(reg.registered_at).toLocaleString('en-US', { timeZone: tz })}
                                         </td>
                                         <td className="px-4 py-3">
                                             <Badge variant={reg.status === 'showed_up' ? 'success' : reg.status === 'cancelled' ? 'danger' : 'primary'}>
@@ -446,7 +450,7 @@ function EventRegistrations() {
                                             year: 'numeric',
                                             month: 'long',
                                             day: 'numeric',
-                                            timeZone: 'America/Halifax'
+                                            timeZone: tz
                                         })}
                                     </div>
                                 </div>

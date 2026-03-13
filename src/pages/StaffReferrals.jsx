@@ -12,6 +12,10 @@ import Toast from '../components/ui/Toast';
 import DateRangePicker from '../components/DateRangePicker';
 
 function StaffReferrals() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const { id: initialId } = useParams();
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
@@ -440,7 +444,7 @@ function StaffReferrals() {
                                                 <div key={purchase.id} className="p-3 bg-background rounded-card">
                                                     <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                                     <p className="text-sm text-text-secondary">
-                                                        Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                        Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                     </p>
                                                 </div>
                                             ))}
@@ -486,7 +490,7 @@ function StaffReferrals() {
                                             <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                             {purchase.purchased_at && (
                                                 <p className="text-sm text-text-secondary mt-1">
-                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                 </p>
                                             )}
                                         </div>

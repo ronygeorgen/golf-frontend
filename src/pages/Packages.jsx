@@ -22,6 +22,10 @@ import Badge from '../components/ui/Badge';
 import { ChevronDown, Clock, Calendar, CalendarDays } from 'lucide-react';
 
 function Packages() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -653,7 +657,7 @@ function Packages() {
                                                                                     <>
                                                                                         <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining</span>
                                                                                         <span className="ml-2 text-text-secondary">
-                                                                                            (Expires: {expiryDate.toLocaleDateString('en-US', { timeZone: 'America/Halifax' })})
+                                                                                            (Expires: {expiryDate.toLocaleDateString('en-US', { timeZone: tz })})
                                                                                         </span>
                                                                                     </>
                                                                                 )}
@@ -684,7 +688,7 @@ function Packages() {
                                                                 {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
                                                             </Badge>
                                                             <span className="text-xs text-text-secondary">
-                                                                Purchased on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                                Purchased on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -784,7 +788,7 @@ function Packages() {
                                                         </Button>
                                                     </div>
                                                     <span className="text-xs text-text-secondary">
-                                                        Created on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                        Created on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                     </span>
                                                 </div>
                                             </div>

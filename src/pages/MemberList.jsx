@@ -13,6 +13,10 @@ import { createUser } from '../store/slices/adminSlice';
 import { getUserPurchases, getUserSimulatorPurchases } from '../store/slices/coachingSlice';
 
 function MemberList() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { user } = useAppSelector((state) => state.auth);
@@ -478,7 +482,7 @@ function MemberList() {
                                                     <div key={purchase.id} className="p-3 bg-background rounded-card border border-border">
                                                         <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                                         <p className="text-sm text-text-secondary">
-                                                            Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                            Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                         </p>
                                                     </div>
                                                 ))}
@@ -510,7 +514,7 @@ function MemberList() {
                                                         <div>
                                                             <span className="text-text-secondary">Purchased:</span>
                                                             <span className="ml-2 font-medium text-text-primary">
-                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -545,7 +549,7 @@ function MemberList() {
                                                         <div>
                                                             <span className="text-text-secondary">Purchased:</span>
                                                             <span className="ml-2 font-medium text-text-primary">
-                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -743,7 +747,7 @@ function MemberList() {
                                             <p className="font-medium text-text-primary">{purchase.purchase_name}</p>
                                             {purchase.purchased_at && (
                                                 <p className="text-sm text-text-secondary mt-1">
-                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                    Purchased: {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                 </p>
                                             )}
                                         </div>

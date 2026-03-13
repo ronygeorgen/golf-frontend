@@ -6,6 +6,10 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 
 function PersonalPurchases() {
+    const authState = useAppSelector((state) => state.auth);
+    const locationTimezone = authState?.locationTimezone;
+    const tz = locationTimezone || 'America/Halifax';
+
     const dispatch = useAppDispatch();
     const {
         purchases,
@@ -125,7 +129,7 @@ function PersonalPurchases() {
                                                                         <>
                                                                             <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining</span>
                                                                             <span className="ml-2 text-text-secondary">
-                                                                                (Expires: {expiryDate.toLocaleDateString('en-US', { timeZone: 'America/Halifax' })})
+                                                                                (Expires: {expiryDate.toLocaleDateString('en-US', { timeZone: tz })})
                                                                             </span>
                                                                         </>
                                                                     )}
@@ -156,7 +160,7 @@ function PersonalPurchases() {
                                                     {isGift ? (purchase.gift_status === 'accepted' ? 'Gift (Accepted)' : 'Gift') : 'Personal Purchase'}
                                                 </Badge>
                                                 <span className="text-xs text-text-secondary">
-                                                    Purchased on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: 'America/Halifax' })}
+                                                    Purchased on {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
                                                 </span>
                                             </div>
                                         </div>
