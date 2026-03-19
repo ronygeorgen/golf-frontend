@@ -828,7 +828,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                     <div className="mb-4 text-sm text-text-secondary flex flex-wrap items-center gap-2">
                         <span className="font-medium">Book simulator sessions for</span>
                         <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
-                            {date ? formatLocalDate(date, tz) : 'Select date'}
+                            {date ? moment(date, 'YYYY-MM-DD').format('MMMM D, YYYY') : 'Select date'}
                         </span>
                         <span className="text-text-secondary/50">|</span>
                         <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
