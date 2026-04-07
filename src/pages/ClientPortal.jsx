@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import moment from 'moment-timezone';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { getUpcomingBookings, cancelBooking, getSimulatorCredits, rescheduleBooking, checkCoachingAvailability, checkSimulatorAvailability, clearAvailability, checkClosedDate, checkSpecialEventsOnDate } from '../store/slices/bookingSlice';
 import { useNavigate } from 'react-router-dom';
@@ -394,32 +395,31 @@ function ClientPortal() {
 
         const duration = rescheduleTarget.duration_minutes || 60;
         const durationMs = duration * 60000;
+        // slot.start_time is a UTC ISO string from the backend
         const slotStart = new Date(slot.start_time);
         const slotEnd = new Date(slotStart.getTime() + durationMs);
 
         for (const event of availability.specialEventsOnDate) {
             if (!event.start_time || !event.end_time) continue;
 
-            const [startH, startM, startS] = event.start_time.split(':').map(Number);
-            const [endH, endM, endS] = event.end_time.split(':').map(Number);
-
             // Use event.date if available, otherwise fallback to the current reschedule date
             const dateToUse = event.date || rescheduleDate;
             if (!dateToUse) continue;
 
-            const [year, month, day] = dateToUse.split('-').map(Number);
+            // The event's start_time/end_time are wall-clock local times stored without
+            // timezone info (e.g. "20:00:00" means 8 PM at the golf center's location).
+            // We must interpret them in the center's IANA timezone (tz) — NOT the browser's
+            // local timezone — before comparing against the UTC-based slot timestamps.
+            const eventStart = moment.tz(`${dateToUse} ${event.start_time}`, 'YYYY-MM-DD HH:mm:ss', tz).toDate();
+            let eventEnd = moment.tz(`${dateToUse} ${event.end_time}`, 'YYYY-MM-DD HH:mm:ss', tz).toDate();
 
-            // Construct event start/end times in local browser time matching the nominal local time
-            const eventStart = new Date(year, month - 1, day, startH, startM, startS || 0);
-            let eventEnd = new Date(year, month - 1, day, endH, endM, endS || 0);
-
-            // Handle event crossing midnight: increment day for end time if it's earlier than or equal to start
+            // Handle event crossing midnight: if end is not after start, it's next-day
             if (eventEnd <= eventStart) {
-                eventEnd.setDate(eventEnd.getDate() + 1);
+                eventEnd = new Date(eventEnd.getTime() + 24 * 60 * 60 * 1000);
             }
 
             // Check for overlap:
-            // Block if the requested slot's interval [slotStart, slotEnd) 
+            // Block if the requested slot's interval [slotStart, slotEnd)
             // overlaps with the event's interval [eventStart, eventEnd).
             if (slotStart < eventEnd && slotEnd > eventStart) {
                 return event;
