@@ -16,6 +16,7 @@ import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
 import { formatLocalTime, formatLocalDate, localToUTCIso, getTodayInTimezone } from '../utils/timezoneUtils';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 import StaffDailySchedule from './StaffDailySchedule';
 
 function CoachingBooking({ client, onBookingSuccess }) {
@@ -1133,7 +1134,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                                         </div>
                                                                     </>
                                                                 ) : (
-                                                                    `Event: ${specialEvent.title}`
+                                                                    SPECIAL_EVENT_AVAILABILITY_MESSAGE
                                                                 )}
                                                             </div>
                                                         ) : (
@@ -1157,15 +1158,14 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                                     <>
                                                                         <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
                                                                         <div className="mb-1">
-                                                                            Session overlaps with {specialEvent.title} (Starts {formatLocalTime(eventStartTime.toISOString(), tz)})
+                                                                            Session overlaps with unavailable time (starts {formatLocalTime(eventStartTime.toISOString(), tz)})
                                                                         </div>
                                                                         <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <div className="font-semibold mb-1">⚠️ Unavailable</div>
-                                                                        <div className="mb-1">Special Event: {specialEvent.title}</div>
-                                                                        <div className="text-yellow-300 font-medium">Please select a different time</div>
+                                                                        <div className="font-semibold mb-1">Unavailable</div>
+                                                                        <div className="mb-1">{SPECIAL_EVENT_AVAILABILITY_MESSAGE}</div>
                                                                     </>
                                                                 )
                                                             ) : (

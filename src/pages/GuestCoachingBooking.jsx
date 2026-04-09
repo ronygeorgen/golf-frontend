@@ -14,6 +14,7 @@ import { endpoints } from '../api/endpoints';
 import logo from '../assets/hole9golf-logo.png';
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
 import { useAppSelector } from '../store/hooks';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 
 function GuestCoachingBooking() {
     const dispatch = useAppDispatch();
@@ -215,7 +216,9 @@ function GuestCoachingBooking() {
                     openPopup({
                         type: 'info',
                         title: 'No slots available',
-                        message: response.data.special_event_message || response.data.message || 'No available time slots for this date.',
+                        message: response.data.special_event_message
+                            ? SPECIAL_EVENT_AVAILABILITY_MESSAGE
+                            : (response.data.message || 'No available time slots for this date.'),
                     });
                 } else {
                     setCurrentStep('slots');

@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../api/axios';
 import { endpoints } from '../../api/endpoints';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../../constants/bookingCopy';
 
 // Booking thunks
 export const getBookings = createAsyncThunk(
@@ -217,7 +218,9 @@ export const checkSimulatorAvailability = createAsyncThunk(
             });
             return {
                 slots: response.data.available_slots || [],
-                specialEventMessage: response.data.special_event_message || null,
+                specialEventMessage: response.data.special_event_message
+                    ? SPECIAL_EVENT_AVAILABILITY_MESSAGE
+                    : null,
                 message: response.data.message || null, // Include API message
                 error: response.data.error || null, // Include API error if present
                 hourly_price: response.data.hourly_price || null, // Include hourly_price for price calculation
@@ -244,7 +247,9 @@ export const checkCoachingAvailability = createAsyncThunk(
             });
             return {
                 slots: response.data.available_slots || [],
-                specialEventMessage: response.data.special_event_message || null,
+                specialEventMessage: response.data.special_event_message
+                    ? SPECIAL_EVENT_AVAILABILITY_MESSAGE
+                    : null,
                 message: response.data.message || null, // Include API message
                 error: response.data.error || null, // Include API error if present
             };

@@ -14,6 +14,7 @@ import Button from '../components/ui/Button';
 import DateInput from '../components/ui/DateInput';
 import Badge from '../components/ui/Badge';
 import { utcTimeToLocal, utcToHalifaxDate } from '../utils/timezone';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 
 function ClientPortal() {
     const authState = useAppSelector((state) => state.auth);
@@ -970,7 +971,7 @@ function ClientPortal() {
                                                                     : 'border-border hover:border-primary hover:bg-background'
                                                                 }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
-                                                            title={isDisabled ? (getSpecialEventConflict(slot) ? 'Blocked by Special Event' : 'This slot cannot accommodate the session duration') : ''}
+                                                            title={isDisabled ? (getSpecialEventConflict(slot) ? SPECIAL_EVENT_AVAILABILITY_MESSAGE : 'This slot cannot accommodate the session duration') : ''}
                                                         >
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
@@ -981,7 +982,7 @@ function ClientPortal() {
                                                             </div>
                                                             <div className="text-xs text-text-secondary">
                                                                 {getSpecialEventConflict(slot) ? (
-                                                                    <span className="text-red-600 font-bold">{getSpecialEventConflict(slot).title}</span>
+                                                                    <span className="text-red-600 font-bold">{SPECIAL_EVENT_AVAILABILITY_MESSAGE}</span>
                                                                 ) : (
                                                                     <span>{slot.available_coaches?.length || 0} coach{slot.available_coaches?.length !== 1 ? 'es' : ''} available</span>
                                                                 )}
@@ -1011,7 +1012,7 @@ function ClientPortal() {
                                                                     : 'border-border hover:border-primary hover:bg-background'
                                                                 }`}
                                                             onClick={() => !isDisabled && handleRescheduleSlotSelect(slot)}
-                                                            title={isDisabled ? (getSpecialEventConflict(slot) ? 'Blocked by Special Event' : 'This slot cannot accommodate the session duration') : ''}
+                                                            title={isDisabled ? (getSpecialEventConflict(slot) ? SPECIAL_EVENT_AVAILABILITY_MESSAGE : 'This slot cannot accommodate the session duration') : ''}
                                                         >
                                                             <div className={`text-base font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                                 {new Date(slot.start_time).toLocaleTimeString('en-US', {
@@ -1022,7 +1023,7 @@ function ClientPortal() {
                                                             </div>
                                                             <div className="text-xs text-text-secondary">
                                                                 {getSpecialEventConflict(slot) ? (
-                                                                    <span className="text-red-600 font-bold">{getSpecialEventConflict(slot).title}</span>
+                                                                    <span className="text-red-600 font-bold">{SPECIAL_EVENT_AVAILABILITY_MESSAGE}</span>
                                                                 ) : (
                                                                     <span>Bay assigned automatically</span>
                                                                 )}
