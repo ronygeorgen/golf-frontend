@@ -235,12 +235,13 @@ export const checkSimulatorAvailability = createAsyncThunk(
 
 export const checkCoachingAvailability = createAsyncThunk(
     'booking/checkCoachingAvailability',
-    async ({ date, packageId, coachId, duration = 60, exclude_booking_id }, { rejectWithValue }) => {
+    async ({ date, packageId, coachId, duration = 60, exclude_booking_id, clientUserId }, { rejectWithValue }) => {
         try {
             const params = { date: date, duration: duration };
             if (packageId) params.package_id = packageId;
             if (coachId) params.coach_id = coachId;
             if (exclude_booking_id) params.exclude_booking_id = exclude_booking_id;
+            if (clientUserId) params.client_user_id = clientUserId;
 
             const response = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
                 params: params,

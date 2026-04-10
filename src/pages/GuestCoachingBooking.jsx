@@ -60,27 +60,37 @@ function GuestCoachingBooking() {
     const [previousPackage, setPreviousPackage] = useState(null);
     const [previousCoach, setPreviousCoach] = useState(null);
 
-    const selectedPackageData = selectedPackage
-        ? packages.find((pkg) => pkg.id === selectedPackage)
-        : null;
+    const selectedPackageData = useMemo(() => {
+        if (!selectedPackage) return null;
+        return (
+            packages.find((pkg) => pkg.id === selectedPackage) ||
+            purchases.find((p) => p.package === selectedPackage)?.package_details ||
+            null
+        );
+    }, [selectedPackage, packages, purchases]);
 
-    // Filter packages to only show TPI packages with sessions remaining
+    // TPI packages with sessions: catalog row if active, else nested package_details on purchase (retired packages)
     const availablePackages = useMemo(() => {
         if (!purchases || purchases.length === 0) {
             return [];
         }
 
-        const packageIdsWithSessions = new Set();
-        purchases
-            .filter((purchase) =>
+        const eligiblePurchases = purchases.filter(
+            (purchase) =>
                 purchase.sessions_remaining > 0 &&
                 purchase.package_status === 'active'
-            )
-            .forEach((purchase) => {
-                packageIdsWithSessions.add(purchase.package);
-            });
-
-        return packages.filter((pkg) => packageIdsWithSessions.has(pkg.id));
+        );
+        const byId = new Map();
+        eligiblePurchases.forEach((purchase) => {
+            const id = purchase.package;
+            if (byId.has(id)) return;
+            const fromCatalog = packages.find((p) => p.id === id);
+            const detail = fromCatalog || purchase.package_details;
+            if (detail) {
+                byId.set(id, detail);
+            }
+        });
+        return Array.from(byId.values());
     }, [packages, purchases]);
 
     const sessionsRemaining = selectedPackage
@@ -140,19 +150,14 @@ function GuestCoachingBooking() {
         }
     }, [searchParams, showSuccess]);
 
-    // Load coaches assigned to the selected package
+    // Load coaches from catalog or from purchase.package_details (inactive / retired TPI packages)
     useEffect(() => {
-        if (selectedPackage && packages.length > 0) {
-            const pkg = packages.find(p => p.id === selectedPackage);
-            if (pkg && pkg.staff_members_details && pkg.staff_members_details.length > 0) {
-                setCoaches(pkg.staff_members_details);
-            } else {
-                setCoaches([]);
-            }
+        if (selectedPackage && selectedPackageData) {
+            setCoaches(selectedPackageData.staff_members_details || []);
         } else {
             setCoaches([]);
         }
-    }, [selectedPackage, packages]);
+    }, [selectedPackage, selectedPackageData]);
 
     const checkAvailability = async () => {
         if (!date) {

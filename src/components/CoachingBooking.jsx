@@ -64,9 +64,13 @@ function CoachingBooking({ client, onBookingSuccess }) {
 
     const selectedPackageData = useMemo(() => {
         if (!selectedPackage) return null;
-        return packages.find((pkg) => pkg.id === selectedPackage) ||
-            purchases.find((p) => p.package === selectedPackage)?.package_details;
-    }, [selectedPackage, packages, purchases]);
+        return (
+            packages.find((pkg) => pkg.id === selectedPackage) ||
+            purchases.find((p) => p.package === selectedPackage)?.package_details ||
+            organizationPackages.find((p) => p.package === selectedPackage)?.package_details ||
+            null
+        );
+    }, [selectedPackage, packages, purchases, organizationPackages]);
 
 
     const submitManualBooking = async () => {
@@ -219,10 +223,10 @@ function CoachingBooking({ client, onBookingSuccess }) {
     }, [availablePackages, selectedPackage, dispatch]);
 
     useEffect(() => {
-        // Load coaches assigned to the selected package
-        if (selectedPackage) {
-            const packageData = packages.find(p => p.id === selectedPackage);
-            setCoaches(packageData?.staff_members_details || []);
+        // Coaches: use full package row from active catalog OR nested package_details on purchases/org.
+        // Inactive (retired) packages are not in `packages`, but purchase.package_details still includes staff.
+        if (selectedPackage && selectedPackageData) {
+            setCoaches(selectedPackageData.staff_members_details || []);
         } else {
             setCoaches([]);
         }
@@ -242,7 +246,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
             setCurrentStep('form');
             previousPackageRef.current = selectedPackage;
         }
-    }, [selectedPackage, packages, dispatch, availability.coaching]);
+    }, [selectedPackage, selectedPackageData, dispatch, availability.coaching]);
 
     useEffect(() => {
         setDuration(packageSessionDuration);
@@ -329,7 +333,8 @@ function CoachingBooking({ client, onBookingSuccess }) {
                 date,
                 packageId: selectedPackage,
                 coachId: selectedCoach,
-                duration: duration
+                duration: duration,
+                clientUserId: client?.id,
             }));
 
             console.log('🤖 Auto-check result:', result);
@@ -337,7 +342,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [date, selectedPackage, selectedCoach, duration, dispatch, hasSessions, isClosedDay]);
+    }, [date, selectedPackage, selectedCoach, duration, dispatch, hasSessions, isClosedDay, client?.id]);
 
     // Move to slots step when slots are fetched - ONLY for manual checks
     useEffect(() => {
@@ -413,7 +418,8 @@ function CoachingBooking({ client, onBookingSuccess }) {
             date,
             packageId: selectedPackage,
             coachId: selectedCoach,
-            duration: duration
+            duration: duration,
+            clientUserId: client?.id,
         }));
         setLoading(false);
         setHasChecked(true);
@@ -1085,7 +1091,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                             <>
                                                 <span className="text-text-secondary/50">|</span>
                                                 <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
-                                                    {packages.find(p => p.id === selectedPackage)?.title}
+                                                    {selectedPackageData?.title}
                                                 </span>
                                             </>
                                         )}

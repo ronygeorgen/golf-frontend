@@ -193,15 +193,19 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     }
                 });
             } else {
-                // Coaching
+                // Coaching (pass client id so inactive catalog packages still resolve for staff rescheduling)
+                const coachingParams = {
+                    date: dateStr,
+                    package_id: booking.package?.id,
+                    coach_id: booking.coach?.id, // Keep same coach
+                    duration: booking.duration_minutes,
+                    exclude_booking_id: booking.id, // Exclude current booking when rescheduling
+                };
+                if (booking.client?.id) {
+                    coachingParams.client_user_id = booking.client.id;
+                }
                 response = await axios.get(endpoints.bookings.checkCoachingAvailability, {
-                    params: {
-                        date: dateStr,
-                        package_id: booking.package?.id,
-                        coach_id: booking.coach?.id, // Keep same coach
-                        duration: booking.duration_minutes,
-                        exclude_booking_id: booking.id // Exclude current booking when rescheduling
-                    }
+                    params: coachingParams,
                 });
             }
             if (response.data && response.data.available_slots) {
