@@ -73,9 +73,74 @@ function CoachingBooking({ client, onBookingSuccess }) {
     }, [selectedPackage, packages, purchases, organizationPackages]);
 
 
-    const submitManualBooking = async () => {
+    const formatBookingApiError = (payload) => {
+        if (payload == null) return 'Failed to create booking';
+        if (typeof payload === 'string') return payload;
+        if (Array.isArray(payload)) return payload.filter(Boolean).join('\n');
+        if (typeof payload === 'object') {
+            if (payload.detail != null) return formatBookingApiError(payload.detail);
+            const formatFieldValue = (val) => {
+                if (Array.isArray(val)) return val.filter(Boolean).join(' ');
+                if (val != null && typeof val === 'object') {
+                    return formatBookingApiError(val);
+                }
+                return val != null ? String(val) : '';
+            };
+            const entries = Object.entries(payload).filter(([, val]) => {
+                if (val == null) return false;
+                if (Array.isArray(val)) return val.some(Boolean);
+                if (typeof val === 'object') return Object.keys(val).length > 0;
+                return String(val).trim() !== '';
+            });
+            if (!entries.length) return 'Failed to create booking';
+            // Single-field DRF errors (e.g. { start_time: ["This slot…"] }) — show the message only, no "start_time:" prefix
+            if (entries.length === 1) {
+                return formatFieldValue(entries[0][1]);
+            }
+            return entries
+                .map(([key, val]) => {
+                    const label = key.replace(/_/g, ' ');
+                    return `${label}: ${formatFieldValue(val)}`;
+                })
+                .join('\n');
+        }
+        return String(payload);
+    };
+
+    const executeManualBooking = async (payload) => {
+        try {
+            const result = await dispatch(createBooking(payload));
+            if (createBooking.fulfilled.match(result)) {
+                setBookingSuccess(true);
+                if (onBookingSuccess) onBookingSuccess();
+                openPopup({
+                    type: 'success',
+                    title: 'Success',
+                    message: 'Manual booking created successfully.',
+                });
+            } else {
+                openPopup({
+                    type: 'error',
+                    title: 'Something went wrong',
+                    message: formatBookingApiError(result.payload),
+                });
+            }
+        } catch (error) {
+            openPopup({
+                type: 'error',
+                title: 'Something went wrong',
+                message: 'An unexpected error occurred.',
+            });
+        }
+    };
+
+    const submitManualBooking = () => {
         if (!date || !manualTime || !selectedPackage || !selectedCoach) {
-            openPopup('Error', 'error', 'Please fill in all fields (Date, Time, Package, Coach).');
+            openPopup({
+                type: 'error',
+                title: 'Error',
+                message: 'Please fill in all fields (Date, Time, Package, Coach).',
+            });
             return;
         }
 
@@ -85,30 +150,52 @@ function CoachingBooking({ client, onBookingSuccess }) {
         const utcStartTime = localToUTCIso(date, manualTime, tz);
         const startDateUTC = new Date(utcStartTime);
         const endDateUTC = new Date(startDateUTC.getTime() + duration * 60000);
+        const endIso = endDateUTC.toISOString();
 
         const payload = {
             start_time: utcStartTime,
-            end_time: endDateUTC.toISOString(),
+            end_time: endIso,
             coaching_package: selectedPackage,
             coach: selectedCoach,
             duration_minutes: duration,
             booking_type: 'coaching',
+            admin_manual_booking: true,
             client_id: client ? client.id : undefined,
             client: client ? client.id : undefined
         };
 
-        try {
-            const result = await dispatch(createBooking(payload));
-            if (createBooking.fulfilled.match(result)) {
-                setBookingSuccess(true);
-                if (onBookingSuccess) onBookingSuccess();
-                openPopup('Success', 'success', 'Manual booking created successfully.');
-            } else {
-                openPopup('Error', 'error', result.payload || 'Failed to create booking');
-            }
-        } catch (error) {
-            openPopup('Error', 'error', 'An unexpected error occurred.');
-        }
+        const coachRecord = coaches.find((c) => c.id === selectedCoach);
+        const coachName = coachRecord
+            ? `${coachRecord.first_name} ${coachRecord.last_name}`.trim()
+            : 'Selected coach';
+        const packageTitle = selectedPackageData?.title || 'Coaching package';
+        const clientLine = client
+            ? `• Client: ${[client.first_name, client.last_name].filter(Boolean).join(' ').trim() || 'Client'}${client.email ? ` (${client.email})` : ''}`
+            : null;
+
+        const summaryMessage = [
+            'You are about to force book a coaching session with these details:',
+            '',
+            `• Date: ${formatLocalDate(utcStartTime, tz)}`,
+            `• Time: ${formatLocalTime(utcStartTime, tz)} – ${formatLocalTime(endIso, tz)} (${duration} min, center local)`,
+            `• Package: ${packageTitle}`,
+            `• Coach: ${coachName}`,
+            ...(clientLine ? [clientLine] : []),
+            '',
+            'Force booking bypasses normal availability checks. When permitted, it may also override special-event blocks. Confirm the coach and bay are actually free before continuing.',
+            '',
+            'Do you want to continue?',
+        ].join('\n');
+
+        openPopup({
+            type: 'warning',
+            title: 'Are you sure?',
+            message: summaryMessage,
+            confirmText: 'Yes, force book',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: () => executeManualBooking(payload),
+        });
     };
     // Filter packages to only show those the user has purchases for (with sessions remaining)
     // This prevents staff from seeing packages they referred to clients
