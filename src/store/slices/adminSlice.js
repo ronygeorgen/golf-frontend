@@ -297,6 +297,22 @@ export const deleteSimulator = createAsyncThunk(
     }
 );
 
+/** Preview or run: move future confirmed bookings off a bay; optional deactivate. */
+export const deactivateSimulatorAndReassign = createAsyncThunk(
+    'admin/deactivateSimulatorAndReassign',
+    async ({ id, body }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post(
+                endpoints.admin.simulators.deactivateAndReassign(id),
+                body
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data || error.message);
+        }
+    }
+);
+
 // Simulator Availability thunks
 export const getSimulatorAvailability = createAsyncThunk(
     'admin/getSimulatorAvailability',

@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { getSimulators, createSimulator, updateSimulator, deleteSimulator } from '../store/slices/adminSlice';
-import { Clock, Edit, Trash2, Power, PowerOff, Calendar } from 'lucide-react';
+import {
+    getSimulators,
+    createSimulator,
+    updateSimulator,
+    deleteSimulator,
+    deactivateSimulatorAndReassign,
+} from '../store/slices/adminSlice';
+import { Edit, Trash2, Power, PowerOff, Calendar, ArrowRightLeft } from 'lucide-react';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -32,6 +38,95 @@ function SimulatorManagement() {
     };
     const [formData, setFormData] = useState(defaultFormState);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [reassignModal, setReassignModal] = useState({
+        open: false,
+        simulator: null,
+        allowCoachingBay: false,
+        deactivateAfter: true,
+        result: null,
+        error: null,
+        loading: false,
+    });
+
+    const openReassignModal = (simulator) => {
+        setReassignModal({
+            open: true,
+            simulator,
+            allowCoachingBay: false,
+            deactivateAfter: Boolean(simulator.is_active),
+            result: null,
+            error: null,
+            loading: false,
+        });
+    };
+
+    const closeReassignModal = () => {
+        setReassignModal({
+            open: false,
+            simulator: null,
+            allowCoachingBay: false,
+            deactivateAfter: true,
+            result: null,
+            error: null,
+            loading: false,
+        });
+    };
+
+    const runReassignRequest = async (dryRun) => {
+        const sim = reassignModal.simulator;
+        if (!sim) return;
+        setReassignModal((prev) => ({ ...prev, loading: true, error: null }));
+        const body = {
+            dry_run: dryRun,
+            allow_coaching_bay: reassignModal.allowCoachingBay,
+            deactivate: dryRun ? false : reassignModal.deactivateAfter && Boolean(sim.is_active),
+        };
+        const result = await dispatch(
+            deactivateSimulatorAndReassign({ id: sim.id, body })
+        );
+        setReassignModal((prev) => ({ ...prev, loading: false }));
+        if (deactivateSimulatorAndReassign.rejected.match(result)) {
+            const p = result.payload || {};
+            const msg =
+                (typeof p === 'string' && p) ||
+                p.error ||
+                p.detail ||
+                p.message ||
+                'Request failed';
+            setReassignModal((prev) => ({ ...prev, error: msg }));
+            return;
+        }
+        setReassignModal((prev) => ({ ...prev, result: result.payload }));
+        if (!dryRun) {
+            await dispatch(getSimulators());
+            const moved = result.payload?.moved?.length ?? 0;
+            const failed = result.payload?.failed || [];
+            const deactivated = result.payload?.deactivated;
+            if (failed.length > 0) {
+                const lines = failed
+                    .slice(0, 12)
+                    .map(
+                        (f) =>
+                            `#${f.booking_id} (${f.booking_type}) ${f.client_label || '—'} — ${f.reason}`
+                    )
+                    .join('\n');
+                openPopup({
+                    type: 'warning',
+                    title: `${failed.length} booking(s) could not be moved`,
+                    message: `${lines}${failed.length > 12 ? '\n…' : ''}\n\nHandle these in the calendar or cancel as needed.`,
+                    confirmText: 'OK',
+                    showCancel: false,
+                    onConfirm: null,
+                });
+            }
+            showSuccess(
+                `Done: ${moved} moved${failed.length ? `, ${failed.length} not moved` : ''}${
+                    deactivated ? '; bay deactivated' : ''
+                }.`
+            );
+            closeReassignModal();
+        }
+    };
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -496,6 +591,19 @@ function SimulatorManagement() {
                                                             </div>
                                                         )}
                                                         <div className="relative group">
+                                                            <button
+                                                                type="button"
+                                                                className="text-primary hover:text-primary-light transition-colors p-1 rounded-md hover:bg-background"
+                                                                onClick={() => openReassignModal(simulator)}
+                                                                aria-label="Reassign bookings or deactivate bay"
+                                                            >
+                                                                <ArrowRightLeft className="w-5 h-5" />
+                                                            </button>
+                                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                                                Reassign / deactivate
+                                                            </span>
+                                                        </div>
+                                                        <div className="relative group">
                                                             <button 
                                                                 className={`${
                                                                     simulator.is_active 
@@ -535,6 +643,136 @@ function SimulatorManagement() {
                                 </table>
                             </div>
                         )}
+                    </div>
+                )}
+                {reassignModal.open && reassignModal.simulator && (
+                    <div
+                        className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+                        style={{ backgroundColor: 'rgba(0, 0, 0, 0.12)', backdropFilter: 'blur(2px)' }}
+                        onClick={closeReassignModal}
+                        role="presentation"
+                    >
+                        <div
+                            className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+                            onClick={(e) => e.stopPropagation()}
+                            role="dialog"
+                            aria-labelledby="reassign-modal-title"
+                        >
+                            <h2
+                                id="reassign-modal-title"
+                                className="text-xl font-bold text-text-primary mb-2"
+                            >
+                                {reassignModal.simulator.is_active
+                                    ? 'Deactivate bay & reassign bookings'
+                                    : 'Reassign upcoming bookings'}
+                            </h2>
+                            <p className="text-sm text-text-secondary mb-4">
+                                Confirmed bookings from <strong>now</strong> onward on{' '}
+                                <strong>Bay {reassignModal.simulator.bay_number}</strong> are moved to
+                                another active bay at the <strong>same</strong> start and end time when a
+                                slot is free. Simulator and coaching sessions on this bay are included.
+                            </p>
+                            <div className="space-y-3 mb-4">
+                                <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={reassignModal.allowCoachingBay}
+                                        onChange={(e) =>
+                                            setReassignModal((prev) => ({
+                                                ...prev,
+                                                allowCoachingBay: e.target.checked,
+                                            }))
+                                        }
+                                        className="w-4 h-4 rounded border-border"
+                                    />
+                                    Allow using coaching bays if no regular bay is free
+                                </label>
+                                {reassignModal.simulator.is_active && (
+                                    <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={reassignModal.deactivateAfter}
+                                            onChange={(e) =>
+                                                setReassignModal((prev) => ({
+                                                    ...prev,
+                                                    deactivateAfter: e.target.checked,
+                                                }))
+                                            }
+                                            className="w-4 h-4 rounded border-border"
+                                        />
+                                        Deactivate this bay after applying moves
+                                    </label>
+                                )}
+                            </div>
+                            {reassignModal.error && (
+                                <p className="text-sm text-danger mb-3">{reassignModal.error}</p>
+                            )}
+                            {reassignModal.result && (
+                                <div className="mb-4 space-y-3 text-sm border border-border rounded-button p-3 bg-background">
+                                    <p className="text-text-secondary">
+                                        {reassignModal.result.dry_run ? 'Preview' : 'Last result'} —{' '}
+                                        {reassignModal.result.bookings_considered ?? 0} booking(s) on
+                                        this bay.
+                                    </p>
+                                    {reassignModal.result.moved?.length > 0 && (
+                                        <div>
+                                            <p className="font-medium text-status-confirmed-text mb-1">
+                                                Would move / moved ({reassignModal.result.moved.length})
+                                            </p>
+                                            <ul className="list-disc pl-5 text-text-primary max-h-32 overflow-y-auto">
+                                                {reassignModal.result.moved.map((m) => (
+                                                    <li key={m.booking_id}>
+                                                        #{m.booking_id} {m.client_label} — Bay{' '}
+                                                        {m.from_bay_number} → Bay {m.to_bay_number}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {reassignModal.result.failed?.length > 0 && (
+                                        <div>
+                                            <p className="font-medium text-danger mb-1">
+                                                Cannot move ({reassignModal.result.failed.length})
+                                            </p>
+                                            <ul className="list-disc pl-5 text-text-primary max-h-32 overflow-y-auto">
+                                                {reassignModal.result.failed.map((f) => (
+                                                    <li key={f.booking_id}>
+                                                        #{f.booking_id} {f.client_label} — {f.reason}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {reassignModal.result.moved?.length === 0 &&
+                                        reassignModal.result.failed?.length === 0 && (
+                                            <p className="text-text-secondary">
+                                                No upcoming confirmed bookings on this bay.
+                                            </p>
+                                        )}
+                                </div>
+                            )}
+                            <div className="flex flex-wrap gap-3 pt-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={reassignModal.loading}
+                                    onClick={() => runReassignRequest(true)}
+                                >
+                                    {reassignModal.loading ? '…' : 'Preview'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    disabled={reassignModal.loading}
+                                    onClick={() => runReassignRequest(false)}
+                                >
+                                    {reassignModal.loading ? 'Applying…' : 'Apply'}
+                                </Button>
+                                <Button type="button" variant="secondary" onClick={closeReassignModal}>
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 )}
                 <PopupMessage
