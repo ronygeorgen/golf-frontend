@@ -110,6 +110,11 @@ export const endpoints = {
         },
     },
     
+    // Service categories (Phase A: read-only, drives booking UI labels / legacy tab mapping)
+    categories: {
+        active: '/categories/active/',
+    },
+
     // Booking endpoints
     bookings: {
         list: '/bookings/',
