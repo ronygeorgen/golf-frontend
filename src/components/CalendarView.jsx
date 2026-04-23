@@ -472,25 +472,25 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         } else if (event.type === 'simulator') {
             backgroundColor = '#10B981'; // Emerald-500 for simulator
         } else if (event.type === 'coaching') {
-            // Assign highly distinct colors for each staff member
-            // Diverse, high-contrast colors for staff (avoiding Green, Amber, Purple, and Red)
             const coachColors = [
-                '#2563EB', // Bright Blue
+                '#2563EB', // Blue
+                '#F97316', // Orange (Orion's choice)
                 '#0891B2', // Cyan
-                '#4F46E5', // Indigo
                 '#D946EF', // Fuchsia
+                '#4F46E5', // Indigo
                 '#65A30D', // Lime
-                '#0369A1', // Sky Blue
                 '#7C3AED', // Violet
                 '#0D9488', // Teal
-                '#334155', // Slate
-                '#713F12', // Brown
-                '#115E59', // Dark Teal
-                '#4338CA', // Blue-Indigo
+                '#DB2777', // Pink
+                '#0EA5E9', // Sky
+                '#9333EA', // Purple
+                '#E11D48', // Rose
             ];
 
             const coachId = event.coach?.id || 0;
-            backgroundColor = coachColors[coachId % coachColors.length];
+            // Use a simple hash to ensure sequential IDs get very different colors
+            const colorIndex = (coachId * 7) % coachColors.length;
+            backgroundColor = coachColors[colorIndex];
         }
 
         if (event.status === 'cancelled') {
