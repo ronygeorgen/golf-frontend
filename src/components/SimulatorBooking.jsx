@@ -9,6 +9,7 @@ import Toast from './ui/Toast';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 
 function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
@@ -887,7 +888,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                                             </div>
                                                         </>
                                                     ) : (
-                                                        `Special Event: ${specialEvent.title}`
+                                                        SPECIAL_EVENT_AVAILABILITY_MESSAGE
                                                     )}
                                                 </div>
                                             ) : (
@@ -912,15 +913,14 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                                         <>
                                                             <div className="font-semibold mb-1">⚠️ Duration Conflict</div>
                                                             <div className="mb-1">
-                                                                Session overlaps with {specialEvent.title} (Starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz })})
+                                                                Session overlaps with unavailable time (starts {eventStartTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz })})
                                                             </div>
                                                             <div className="text-yellow-300 font-medium">💡 Try {conflict.maxDuration} mins or less</div>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className="font-semibold mb-1">⚠️ Unavailable</div>
-                                                            <div className="mb-1">Special Event: {specialEvent.title}</div>
-                                                            <div className="text-yellow-300 font-medium">Please select a different time</div>
+                                                            <div className="font-semibold mb-1">Unavailable</div>
+                                                            <div className="mb-1">{SPECIAL_EVENT_AVAILABILITY_MESSAGE}</div>
                                                         </>
                                                     )
                                                 ) : (

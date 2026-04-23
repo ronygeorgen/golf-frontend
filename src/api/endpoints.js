@@ -39,6 +39,7 @@ export const endpoints = {
             detail: (id) => `/admin/simulators/${id}/`,
             active: '/admin/simulators/active_simulators/',
             toggleActive: (id) => `/admin/simulators/${id}/toggle_active/`,
+            deactivateAndReassign: (id) => `/admin/simulators/${id}/deactivate_and_reassign/`,
             availability: (id) => `/simulators/simulators/${id}/availability/`,
         },
         durationPrices: {

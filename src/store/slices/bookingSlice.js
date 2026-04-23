@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../api/axios';
 import { endpoints } from '../../api/endpoints';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../../constants/bookingCopy';
 
 // Booking thunks
 export const getBookings = createAsyncThunk(
@@ -217,7 +218,9 @@ export const checkSimulatorAvailability = createAsyncThunk(
             });
             return {
                 slots: response.data.available_slots || [],
-                specialEventMessage: response.data.special_event_message || null,
+                specialEventMessage: response.data.special_event_message
+                    ? SPECIAL_EVENT_AVAILABILITY_MESSAGE
+                    : null,
                 message: response.data.message || null, // Include API message
                 error: response.data.error || null, // Include API error if present
                 hourly_price: response.data.hourly_price || null, // Include hourly_price for price calculation
@@ -232,19 +235,22 @@ export const checkSimulatorAvailability = createAsyncThunk(
 
 export const checkCoachingAvailability = createAsyncThunk(
     'booking/checkCoachingAvailability',
-    async ({ date, packageId, coachId, duration = 60, exclude_booking_id }, { rejectWithValue }) => {
+    async ({ date, packageId, coachId, duration = 60, exclude_booking_id, clientUserId }, { rejectWithValue }) => {
         try {
             const params = { date: date, duration: duration };
             if (packageId) params.package_id = packageId;
             if (coachId) params.coach_id = coachId;
             if (exclude_booking_id) params.exclude_booking_id = exclude_booking_id;
+            if (clientUserId) params.client_user_id = clientUserId;
 
             const response = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
                 params: params,
             });
             return {
                 slots: response.data.available_slots || [],
-                specialEventMessage: response.data.special_event_message || null,
+                specialEventMessage: response.data.special_event_message
+                    ? SPECIAL_EVENT_AVAILABILITY_MESSAGE
+                    : null,
                 message: response.data.message || null, // Include API message
                 error: response.data.error || null, // Include API error if present
             };

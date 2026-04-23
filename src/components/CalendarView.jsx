@@ -9,6 +9,7 @@ import usePopup from '../hooks/usePopup';
 import axios from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { formatLocalTime, formatLocalDate, getTimezoneAbbreviation, getTodayInTimezone } from '../utils/timezoneUtils';
+import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import BookForClientModal from './BookForClientModal';
@@ -192,15 +193,19 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     }
                 });
             } else {
-                // Coaching
+                // Coaching (pass client id so inactive catalog packages still resolve for staff rescheduling)
+                const coachingParams = {
+                    date: dateStr,
+                    package_id: booking.package?.id,
+                    coach_id: booking.coach?.id, // Keep same coach
+                    duration: booking.duration_minutes,
+                    exclude_booking_id: booking.id, // Exclude current booking when rescheduling
+                };
+                if (booking.client?.id) {
+                    coachingParams.client_user_id = booking.client.id;
+                }
                 response = await axios.get(endpoints.bookings.checkCoachingAvailability, {
-                    params: {
-                        date: dateStr,
-                        package_id: booking.package?.id,
-                        coach_id: booking.coach?.id, // Keep same coach
-                        duration: booking.duration_minutes,
-                        exclude_booking_id: booking.id // Exclude current booking when rescheduling
-                    }
+                    params: coachingParams,
                 });
             }
             if (response.data && response.data.available_slots) {
@@ -1173,7 +1178,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                     key={slot.start_time}
                                                     onClick={() => !disabled && setRescheduleState(prev => ({ ...prev, selectedSlot: slot }))}
                                                     disabled={disabled}
-                                                    title={disabled ? (conflict ? 'Blocked by Special Event: ' + conflict.title : 'Details not available') : ''}
+                                                    title={disabled ? (conflict ? SPECIAL_EVENT_AVAILABILITY_MESSAGE : 'Details not available') : ''}
                                                     className={`px-2 py-2 text-sm rounded-lg border transition-all ${disabled
                                                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed decoration-slice'
                                                         : isSelected
@@ -1184,7 +1189,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                     {formatLocalTime(slot.start_time, tz)}
                                                     {conflict && (
                                                         <div className="text-xs text-red-500 font-bold block mt-1">
-                                                            {conflict.title}
+                                                            {SPECIAL_EVENT_AVAILABILITY_MESSAGE}
                                                         </div>
                                                     )}
                                                 </button>
