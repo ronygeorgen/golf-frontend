@@ -431,6 +431,9 @@ function StaffManagement() {
                                                 Role
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Color
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
@@ -451,6 +454,17 @@ function StaffManagement() {
                                                     <Badge status={staffMember.role === 'admin' ? 'personal' : 'pending'}>
                                                         {staffMember.role}
                                                     </Badge>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-4 h-4 rounded-full border border-border shadow-sm"
+                                                            style={{ backgroundColor: staffMember.calendar_color || '#2563EB' }}
+                                                        />
+                                                        <span className="text-xs text-text-secondary uppercase font-mono">
+                                                            {staffMember.calendar_color || '#2563EB'}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
