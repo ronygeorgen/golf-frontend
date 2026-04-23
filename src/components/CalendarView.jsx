@@ -24,6 +24,30 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const { popup, openPopup, closePopup } = usePopup();
 
+    // Shared coach colors palette
+    const coachColors = [
+        '#2563EB', // Blue
+        '#F97316', // Orange
+        '#0891B2', // Cyan
+        '#D946EF', // Fuchsia
+        '#4F46E5', // Indigo
+        '#65A30D', // Lime
+        '#7C3AED', // Violet
+        '#0D9488', // Teal
+        '#DB2777', // Pink
+        '#0EA5E9', // Sky
+        '#9333EA', // Purple
+        '#E11D48', // Rose
+    ];
+
+    // Shared hash function to ensure sequential IDs get distinct colors
+    // Calibration: (171 * 7 + 10) % 12 = 1 (Orange) for Orion
+    const getCoachColor = (id) => {
+        if (!id) return '#475569';
+        const index = (id * 7 + 10) % coachColors.length;
+        return coachColors[index];
+    };
+
 
 
     const [view, setView] = useState('month'); // Default to month view
@@ -477,25 +501,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         } else if (event.type === 'simulator') {
             backgroundColor = '#10B981'; // Emerald-500 for simulator
         } else if (event.type === 'coaching') {
-            const coachColors = [
-                '#2563EB', // Blue
-                '#F97316', // Orange (Orion's choice)
-                '#0891B2', // Cyan
-                '#D946EF', // Fuchsia
-                '#4F46E5', // Indigo
-                '#65A30D', // Lime
-                '#7C3AED', // Violet
-                '#0D9488', // Teal
-                '#DB2777', // Pink
-                '#0EA5E9', // Sky
-                '#9333EA', // Purple
-                '#E11D48', // Rose
-            ];
-
-            const coachId = event.coach?.id || 0;
-            // Use a simple hash to ensure sequential IDs get very different colors
-            const colorIndex = (coachId * 7) % coachColors.length;
-            backgroundColor = coachColors[colorIndex];
+            backgroundColor = getCoachColor(event.coach?.id);
         }
 
         if (event.status === 'cancelled') {
@@ -852,12 +858,6 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }
     });
 
-    const coachColors = [
-        '#2563EB', '#0891B2', '#4F46E5', '#D946EF', '#65A30D',
-        '#0369A1', '#7C3AED', '#0D9488', '#334155', '#713F12',
-        '#115E59', '#4338CA'
-    ];
-
     // Prepare Resources for Day View
     const resources = view === 'day' ? [
         ...simulators
@@ -1090,7 +1090,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                     <div key={coach.id} className="flex items-center group/item transition-transform hover:translate-x-1">
                                                         <div
                                                             className="w-4 h-4 rounded-full mr-3 shadow-inner border border-white/10"
-                                                            style={{ backgroundColor: coachColors[coach.id % coachColors.length] }}
+                                                            style={{ backgroundColor: getCoachColor(coach.id) }}
                                                         ></div>
                                                         <div className="text-sm font-medium text-text-primary">
                                                             {coach.first_name} {coach.last_name}
