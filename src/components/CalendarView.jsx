@@ -24,27 +24,27 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const tz = locationTimezone || 'America/Halifax'; // DST-aware IANA timezone
     const { popup, openPopup, closePopup } = usePopup();
 
-    // Shared coach colors palette
+    // Shared coach colors palette - maximized for distinctiveness
     const coachColors = [
-        '#2563EB', // Blue
-        '#F97316', // Orange
-        '#0891B2', // Cyan
-        '#D946EF', // Fuchsia
-        '#4F46E5', // Indigo
-        '#65A30D', // Lime
-        '#7C3AED', // Violet
-        '#0D9488', // Teal
-        '#DB2777', // Pink
-        '#0EA5E9', // Sky
-        '#9333EA', // Purple
-        '#E11D48', // Rose
+        '#2563EB', // 0: Blue
+        '#F97316', // 1: Orange (Orion's choice)
+        '#65A30D', // 2: Lime
+        '#16A34A', // 3: Green
+        '#0891B2', // 4: Cyan
+        '#7C3AED', // 5: Violet
+        '#EA580C', // 6: Deep Orange
+        '#0D9488', // 7: Teal
+        '#DB2777', // 8: Pink
+        '#4F46E5', // 9: Indigo
+        '#CA8A04', // 10: Gold
+        '#572211', // 11: Dark Brown
     ];
 
     // Shared hash function to ensure sequential IDs get distinct colors
-    // Calibration: (171 * 7 + 10) % 12 = 1 (Orange) for Orion
+    // Calibration: (1238 * 7 + 11) % 12 = 1 (Orange) for Orion
     const getCoachColor = (id) => {
         if (!id) return '#475569';
-        const index = (id * 7 + 10) % coachColors.length;
+        const index = (id * 7 + 11) % coachColors.length;
         return coachColors[index];
     };
 
