@@ -42,9 +42,10 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
 
     // Shared hash function to ensure sequential IDs get distinct colors
     // Calibration: (1238 * 7 + 11) % 12 = 1 (Orange) for Orion
-    const getCoachColor = (id) => {
-        if (!id) return '#475569';
-        const index = (id * 7 + 11) % coachColors.length;
+    const getCoachColor = (coach) => {
+        if (!coach?.id) return '#475569';
+        if (coach.calendar_color) return coach.calendar_color;
+        const index = (coach.id * 7 + 11) % coachColors.length;
         return coachColors[index];
     };
 
@@ -501,7 +502,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         } else if (event.type === 'simulator') {
             backgroundColor = '#10B981'; // Emerald-500 for simulator
         } else if (event.type === 'coaching') {
-            backgroundColor = getCoachColor(event.coach?.id);
+            backgroundColor = getCoachColor(event.coach);
         }
 
         if (event.status === 'cancelled') {
@@ -1090,7 +1091,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                     <div key={coach.id} className="flex items-center group/item transition-transform hover:translate-x-1">
                                                         <div
                                                             className="w-4 h-4 rounded-full mr-3 shadow-inner border border-white/10"
-                                                            style={{ backgroundColor: getCoachColor(coach.id) }}
+                                                            style={{ backgroundColor: getCoachColor(coach) }}
                                                         ></div>
                                                         <div className="text-sm font-medium text-text-primary">
                                                             {coach.first_name} {coach.last_name}

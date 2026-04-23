@@ -34,7 +34,8 @@ function StaffManagement() {
         phone: '',
         role: isSuperadmin ? 'admin' : 'staff',
         date_of_birth: '',
-        ghl_location_id: ''
+        ghl_location_id: '',
+        calendar_color: '#2563EB'
     });
     const [ghlLocations, setGhlLocations] = useState([]);
     const [loadingLocations, setLoadingLocations] = useState(false);
@@ -127,7 +128,8 @@ function StaffManagement() {
                     phone: '',
                     role: isSuperadmin ? 'admin' : 'staff',
                     date_of_birth: '',
-                    ghl_location_id: ''
+                    ghl_location_id: '',
+                    calendar_color: '#2563EB'
                 });
                 // No need to refetch - Redux already updates the state optimistically
             } else if (editingStaff ? updateStaff.rejected.match(result) : createStaff.rejected.match(result)) {
@@ -175,7 +177,8 @@ function StaffManagement() {
             phone: staffMember.phone,
             role: isSuperadmin ? staffMember.role : 'staff', // Regular admin can only edit as staff
             date_of_birth: staffMember.date_of_birth || '',
-            ghl_location_id: staffMember.ghl_location_id || ''
+            ghl_location_id: staffMember.ghl_location_id || '',
+            calendar_color: staffMember.calendar_color || '#2563EB'
         });
         setShowForm(true);
     };
@@ -218,7 +221,8 @@ function StaffManagement() {
                                     phone: '',
                                     role: isSuperadmin ? 'admin' : 'staff',
                                     date_of_birth: '',
-                                    ghl_location_id: ''
+                                    ghl_location_id: '',
+                                    calendar_color: '#2563EB'
                                 });
                                 setShowForm(true);
                             }}
@@ -234,7 +238,7 @@ function StaffManagement() {
                     <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(3px)' }} onClick={() => {
                         setShowForm(false);
                         setEditingStaff(null);
-                        setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff', date_of_birth: '' });
+                        setFormData({ first_name: '', last_name: '', email: '', phone: '', role: 'staff', date_of_birth: '', calendar_color: '#2563EB' });
                     }}>
                         <div ref={modalRef} className="bg-surface rounded-card shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
@@ -340,6 +344,27 @@ function StaffManagement() {
                                             placeholder="Select date of birth"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Calendar Color
+                                        </label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="color"
+                                                value={formData.calendar_color}
+                                                onChange={(e) => setFormData({ ...formData, calendar_color: e.target.value })}
+                                                className="w-12 h-10 p-1 rounded border border-border cursor-pointer"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={formData.calendar_color}
+                                                onChange={(e) => setFormData({ ...formData, calendar_color: e.target.value })}
+                                                className="flex-1"
+                                                placeholder="#000000"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-text-secondary mt-1">This color will represent the coach on the bookings calendar.</p>
+                                    </div>
                                     <div className="flex gap-4 pt-4">
                                         <Button
                                             type="submit"
@@ -365,7 +390,8 @@ function StaffManagement() {
                                                     phone: '',
                                                     role: isSuperadmin ? 'admin' : 'staff',
                                                     date_of_birth: '',
-                                                    ghl_location_id: ''
+                                                    ghl_location_id: '',
+                                                    calendar_color: '#2563EB'
                                                 });
                                             }}
                                         >
