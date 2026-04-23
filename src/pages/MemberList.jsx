@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axios';
@@ -36,11 +36,12 @@ function MemberList() {
     const [showPackageModal, setShowPackageModal] = useState(false);
     const [showPackagesListModal, setShowPackagesListModal] = useState(false);
     const [selectedMemberPackages, setSelectedMemberPackages] = useState([]);
-    const [packages, setPackages] = useState([]);
+    const [packages, setPackages] = useState([]);           // keyed by category tab id
     const [simulatorPackages, setSimulatorPackages] = useState([]);
     const [packagesLoading, setPackagesLoading] = useState(false);
     const [purchasingPackageId, setPurchasingPackageId] = useState(null);
-    const [packageTypeFilter, setPackageTypeFilter] = useState('coaching'); // 'coaching' or 'simulator'
+    const [activePackageTab, setActivePackageTab] = useState('');  // set after categories load
+    const [serviceCategories, setServiceCategories] = useState([]);
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({
         count: 0,
@@ -119,31 +120,79 @@ function MemberList() {
         };
     }, []);
 
-    const fetchPackages = async () => {
-        if (!user?.ghl_location_id) {
-            showError('Location ID not found');
-            return;
-        }
+    // Load service categories once so tabs are dynamic
+    useEffect(() => {
+        apiClient.get(endpoints.categories.admin.list)
+            .then((res) => {
+                const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+                const active = data.filter((c) => c.is_active);
+                setServiceCategories(active);
+                // Default detail tab: first non-simulator category, or first overall
+                if (active.length > 0) {
+                    const first = active.find((c) => c.legacy_booking_type !== 'simulator') || active[0];
+                    setActivePackageTab(
+                        first.legacy_booking_type === 'simulator' ? 'simulator'
+                        : first.legacy_booking_type === 'coaching' ? 'coaching'
+                        : `cat-${first.id}`
+                    );
+                }
+            })
+            .catch(() => {});
+    }, []);
 
+    // Build tab list for the member-detail modal from categories
+    const detailTabs = useMemo(() => {
+        const tabs = [{ id: 'details', label: 'Details' }];
+        serviceCategories.forEach((cat) => {
+            if (cat.legacy_booking_type === 'simulator') {
+                tabs.push({ id: 'simulator', label: `Simulator Packages` });
+            } else if (cat.legacy_booking_type === 'coaching') {
+                tabs.push({ id: 'coaching', label: `Coaching Packages` });
+            } else {
+                tabs.push({ id: `cat-${cat.id}`, label: `${cat.customer_label || cat.name} Packages`, categoryId: cat.id });
+            }
+        });
+        return tabs;
+    }, [serviceCategories]);
+
+    // Build tab list for the Add Package modal from categories
+    const packageModalTabs = useMemo(() => {
+        return serviceCategories.map((cat) => ({
+            id: cat.legacy_booking_type === 'simulator' ? 'simulator'
+                : cat.legacy_booking_type === 'coaching' ? 'coaching'
+                : `cat-${cat.id}`,
+            label: cat.customer_label || cat.name,
+            categoryId: cat.id,
+            legacyType: cat.legacy_booking_type,
+        }));
+    }, [serviceCategories]);
+
+    const fetchPackages = async () => {
         try {
             setPackagesLoading(true);
-            // Fetch both coaching and simulator packages in parallel
-            const [coachingResponse, simulatorResponse] = await Promise.all([
-                apiClient.get('/coaching/packages/', {
-                    params: {
-                        location_id: user.ghl_location_id,
-                        is_active: true
-                    }
-                }),
-                apiClient.get('/coaching/simulator-packages/', {
-                    params: {
-                        location_id: user.ghl_location_id,
-                        is_active: true
-                    }
-                })
-            ]);
-            setPackages(coachingResponse.data || []);
-            setSimulatorPackages(simulatorResponse.data || []);
+            const params = { is_active: true };
+            if (user?.ghl_location_id) params.location_id = user.ghl_location_id;
+
+            // Build one request per category tab
+            const requests = packageModalTabs.map((tab) => {
+                if (tab.legacyType === 'simulator') {
+                    return apiClient.get(endpoints.coaching.simulatorPackages, { params });
+                }
+                const p = { ...params };
+                if (!tab.legacyType) p.category_id = tab.categoryId; // new-sport categories
+                return apiClient.get(endpoints.coaching.packages, { params: p });
+            });
+
+            const results = await Promise.all(requests);
+            const byTab = {};
+            packageModalTabs.forEach((tab, i) => {
+                const data = results[i].data;
+                byTab[tab.id] = Array.isArray(data) ? data : data?.results || [];
+            });
+            setPackages(byTab);
+            // Also keep simulatorPackages for backward compat
+            const simTab = packageModalTabs.find((t) => t.legacyType === 'simulator');
+            if (simTab) setSimulatorPackages(byTab[simTab.id] || []);
         } catch (error) {
             console.error('Error fetching packages:', error);
             showError('Failed to load packages');
@@ -169,7 +218,7 @@ function MemberList() {
 
     const handleAddPackage = () => {
         setShowPackageModal(true);
-        setPackageTypeFilter('coaching'); // Reset to coaching by default
+        if (packageModalTabs.length > 0) setActivePackageTab(packageModalTabs[0].id);
         fetchPackages();
     };
 
@@ -413,34 +462,36 @@ function MemberList() {
                                 </button>
                             </div>
 
-                            <div className="flex border-b border-border mb-6">
-                                <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'details'
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-text-secondary hover:text-text-primary'
-                                        }`}
-                                    onClick={() => setActiveTab('details')}
-                                >
-                                    Details
-                                </button>
-                                <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'coaching'
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-text-secondary hover:text-text-primary'
-                                        }`}
-                                    onClick={() => setActiveTab('coaching')}
-                                >
-                                    Coaching Packages ({purchases?.length || 0})
-                                </button>
-                                <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'simulator'
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-text-secondary hover:text-text-primary'
-                                        }`}
-                                    onClick={() => setActiveTab('simulator')}
-                                >
-                                    Simulator Packages ({simulatorPurchases?.length || 0})
-                                </button>
+                            <div className="flex flex-wrap border-b border-border mb-6">
+                                {detailTabs.map((tab) => {
+                                    let count = '';
+                                    if (tab.id === 'simulator') {
+                                        count = ` (${simulatorPurchases?.length || 0})`;
+                                    } else if (tab.id === 'coaching') {
+                                        const n = (purchases || []).filter((p) =>
+                                            !p.package_details?.service_category_id ||
+                                            p.package_details?.service_category_legacy_type === 'coaching'
+                                        ).length;
+                                        count = ` (${n})`;
+                                    } else if (tab.id !== 'details' && tab.categoryId) {
+                                        const n = (purchases || []).filter((p) =>
+                                            p.package_details?.service_category_id === tab.categoryId
+                                        ).length;
+                                        count = ` (${n})`;
+                                    }
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activeTab === tab.id
+                                                ? 'border-primary text-primary'
+                                                : 'border-transparent text-text-secondary hover:text-text-primary'
+                                                }`}
+                                            onClick={() => setActiveTab(tab.id)}
+                                        >
+                                            {tab.label}{count}
+                                        </button>
+                                    );
+                                })}
                             </div>
 
                             {activeTab === 'details' && (
@@ -494,41 +545,7 @@ function MemberList() {
                                 </div>
                             )}
 
-                            {activeTab === 'coaching' && (
-                                <div className="space-y-4">
-                                    {purchasesLoading ? (
-                                        <div className="text-center py-8 text-text-secondary">Loading purchases...</div>
-                                    ) : purchases?.length > 0 ? (
-                                        <div className="space-y-3">
-                                            {purchases.map((purchase) => (
-                                                <div key={purchase.id} className="p-4 bg-background rounded-card border border-border">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h4 className="font-semibold text-text-primary">{purchase.purchase_name}</h4>
-                                                        {renderPurchaseStatus(purchase.package_status)}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                                        <div>
-                                                            <span className="text-text-secondary">Sessions Remaining:</span>
-                                                            <span className="ml-2 font-medium text-text-primary">{purchase.sessions_remaining}</span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-text-secondary">Purchased:</span>
-                                                            <span className="ml-2 font-medium text-text-primary">
-                                                                {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-8 text-text-secondary">
-                                            No coaching packages found.
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
+                            {/* Dynamic purchase tab content */}
                             {activeTab === 'simulator' && (
                                 <div className="space-y-4">
                                     {simulatorPurchasesLoading ? (
@@ -557,12 +574,57 @@ function MemberList() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="text-center py-8 text-text-secondary">
-                                            No simulator packages found.
-                                        </div>
+                                        <div className="text-center py-8 text-text-secondary">No simulator packages found.</div>
                                     )}
                                 </div>
                             )}
+
+                            {/* Coaching (legacy) and new-sport category tabs */}
+                            {activeTab !== 'details' && activeTab !== 'simulator' && (() => {
+                                const isCoaching = activeTab === 'coaching';
+                                const tabDef = detailTabs.find((t) => t.id === activeTab);
+                                const filtered = purchasesLoading ? [] : (purchases || []).filter((p) => {
+                                    if (isCoaching) {
+                                        return !p.package_details?.service_category_id ||
+                                            p.package_details?.service_category_legacy_type === 'coaching';
+                                    }
+                                    return p.package_details?.service_category_id === tabDef?.categoryId;
+                                });
+                                return (
+                                    <div className="space-y-4">
+                                        {purchasesLoading ? (
+                                            <div className="text-center py-8 text-text-secondary">Loading purchases...</div>
+                                        ) : filtered.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {filtered.map((purchase) => (
+                                                    <div key={purchase.id} className="p-4 bg-background rounded-card border border-border">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="font-semibold text-text-primary">{purchase.purchase_name}</h4>
+                                                            {renderPurchaseStatus(purchase.package_status)}
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                                            <div>
+                                                                <span className="text-text-secondary">Sessions Remaining:</span>
+                                                                <span className="ml-2 font-medium text-text-primary">{purchase.sessions_remaining}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-text-secondary">Purchased:</span>
+                                                                <span className="ml-2 font-medium text-text-primary">
+                                                                    {new Date(purchase.purchased_at).toLocaleDateString('en-US', { timeZone: tz })}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8 text-text-secondary">
+                                                No {tabDef?.label || 'packages'} found.
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             <div className="flex flex-col sm:flex-row sm:justify-end gap-3 mt-8 pt-4 border-t border-border">
                                 <Button
@@ -607,120 +669,88 @@ function MemberList() {
                                 </button>
                             </div>
 
-                            {/* Package Type Filter Tabs */}
-                            <div className="flex border-b border-border mb-4">
-                                <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                        packageTypeFilter === 'coaching'
-                                            ? 'border-primary text-primary'
-                                            : 'border-transparent text-text-secondary hover:text-text-primary'
-                                    }`}
-                                    onClick={() => setPackageTypeFilter('coaching')}
-                                >
-                                    Coaching Packages ({packages.length})
-                                </button>
-                                <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                        packageTypeFilter === 'simulator'
-                                            ? 'border-primary text-primary'
-                                            : 'border-transparent text-text-secondary hover:text-text-primary'
-                                    }`}
-                                    onClick={() => setPackageTypeFilter('simulator')}
-                                >
-                                    Simulator Packages ({simulatorPackages.length})
-                                </button>
+                            {/* Package Type Filter Tabs — dynamic from service categories */}
+                            <div className="flex flex-wrap border-b border-border mb-4">
+                                {packageModalTabs.map((tab) => {
+                                    const tabPkgs = Array.isArray(packages) ? [] : (packages[tab.id] || []);
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                                activePackageTab === tab.id
+                                                    ? 'border-primary text-primary'
+                                                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                                            }`}
+                                            onClick={() => setActivePackageTab(tab.id)}
+                                        >
+                                            {tab.label} ({tabPkgs.length})
+                                        </button>
+                                    );
+                                })}
                             </div>
 
                             {packagesLoading ? (
                                 <div className="text-center py-8">
                                     <p className="text-text-secondary">Loading packages...</p>
                                 </div>
-                            ) : (
-                                <>
-                                    {packageTypeFilter === 'coaching' ? (
-                                        packages.length === 0 ? (
-                                            <div className="text-center py-8">
-                                                <p className="text-text-secondary">No coaching packages available</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {packages.map((pkg) => (
-                                                    <div
-                                                        key={pkg.id}
-                                                        className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
-                                                    >
-                                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                                                            <div className="flex-1">
-                                                                <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
-                                                                <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
-                                                                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                            ) : (() => {
+                                const currentTab = packageModalTabs.find((t) => t.id === activePackageTab);
+                                const tabPkgs = Array.isArray(packages) ? [] : (packages[activePackageTab] || []);
+                                const isSimulator = currentTab?.legacyType === 'simulator';
+
+                                if (tabPkgs.length === 0) {
+                                    return (
+                                        <div className="text-center py-8">
+                                            <p className="text-text-secondary">No {currentTab?.label || ''} packages available</p>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="space-y-3">
+                                        {tabPkgs.map((pkg) => (
+                                            <div
+                                                key={pkg.id}
+                                                className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
+                                            >
+                                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                                                    <div className="flex-1">
+                                                        <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
+                                                        <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
+                                                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                                                            {isSimulator ? (
+                                                                <span className="text-text-secondary">
+                                                                    Hours: <span className="font-medium text-text-primary">{pkg.hours_total}</span>
+                                                                </span>
+                                                            ) : (
+                                                                <>
                                                                     <span className="text-text-secondary">
                                                                         Sessions: <span className="font-medium text-text-primary">{pkg.session_count}</span>
                                                                     </span>
                                                                     {pkg.simulator_hours > 0 && (
                                                                         <span className="text-text-secondary">
-                                                                            Simulator Hours: <span className="font-medium text-text-primary">{pkg.simulator_hours}</span>
+                                                                            Sim Hours: <span className="font-medium text-text-primary">{pkg.simulator_hours}</span>
                                                                         </span>
                                                                     )}
-                                                                    <span className="font-bold text-primary text-base">
-                                                                        ${pkg.price}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <Button
-                                                                onClick={() => handlePurchasePackage(pkg.id, 'coaching')}
-                                                                variant="primary"
-                                                                disabled={purchasingPackageId === pkg.id}
-                                                                className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
-                                                            >
-                                                                {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
-                                                            </Button>
+                                                                </>
+                                                            )}
+                                                            <span className="font-bold text-primary text-base">${pkg.price}</span>
                                                         </div>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )
-                                    ) : (
-                                        simulatorPackages.length === 0 ? (
-                                            <div className="text-center py-8">
-                                                <p className="text-text-secondary">No simulator packages available</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {simulatorPackages.map((pkg) => (
-                                                    <div
-                                                        key={pkg.id}
-                                                        className="border border-border rounded-card p-4 hover:shadow-card-hover transition-shadow"
+                                                    <Button
+                                                        onClick={() => handlePurchasePackage(pkg.id, isSimulator ? 'simulator' : 'coaching')}
+                                                        variant="primary"
+                                                        disabled={purchasingPackageId === pkg.id}
+                                                        className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
                                                     >
-                                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                                                            <div className="flex-1">
-                                                                <h3 className="font-semibold text-text-primary text-lg">{pkg.title}</h3>
-                                                                <p className="text-sm text-text-secondary mt-1 line-clamp-2">{pkg.description}</p>
-                                                                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                                                                    <span className="text-text-secondary">
-                                                                        Hours: <span className="font-medium text-text-primary">{pkg.hours_total}</span>
-                                                                    </span>
-                                                                    <span className="font-bold text-primary text-base">
-                                                                        ${pkg.price}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <Button
-                                                                onClick={() => handlePurchasePackage(pkg.id, 'simulator')}
-                                                                variant="primary"
-                                                                disabled={purchasingPackageId === pkg.id}
-                                                                className="w-full sm:w-auto sm:min-w-[120px] sm:self-start"
-                                                            >
-                                                                {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                        {purchasingPackageId === pkg.id ? 'Processing...' : 'Purchase'}
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        )
-                                    )}
-                                </>
-                            )}
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

@@ -288,9 +288,8 @@ function SpecialEventsManagement() {
     }
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-text-primary">Special Events Management</h1>
+        <div className="space-y-6">
+            <div className="flex justify-end items-center">
                 <div className="flex items-center gap-4">
                     {/* View Type Toggle */}
                     <div className="flex items-center gap-2 bg-background border border-border rounded-lg p-1">

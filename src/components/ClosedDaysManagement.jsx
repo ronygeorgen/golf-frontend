@@ -282,9 +282,8 @@ function ClosedDaysManagement() {
     }
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-text-primary">Manage Closed Days</h1>
+        <div className="space-y-6">
+            <div className="flex justify-end">
                 <Button
                     onClick={() => {
                         setEditingClosedDay(null);

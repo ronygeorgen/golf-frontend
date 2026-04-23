@@ -33,6 +33,7 @@ export const endpoints = {
             dayAvailability: (id) => `/admin/staff/${id}/day-availability/`,
             blockedDates: (id) => `/admin/staff/${id}/blocked-dates/`,
             referrals: (id) => `/admin/staff/${id}/referrals/`,
+            categories: (id) => `/admin/staff/${id}/categories/`,
         },
         simulators: {
             list: '/admin/simulators/',
@@ -110,9 +111,18 @@ export const endpoints = {
         },
     },
     
-    // Service categories (Phase A: read-only, drives booking UI labels / legacy tab mapping)
+    // Service categories
     categories: {
+        // Public (Phase A)
         active: '/categories/active/',
+        // Phase E: slot availability for non-legacy categories
+        slots: (id) => `/categories/${id}/slots/`,
+        // Admin CRUD (Phase B)
+        admin: {
+            list: '/admin/categories/',
+            detail: (id) => `/admin/categories/${id}/`,
+            toggleActive: (id) => `/admin/categories/${id}/toggle_active/`,
+        },
     },
 
     // Booking endpoints

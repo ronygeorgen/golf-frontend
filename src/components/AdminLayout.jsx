@@ -21,7 +21,8 @@ import {
     Clock,
     CalendarOff,
     MapPin,
-    Megaphone
+    Megaphone,
+    Layers
 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
@@ -73,11 +74,11 @@ function AdminLayout() {
             label: 'Manage',
             icon: Settings,
             items: [
+                { path: '/admin/categories', label: 'Manage Categories', icon: Layers },
                 { path: '/admin/users', label: 'Manage Users', icon: UserCog },
                 { path: '/admin/staff', label: isSuperadmin ? 'Manage Admin' : 'Manage Staff', icon: Users },
                 { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
-                { path: '/admin/packages', label: 'Manage Coaching/Combo Packages', icon: Package },
-                { path: '/admin/simulator-packages', label: 'Manage Simulator Only Packages', icon: Clock },
+                { path: '/admin/packages', label: 'Manage Packages', icon: Package },
                 { path: '/admin/special-events', label: 'Manage Special Events', icon: CalendarDays },
                 ...((isAdmin || isSuperadmin) ? [{ path: '/admin/banners', label: 'Manage Banners', icon: Megaphone }] : []),
                 { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },

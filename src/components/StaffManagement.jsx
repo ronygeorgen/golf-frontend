@@ -10,7 +10,7 @@ import Toast from './ui/Toast';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import Badge from './ui/Badge';
-import { Edit, Trash2, Calendar, Users, UserCheck } from 'lucide-react';
+import { Edit, Trash2, Calendar, Users, UserCheck, Layers } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
@@ -40,6 +40,58 @@ function StaffManagement() {
     const [loadingLocations, setLoadingLocations] = useState(false);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+
+    // Phase D: categories modal
+    const [catModalStaff, setCatModalStaff] = useState(null);   // staff row being edited
+    const [allCategories, setAllCategories] = useState([]);
+    const [assignedCatIds, setAssignedCatIds] = useState([]);   // currently checked IDs
+    const [catLoading, setCatLoading] = useState(false);
+    const [catSaving, setCatSaving] = useState(false);
+
+    const openCatModal = async (staffMember) => {
+        setCatModalStaff(staffMember);
+        setCatLoading(true);
+        try {
+            const [catsRes, assignedRes] = await Promise.all([
+                apiClient.get(endpoints.categories.active),
+                apiClient.get(endpoints.admin.staff.categories(staffMember.id)),
+            ]);
+            setAllCategories(Array.isArray(catsRes.data) ? catsRes.data : []);
+            const ids = Array.isArray(assignedRes.data)
+                ? assignedRes.data.map((a) => a.category_id)
+                : [];
+            setAssignedCatIds(ids);
+        } catch {
+            showError('Failed to load categories');
+            setCatModalStaff(null);
+        } finally {
+            setCatLoading(false);
+        }
+    };
+
+    const toggleCatId = (id) => {
+        setAssignedCatIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+    };
+
+    const saveCatAssignments = async () => {
+        if (!catModalStaff) return;
+        setCatSaving(true);
+        try {
+            await apiClient.put(endpoints.admin.staff.categories(catModalStaff.id), {
+                category_ids: assignedCatIds,
+            });
+            showSuccess('Categories updated');
+            setCatModalStaff(null);
+            dispatch(getStaff());
+        } catch {
+            showError('Failed to save categories');
+        } finally {
+            setCatSaving(false);
+        }
+    };
+
     const handlePopupConfirm = async () => {
         const action = popup.onConfirm;
         closePopup();
@@ -503,6 +555,23 @@ function StaffManagement() {
                                                         </div>
                                                         <div className="relative group">
                                                             <button
+                                                                className="p-2 text-status-pending-text hover:text-status-pending-text/80 hover:bg-status-pending-bg/20 rounded-button transition-colors"
+                                                                onClick={() => openCatModal(staffMember)}
+                                                                aria-label="Manage service categories"
+                                                            >
+                                                                <Layers className="w-4 h-4" />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                                                <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                                                    Manage categories
+                                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                                                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <button
                                                                 className="p-2 text-primary hover:text-primary-light hover:bg-primary-light/10 rounded-button transition-colors"
                                                                 onClick={() => navigate(`/admin/staff/${staffMember.id}/referrals`)}
                                                                 aria-label="View staff referrals"
@@ -547,6 +616,76 @@ function StaffManagement() {
                     duration={toast.duration}
                     onClose={hideToast}
                 />
+            )}
+
+            {/* Phase D: Staff Categories Modal */}
+            {catModalStaff && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-surface rounded-card shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+                        <div className="flex items-center justify-between p-6 border-b border-border">
+                            <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                                <Layers className="w-5 h-5" />
+                                Categories — {catModalStaff.first_name} {catModalStaff.last_name}
+                            </h3>
+                            <button
+                                onClick={() => setCatModalStaff(null)}
+                                className="text-text-secondary hover:text-text-primary transition-colors"
+                                aria-label="Close"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {catLoading ? (
+                                <p className="text-sm text-text-secondary text-center py-4">Loading…</p>
+                            ) : allCategories.length === 0 ? (
+                                <p className="text-sm text-text-secondary text-center py-4">
+                                    No active categories found. Create categories first in Manage → Manage Categories.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    <p className="text-xs text-text-secondary mb-3">
+                                        Select the service categories this staff member can deliver.
+                                    </p>
+                                    {allCategories.map((cat) => (
+                                        <label
+                                            key={cat.id}
+                                            className="flex items-center gap-3 p-3 rounded-button border border-border hover:bg-background cursor-pointer transition-colors"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={assignedCatIds.includes(cat.id)}
+                                                onChange={() => toggleCatId(cat.id)}
+                                                className="w-4 h-4 accent-primary"
+                                            />
+                                            <span className="text-sm font-medium text-text-primary">{cat.name}</span>
+                                            {cat.customer_label && cat.customer_label !== cat.name && (
+                                                <span className="text-xs text-text-secondary">({cat.customer_label})</span>
+                                            )}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-border flex gap-3">
+                            <button
+                                disabled={catSaving || catLoading}
+                                onClick={saveCatAssignments}
+                                className="flex-1 py-2.5 px-4 rounded-button bg-primary text-white font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            >
+                                {catSaving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                                onClick={() => setCatModalStaff(null)}
+                                className="flex-1 py-2.5 px-4 rounded-button border border-border text-text-primary font-semibold hover:bg-background transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </>
     );
