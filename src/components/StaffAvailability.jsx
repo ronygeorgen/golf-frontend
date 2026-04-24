@@ -63,14 +63,18 @@ function StaffAvailability() {
 
     const categoryTabs = useMemo(() => {
         const tabs = [{ id: null, label: 'General (All Categories)', isGeneral: true }];
-        serviceCategories.forEach((cat) => {
-            tabs.push({
-                id: cat.id,
-                label: cat.customer_label || cat.name,
-                isGeneral: false,
-                legacy_booking_type: cat.legacy_booking_type,
+        // Only add truly dynamic categories (non-legacy) as tabs.
+        // Legacy types ('coaching', 'simulator') are handled by the existing booking flows
+        // which already read from general (null) availability — no per-category tab needed.
+        serviceCategories
+            .filter((cat) => !cat.legacy_booking_type)
+            .forEach((cat) => {
+                tabs.push({
+                    id: cat.id,
+                    label: cat.customer_label || cat.name,
+                    isGeneral: false,
+                });
             });
-        });
         return tabs;
     }, [serviceCategories]);
 
@@ -386,11 +390,11 @@ function StaffAvailability() {
                             <p className="text-sm text-gray-600">
                                 {activeTab.isGeneral ? (
                                     <>
-                                        <span className="font-semibold">General availability</span> — used for any category that doesn't have its own specific schedule set below.
+                                        <span className="font-semibold">General availability</span> — used for Coaching, Simulator, and any dynamic category that doesn't have its own schedule set.
                                     </>
                                 ) : (
                                     <>
-                                        <span className="font-semibold">{activeTab.label} availability</span> — overrides general for this category only. If not set, general availability is used as a fallback.
+                                        <span className="font-semibold">{activeTab.label} availability</span> — overrides general for <span className="font-semibold">{activeTab.label}</span> sessions only. If left empty, general availability is used as a fallback.
                                     </>
                                 )}
                             </p>
