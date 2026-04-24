@@ -2,69 +2,71 @@
  * Phase E — Generic staff-based booking for non-legacy service categories
  * (legacy_booking_type = null).
  *
- * Flow: select package → pick date → check availability → pick slot → confirm
- *
- * Follows the same layout pattern as CoachingBooking: a plain <select> for
- * owned packages, an empty-state card when the user has none, date picker,
- * then a slot grid.  No role-based UI branching — admin and customer see
- * the same interface.
+ * UI and flow are intentionally identical to CoachingBooking:
+ *   Step 1 (form)    → package + date + coach selector → "Check Availability"
+ *   Step 2 (slots)   → time-slot grid → click to select
+ *   Step 3 (summary) → confirm details → "Confirm Booking"
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppSelector } from '../store/hooks';
 import { useNavigate } from 'react-router-dom';
+import moment from 'moment-timezone';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
-import { formatLocalTime, formatLocalDate } from '../utils/timezoneUtils';
+import PopupMessage from './PopupMessage';
+import usePopup from '../hooks/usePopup';
+import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
 
-const STEP_FORM = 'form';
-const STEP_SLOTS = 'slots';
-const STEP_CONFIRM = 'confirm';
-
-function DynamicCategoryBooking({ category, client }) {
+function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     const { user: reduxUser, locationTimezone } = useAppSelector((s) => s.auth);
     const navigate = useNavigate();
+    const { popup, openPopup, closePopup } = usePopup();
+
     const tz = locationTimezone || 'America/Halifax';
     const user = reduxUser || JSON.parse(localStorage.getItem('user') || '{}') || {};
     const userRole = (user.role || '').toLowerCase();
     const isAdminOrStaff = userRole !== 'client' || !!user.is_superuser;
 
-    // ------------------------------------------------------------------ //
-    // State
-    // ------------------------------------------------------------------ //
-    const [step, setStep] = useState(STEP_FORM);
+    // ── Step management (mirrors CoachingBooking) ────────────────────────── //
+    const [currentStep, setCurrentStep] = useState('form');
 
-    // Catalog packages (all active for this category) + user's purchases
+    // ── Catalog packages + user purchases ───────────────────────────────── //
     const [packages, setPackages] = useState([]);
     const [purchasedPackages, setPurchasedPackages] = useState([]);
     const [loadingPackages, setLoadingPackages] = useState(false);
 
+    // ── Form state ───────────────────────────────────────────────────────── //
     const [selectedPackageId, setSelectedPackageId] = useState('');
     const [date, setDate] = useState('');
     const [selectedCoachId, setSelectedCoachId] = useState('');
 
-    // Slot results
+    // ── Slots ────────────────────────────────────────────────────────────── //
     const [slots, setSlots] = useState([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [slotsError, setSlotsError] = useState('');
+
+    // ── Selected slot ────────────────────────────────────────────────────── //
     const [selectedSlot, setSelectedSlot] = useState(null);
 
-    // Booking creation
-    const [booking, setBooking] = useState(false);
+    // ── Toast (mirrors CoachingBooking) ─────────────────────────────────── //
+    const [toast, setToast] = useState({ show: false, message: '' });
+
+    // ── Booking state ────────────────────────────────────────────────────── //
+    const [bookingLoading, setBookingLoading] = useState(false);
     const [bookingSuccess, setBookingSuccess] = useState(false);
-    const [bookingError, setBookingError] = useState('');
 
-    // ------------------------------------------------------------------ //
-    // Derived
-    // ------------------------------------------------------------------ //
+    // ── Back-navigation memory ───────────────────────────────────────────── //
+    const [previousDate, setPreviousDate] = useState('');
+    const [previousPackageId, setPreviousPackageId] = useState('');
+    const [previousCoachId, setPreviousCoachId] = useState('');
 
-    /**
-     * Packages the user (or client) can actually use right now —
-     * same approach as CoachingBooking.availablePackages:
-     * only packages with an active purchase that has sessions remaining.
-     */
+    // ── Derived ─────────────────────────────────────────────────────────── //
+
+    /** Packages the user can actually use: active purchases with sessions left,
+     *  restricted to this category's catalog. Same logic as CoachingBooking. */
     const availablePackages = useMemo(() => {
         if (!purchasedPackages.length) return [];
         const seen = new Map();
@@ -77,10 +79,8 @@ function DynamicCategoryBooking({ category, client }) {
             )
             .forEach((p) => {
                 const pkgId = p.package;
-                // Only include this purchase if its package exists in the current
-                // category's catalog (packages[] is already filtered by category_id).
-                // Do NOT fall back to p.package_details — that would let packages
-                // from other categories appear in this selector.
+                // Only include if the package exists in this category's catalog.
+                // Do NOT fall back to p.package_details — prevents cross-category leakage.
                 const pkgData = packages.find((pkg) => pkg.id === pkgId);
                 if (pkgData && !seen.has(pkgId)) seen.set(pkgId, pkgData);
             });
@@ -92,31 +92,13 @@ function DynamicCategoryBooking({ category, client }) {
         [availablePackages, selectedPackageId],
     );
 
-    const allCoaches = useMemo(() => {
-        if (!selectedSlot) return [];
-        const seen = new Set();
-        return (selectedSlot.available_coaches || []).filter((c) => {
-            if (seen.has(c.id)) return false;
-            seen.add(c.id);
-            return true;
-        });
-    }, [selectedSlot]);
+    const coaches = useMemo(
+        () => selectedPkg?.staff_members_details || [],
+        [selectedPkg],
+    );
 
-    const resolvedCoach = useMemo(() => {
-        if (!selectedSlot) return null;
-        if (selectedCoachId) {
-            return (
-                (selectedSlot.available_coaches || []).find(
-                    (c) => c.id === Number(selectedCoachId),
-                ) || selectedSlot.available_coaches?.[0] || null
-            );
-        }
-        return selectedSlot.available_coaches?.[0] || null;
-    }, [selectedSlot, selectedCoachId]);
-
-    // Sessions remaining for the selected package
     const sessionsRemaining = useMemo(() => {
-        if (!selectedPackageId) return null;
+        if (!selectedPackageId) return 0;
         const pkgId = Number(selectedPackageId);
         return purchasedPackages
             .filter(
@@ -129,9 +111,17 @@ function DynamicCategoryBooking({ category, client }) {
             .reduce((sum, p) => sum + (p.sessions_remaining || 0), 0);
     }, [selectedPackageId, purchasedPackages]);
 
-    // ------------------------------------------------------------------ //
-    // Load catalog packages + user's purchases
-    // ------------------------------------------------------------------ //
+    const hasSessions = selectedPackageId ? sessionsRemaining > 0 : false;
+    const duration = selectedPkg?.session_duration_minutes || 60;
+
+    // Date bounds (mirrors CoachingBooking: clients must book ≥1 day ahead)
+    const todayStr = getTodayInTimezone(tz);
+    const minDateString = isAdminOrStaff
+        ? todayStr
+        : moment.tz(todayStr, tz).add(1, 'days').format('YYYY-MM-DD');
+    const maxDateString = moment.tz(todayStr, tz).add(30, 'days').format('YYYY-MM-DD');
+
+    // ── Load catalog + purchases ─────────────────────────────────────────── //
     useEffect(() => {
         if (!category?.id) return;
         let cancelled = false;
@@ -166,7 +156,7 @@ function DynamicCategoryBooking({ category, client }) {
                 const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
                 if (!cancelled) setPurchasedPackages(data);
             } catch {
-                // non-fatal — available packages will just be empty
+                // non-fatal
             }
         }
 
@@ -175,59 +165,125 @@ function DynamicCategoryBooking({ category, client }) {
         return () => { cancelled = true; };
     }, [category?.id, client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Auto-select the first available package
+    // Auto-select first available package (mirrors CoachingBooking behaviour)
+    const isFirstMount = useRef(true);
     useEffect(() => {
-        if (availablePackages.length > 0 && !selectedPackageId) {
+        if (isFirstMount.current && availablePackages.length > 0 && !selectedPackageId) {
             setSelectedPackageId(String(availablePackages[0].id));
+            isFirstMount.current = false;
         }
     }, [availablePackages, selectedPackageId]);
 
-    // ------------------------------------------------------------------ //
-    // Fetch slots
-    // ------------------------------------------------------------------ //
-    const fetchSlots = useCallback(async () => {
-        if (!category?.id || !date) return;
+    // Reset slots + step when package changes
+    const prevPkgRef = useRef(null);
+    useEffect(() => {
+        if (prevPkgRef.current !== selectedPackageId) {
+            setSlots([]);
+            setSlotsError('');
+            setSelectedSlot(null);
+            setSelectedCoachId('');
+            if (currentStep !== 'form') setCurrentStep('form');
+            prevPkgRef.current = selectedPackageId;
+        }
+    }, [selectedPackageId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Slot helpers (mirrors CoachingBooking) ───────────────────────────── //
+    const isSlotDisabled = useCallback(
+        (slot) => {
+            const start = new Date(slot.start_time);
+            const requestedEnd = new Date(start.getTime() + duration * 60000);
+            const maxEnd = slot.availability_end_time
+                ? new Date(slot.availability_end_time)
+                : new Date(slot.end_time);
+            return requestedEnd > maxEnd;
+        },
+        [duration],
+    );
+
+    // ── Check availability ───────────────────────────────────────────────── //
+    const checkAvailability = useCallback(async () => {
+        if (!date) {
+            openPopup({ type: 'warning', title: 'Select a date', message: 'Please choose a date before checking availability.' });
+            return;
+        }
+        if (!selectedPackageId) {
+            openPopup({ type: 'warning', title: 'Select a package', message: 'Please choose a package before checking availability.' });
+            return;
+        }
+        if (!hasSessions) {
+            openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package to continue.' });
+            return;
+        }
+
+        // Store for back-navigation
+        setPreviousDate(date);
+        setPreviousPackageId(selectedPackageId);
+        setPreviousCoachId(selectedCoachId);
+
         setSlotsError('');
         setSlots([]);
         setSelectedSlot(null);
+        setToast({ show: false, message: '' });
         setLoadingSlots(true);
+
         try {
             const params = { date };
             if (selectedPackageId) params.package_id = selectedPackageId;
             if (selectedCoachId) params.coach_id = selectedCoachId;
             const { data } = await apiClient.get(endpoints.categories.slots(category.id), { params });
-            setSlots(data?.available_slots || []);
-            if (!(data?.available_slots || []).length) {
-                setSlotsError(data?.message || 'No available slots for this date.');
+            const fetched = data?.available_slots || [];
+            setSlots(fetched);
+
+            if (fetched.length === 0) {
+                const msg = data?.message || 'No available time slots found for the selected date. Please try a different date.';
+                setToast({ show: true, message: msg });
+                setTimeout(() => setToast({ show: false, message: '' }), 5000);
+                setCurrentStep('form');
+            } else {
+                setCurrentStep('slots');
             }
         } catch (err) {
-            setSlotsError(
-                err?.response?.data?.error || 'Failed to load availability. Please try again.',
-            );
+            const msg = err?.response?.data?.error || 'Failed to load availability. Please try again.';
+            setToast({ show: true, message: msg });
+            setTimeout(() => setToast({ show: false, message: '' }), 5000);
         } finally {
             setLoadingSlots(false);
         }
-    }, [category?.id, date, selectedPackageId, selectedCoachId]);
+    }, [category?.id, date, selectedPackageId, selectedCoachId, hasSessions, openPopup]);
 
-    const handleCheckAvailability = async () => {
-        if (!date) { setSlotsError('Please select a date first.'); return; }
-        await fetchSlots();
-        setStep(STEP_SLOTS);
+    // ── Back navigation (mirrors CoachingBooking) ────────────────────────── //
+    const handleBack = () => {
+        if (currentStep === 'summary') {
+            setSelectedSlot(null);
+            setCurrentStep('slots');
+        } else if (currentStep === 'slots') {
+            if (previousDate) setDate(previousDate);
+            if (previousPackageId) setSelectedPackageId(previousPackageId);
+            if (previousCoachId) setSelectedCoachId(previousCoachId);
+            setSlots([]);
+            setSelectedSlot(null);
+            setCurrentStep('form');
+        }
     };
 
-    // ------------------------------------------------------------------ //
-    // Create booking
-    // ------------------------------------------------------------------ //
-    const handleConfirmBooking = async () => {
-        if (!selectedSlot || !resolvedCoach) return;
-        setBooking(true);
-        setBookingError('');
+    // ── Slot selection ───────────────────────────────────────────────────── //
+    const handleSlotSelect = (slot) => {
+        if (isSlotDisabled(slot)) return;
+        setSelectedSlot(slot);
+        setCurrentStep('summary');
+    };
+
+    // ── Submit booking ───────────────────────────────────────────────────── //
+    const submitBooking = async () => {
+        if (!selectedSlot) return;
+        setBookingLoading(true);
         try {
+            const coachData = selectedSlot.available_coaches?.[0];
             const target = client || user;
             const payload = {
                 booking_type: 'coaching',
                 coaching_package: selectedPkg?.id || null,
-                coach: resolvedCoach.id,
+                coach: coachData?.id,
                 start_time: selectedSlot.start_time,
                 end_time: selectedSlot.end_time,
                 total_price: selectedPkg?.price || 0,
@@ -238,284 +294,424 @@ function DynamicCategoryBooking({ category, client }) {
             }
             await apiClient.post(endpoints.bookings.create, payload);
             setBookingSuccess(true);
-            setStep(STEP_CONFIRM);
+            setCurrentStep('form');
+            setDate('');
+            setSelectedPackageId('');
+            setSelectedCoachId('');
+            setSlots([]);
+            setSelectedSlot(null);
+            if (onBookingSuccess) setTimeout(onBookingSuccess, 2000);
         } catch (err) {
             const detail = err?.response?.data;
-            if (typeof detail === 'string') setBookingError(detail);
-            else if (Array.isArray(detail)) setBookingError(detail.join(' '));
+            let msg = 'Failed to create booking. Please try again.';
+            if (typeof detail === 'string') msg = detail;
+            else if (Array.isArray(detail)) msg = detail.join(' ');
             else if (detail && typeof detail === 'object')
-                setBookingError(Object.values(detail).flat().join(' '));
-            else setBookingError('Failed to create booking. Please try again.');
+                msg = Object.values(detail).flat().join(' ');
+            openPopup({ type: 'error', title: 'Booking failed', message: msg });
         } finally {
-            setBooking(false);
+            setBookingLoading(false);
         }
     };
 
-    const formatSlotTime = (isoStr) => {
-        if (!isoStr) return '';
-        try { return formatLocalTime(isoStr, tz); } catch { return isoStr; }
+    const handleBooking = async () => {
+        if (!selectedSlot) {
+            openPopup({ type: 'warning', title: 'Select a slot', message: 'Please choose a time slot before confirming.' });
+            return;
+        }
+        if (!selectedSlot.available_coaches?.length) {
+            openPopup({ type: 'warning', title: 'No coach available', message: 'No coach is available for this slot. Please select another time.' });
+            return;
+        }
+        if (!hasSessions) {
+            openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package.' });
+            return;
+        }
+        if (client) {
+            openPopup({
+                type: 'warning',
+                title: 'Confirm Booking On Behalf',
+                message: `Are you sure you want to book a ${category.customer_label || category.name} session for ${client.first_name || 'Client'} ${client.last_name || ''}?`,
+                confirmText: 'Yes, Book It',
+                cancelText: 'Cancel',
+                showCancel: true,
+                onConfirm: submitBooking,
+            });
+        } else {
+            await submitBooking();
+        }
     };
 
-    // ------------------------------------------------------------------ //
-    // Success screen
-    // ------------------------------------------------------------------ //
-    if (bookingSuccess && step === STEP_CONFIRM) {
+    // ── Success screen (mirrors CoachingBooking) ─────────────────────────── //
+    if (bookingSuccess) {
         return (
-            <div className="text-center py-10 space-y-4">
-                <div className="text-5xl">✓</div>
-                <h2 className="text-2xl font-bold text-text-primary">Booking confirmed!</h2>
-                <p className="text-text-secondary">
-                    Your {category.customer_label || category.name} session on{' '}
-                    {formatLocalDate(selectedSlot?.start_time, tz)} at{' '}
-                    {formatSlotTime(selectedSlot?.start_time)} has been booked.
+            <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-8 text-center">
+                <div className="mb-4">
+                    <svg className="mx-auto h-12 w-12 text-status-confirmed-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-status-confirmed-text mb-2">Booking Confirmed!</h3>
+                <p className="text-text-secondary mb-6">
+                    Your {category.customer_label || category.name} session has been booked successfully.
                 </p>
                 <Button
                     onClick={() => {
                         setBookingSuccess(false);
-                        setStep(STEP_FORM);
-                        setDate('');
-                        setSlots([]);
                         setSelectedSlot(null);
+                        setDate('');
+                        setSelectedPackageId('');
                         setSelectedCoachId('');
                     }}
+                    variant="primary"
                 >
-                    Book another session
+                    Book Another Session
                 </Button>
             </div>
         );
     }
 
-    // ------------------------------------------------------------------ //
-    // Render
-    // ------------------------------------------------------------------ //
+    // ── Render ───────────────────────────────────────────────────────────── //
     return (
         <div className="space-y-6">
-            {/* ---- Package & Date Form ---- */}
-            <div className="bg-surface rounded-card shadow-card p-6 space-y-5">
-                <h2 className="text-lg font-bold text-text-primary">
-                    {category.customer_label || category.name}
-                </h2>
 
-                {loadingPackages ? (
-                    <p className="text-sm text-text-secondary">Loading packages…</p>
-                ) : (
-                    <>
-                        {/* Package selector — only owned packages with sessions left */}
-                        <div>
-                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                Select Package
-                            </label>
-
-                            {availablePackages.length === 0 ? (
-                                /* Empty state — mirrors CoachingBooking */
-                                <div className="border border-border rounded-button p-6 text-center bg-background">
-                                    <p className="text-text-secondary mb-4">
-                                        {client
-                                            ? `${client.first_name} doesn't have any packages with available sessions for ${category.customer_label || category.name}.`
-                                            : `You don't have any packages with available sessions for ${category.customer_label || category.name}.`
-                                        }
-                                    </p>
-                                    {!client && (
-                                        <Button
-                                            onClick={() => navigate('/packages')}
-                                            variant="primary"
-                                            className="w-full"
-                                        >
-                                            Browse Packages
-                                        </Button>
-                                    )}
-                                </div>
-                            ) : (
-                                <select
-                                    className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                    value={selectedPackageId}
-                                    onChange={(e) => {
-                                        setSelectedPackageId(e.target.value);
-                                        setSlots([]);
-                                        setSelectedSlot(null);
-                                        if (step === STEP_SLOTS) setStep(STEP_FORM);
-                                    }}
-                                >
-                                    <option value="" disabled>Select a package</option>
-                                    {availablePackages.map((pkg) => (
-                                        <option key={pkg.id} value={pkg.id}>
-                                            {pkg.title}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
+            {/* Toast notification (identical to CoachingBooking) */}
+            {toast.show && (
+                <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg shadow-lg max-w-md">
+                        <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3 flex-1">
+                                <p className="text-sm text-yellow-700">{toast.message}</p>
+                            </div>
+                            <div className="ml-4 flex-shrink-0">
+                                <button onClick={() => setToast({ show: false, message: '' })} className="inline-flex text-yellow-400 hover:text-yellow-600 focus:outline-none">
+                                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
-
-                        {/* Session info (shown once a package is selected) */}
-                        {selectedPkg && (
-                            <div>
-                                <label className="block text-sm font-medium text-text-primary mb-2">
-                                    Your session duration will be
-                                </label>
-                                <input
-                                    type="text"
-                                    value={`${selectedPkg.session_duration_minutes} minutes`}
-                                    disabled
-                                    className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
-                                />
-                                {sessionsRemaining !== null && (
-                                    <p className="text-xs text-text-secondary mt-1">
-                                        Sessions remaining: <span className="font-semibold">{sessionsRemaining}</span>
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Date + Check Availability — only after a package is chosen */}
-                        {availablePackages.length > 0 && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-2">
-                                        Date
-                                    </label>
-                                    <DateInput
-                                        value={date}
-                                        onChange={(val) => {
-                                            setDate(val);
-                                            setSlots([]);
-                                            setSelectedSlot(null);
-                                            if (step === STEP_SLOTS) setStep(STEP_FORM);
-                                        }}
-                                        min={new Date().toISOString().split('T')[0]}
-                                    />
-                                </div>
-
-                                <Button
-                                    onClick={handleCheckAvailability}
-                                    disabled={!date || !selectedPackageId || loadingSlots}
-                                    className="w-full"
-                                >
-                                    {loadingSlots ? 'Loading availability…' : 'Check availability'}
-                                </Button>
-                            </>
-                        )}
-                    </>
-                )}
-            </div>
-
-            {/* ---- Slot Picker ---- */}
-            {step === STEP_SLOTS && (
-                <div className="bg-surface rounded-card shadow-card p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-base font-bold text-text-primary">
-                            Available slots — {date}
-                        </h3>
-                        <button
-                            type="button"
-                            className="text-xs text-primary underline"
-                            onClick={() => {
-                                setStep(STEP_FORM);
-                                setSlots([]);
-                                setSelectedSlot(null);
-                            }}
-                        >
-                            ← Change date
-                        </button>
                     </div>
+                </div>
+            )}
 
-                    {loadingSlots && (
-                        <p className="text-sm text-text-secondary">Loading slots…</p>
-                    )}
+            {/* ── Step 1: Form ─────────────────────────────────────────────── */}
+            {currentStep === 'form' && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <h2 className="text-xl font-bold text-text-primary mb-4">
+                        Book {category.customer_label || category.name} Session
+                    </h2>
 
-                    {!loadingSlots && slotsError && (
-                        <p className="text-sm text-error bg-error/10 rounded-card p-3">{slotsError}</p>
-                    )}
+                    {loadingPackages ? (
+                        <p className="text-sm text-text-secondary py-4">Loading packages…</p>
+                    ) : (
+                        <div className="space-y-4">
 
-                    {!loadingSlots && !slotsError && slots.length > 0 && (
-                        <>
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                {slots.map((slot) => {
-                                    const isSelected = selectedSlot?.start_time === slot.start_time;
-                                    return (
-                                        <button
-                                            key={slot.start_time}
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedSlot(slot);
-                                                setSelectedCoachId('');
-                                            }}
-                                            className={`py-2 px-3 rounded-button text-sm font-medium border transition-colors ${
-                                                isSelected
-                                                    ? 'bg-primary text-white border-primary'
-                                                    : 'bg-background text-text-primary border-border hover:border-primary/50 hover:bg-primary/5'
-                                            }`}
-                                        >
-                                            {formatSlotTime(slot.start_time)}
-                                        </button>
-                                    );
-                                })}
+                            {/* Date */}
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-2">Date</label>
+                                <DateInput
+                                    value={date}
+                                    onChange={setDate}
+                                    min={minDateString}
+                                    max={maxDateString}
+                                    placeholder="Select date"
+                                    className="cursor-pointer"
+                                />
                             </div>
 
-                            {/* Coach selector (optional, only when multiple available) */}
-                            {selectedSlot && allCoaches.length > 1 && (
-                                <div>
-                                    <label className="block text-sm font-medium text-text-primary mb-2">
-                                        Coach (optional)
-                                    </label>
+                            {/* Package selector */}
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-2">Select Package</label>
+                                {availablePackages.length === 0 ? (
+                                    <div className="border border-border rounded-button p-6 text-center bg-background">
+                                        <p className="text-text-secondary mb-4">
+                                            {client
+                                                ? `${client.first_name} doesn't have any packages with available sessions for ${category.customer_label || category.name}.`
+                                                : `You don't have any packages with available sessions for ${category.customer_label || category.name}.`}
+                                        </p>
+                                        {!client && (
+                                            <Button onClick={() => navigate('/packages')} variant="primary" className="w-full">
+                                                Add Package
+                                            </Button>
+                                        )}
+                                    </div>
+                                ) : (
                                     <select
+                                        value={selectedPackageId}
+                                        onChange={(e) => {
+                                            setSelectedPackageId(e.target.value);
+                                            setSelectedCoachId('');
+                                        }}
                                         className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                        value={selectedCoachId}
-                                        onChange={(e) => setSelectedCoachId(e.target.value)}
                                     >
-                                        <option value="">— Any available coach —</option>
-                                        {allCoaches.map((c) => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        <option value="" disabled>Select a package</option>
+                                        {availablePackages.map((pkg) => (
+                                            <option key={pkg.id} value={pkg.id}>{pkg.title}</option>
                                         ))}
                                     </select>
-                                </div>
-                            )}
+                                )}
+                            </div>
 
-                            {/* Booking summary + confirm */}
-                            {selectedSlot && resolvedCoach && (
-                                <div className="border border-border rounded-card p-4 bg-background space-y-2">
-                                    <p className="text-sm font-semibold text-text-primary">Booking summary</p>
-                                    <ul className="text-sm text-text-secondary space-y-1">
-                                        <li>
-                                            <span className="font-medium text-text-primary">Category:</span>{' '}
-                                            {category.customer_label || category.name}
-                                        </li>
-                                        <li>
-                                            <span className="font-medium text-text-primary">Package:</span>{' '}
-                                            {selectedPkg?.title || '—'}
-                                        </li>
-                                        <li>
-                                            <span className="font-medium text-text-primary">Date:</span>{' '}
-                                            {formatLocalDate(selectedSlot.start_time, tz)}
-                                        </li>
-                                        <li>
-                                            <span className="font-medium text-text-primary">Time:</span>{' '}
-                                            {formatSlotTime(selectedSlot.start_time)} – {formatSlotTime(selectedSlot.end_time)}
-                                        </li>
-                                        <li>
-                                            <span className="font-medium text-text-primary">Coach:</span>{' '}
-                                            {resolvedCoach.name}
-                                        </li>
-                                    </ul>
-
-                                    {bookingError && (
-                                        <p className="text-sm text-error bg-error/10 rounded-card p-2 mt-2">
-                                            {bookingError}
+                            {availablePackages.length > 0 && (
+                                <>
+                                    {/* Session duration (read-only) */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Your session duration will be
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={selectedPkg ? `${duration} minutes` : 'Select a package to see session length'}
+                                            disabled
+                                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
+                                        />
+                                        <p className="text-xs text-text-secondary mt-1">
+                                            Duration is locked to your package and consumes one session.
                                         </p>
+                                    </div>
+
+                                    {/* Sessions remaining */}
+                                    {selectedPackageId && (
+                                        <div className="border border-border rounded-card bg-background p-4 space-y-2">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm text-text-secondary">Sessions remaining</p>
+                                                    <p className={`text-2xl font-bold ${hasSessions ? 'text-status-confirmed-text' : 'text-danger'}`}>
+                                                        {sessionsRemaining}
+                                                    </p>
+                                                </div>
+                                                {!client && (
+                                                    <Button
+                                                        type="button"
+                                                        onClick={() => navigate('/packages')}
+                                                        variant="accent"
+                                                    >
+                                                        {hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            {!hasSessions && (
+                                                <p className="text-sm text-danger">
+                                                    {client
+                                                        ? 'Cannot access packages while booking for a client. Please reset booking flow first.'
+                                                        : 'You are out of sessions. Add another package bundle before booking.'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Coach selector */}
+                                    {selectedPackageId && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Select Coach
+                                            </label>
+                                            {coaches.length > 0 ? (
+                                                <select
+                                                    value={selectedCoachId}
+                                                    onChange={(e) => setSelectedCoachId(e.target.value)}
+                                                    className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                >
+                                                    <option value="">All Coaches in Package</option>
+                                                    {coaches.map((c) => (
+                                                        <option key={c.id} value={c.id}>
+                                                            {c.first_name} {c.last_name} ({c.email})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <p className="text-sm text-danger">No coaches are assigned to this package yet.</p>
+                                            )}
+                                        </div>
                                     )}
 
                                     <Button
-                                        className="w-full mt-3"
-                                        onClick={handleConfirmBooking}
-                                        disabled={booking}
+                                        onClick={checkAvailability}
+                                        disabled={loadingSlots || (!!selectedPackageId && !hasSessions)}
+                                        variant="primary"
+                                        className="w-full py-3"
                                     >
-                                        {booking ? 'Confirming…' : 'Confirm booking'}
+                                        {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
                                     </Button>
-                                </div>
+                                </>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
             )}
+
+            {/* ── Step 2: Slots ─────────────────────────────────────────────── */}
+            {currentStep === 'slots' && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">Available Time Slots</h2>
+                        <Button onClick={handleBack} variant="secondary" className="flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
+                    </div>
+
+                    {loadingSlots ? (
+                        <p className="text-sm text-text-secondary py-8 text-center">Loading slots…</p>
+                    ) : slots.length > 0 ? (
+                        <>
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+                                <h3 className="text-lg font-bold text-text-primary">Select a Time Slot</h3>
+                                <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
+                                    <span className="font-medium">Book session for</span>
+                                    <span className="px-2 py-1 bg-primary-light/20 text-primary rounded-badge font-semibold">
+                                        {date ? moment(date, 'YYYY-MM-DD').format('MMMM D, YYYY') : ''}
+                                    </span>
+                                    <span className="text-text-secondary/50">|</span>
+                                    <span className="px-2 py-1 bg-status-confirmed-bg text-status-confirmed-text rounded-badge font-semibold">
+                                        {duration >= 60
+                                            ? `${Math.floor(duration / 60)}h${duration % 60 > 0 ? ` ${duration % 60}min` : ''}`
+                                            : `${duration} min`}
+                                    </span>
+                                    {selectedPkg && (
+                                        <>
+                                            <span className="text-text-secondary/50">|</span>
+                                            <span className="px-2 py-1 bg-status-pending-bg text-status-pending-text rounded-badge font-semibold">
+                                                {selectedPkg.title}
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+                                {slots.map((slot, index) => {
+                                    const disabled = isSlotDisabled(slot);
+                                    const isSelected =
+                                        selectedSlot &&
+                                        new Date(selectedSlot.start_time).getTime() ===
+                                            new Date(slot.start_time).getTime();
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`p-4 border-2 rounded-card transition duration-200 relative group ${
+                                                disabled
+                                                    ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
+                                                    : isSelected
+                                                    ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
+                                                    : 'border-border hover:border-primary hover:bg-background cursor-pointer'
+                                            }`}
+                                            onClick={() => !disabled && handleSlotSelect(slot)}
+                                        >
+                                            <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
+                                                {formatLocalTime(slot.start_time, tz)}
+                                            </div>
+                                            <div className={`text-sm ${disabled ? 'text-text-secondary/40' : 'text-text-secondary'}`}>
+                                                {duration} minutes
+                                            </div>
+                                            <div className="text-xs text-gray-400 mt-1">
+                                                Coach assigned at confirmation
+                                            </div>
+                                            {disabled && (
+                                                <div className="mt-2 pt-2 border-t border-danger/30">
+                                                    <div className="text-xs text-danger font-medium">Exceeds availability</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-center py-8 text-text-secondary">
+                            <p>No available time slots found. Please try a different date or package.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Step 3: Summary ───────────────────────────────────────────── */}
+            {currentStep === 'summary' && selectedSlot && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-text-primary">Booking Summary</h2>
+                        <Button onClick={handleBack} variant="secondary" className="flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
+                    </div>
+                    <div className="bg-background rounded-card p-6">
+                        <h4 className="text-lg font-bold text-text-primary mb-4">Confirm Your Booking</h4>
+                        <div className="space-y-2 mb-4">
+                            <p className="text-text-primary">
+                                <span className="font-medium">Category:</span> {category.customer_label || category.name}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Date:</span> {formatLocalDate(selectedSlot.start_time, tz)}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Time:</span>{' '}
+                                {formatLocalTime(selectedSlot.start_time, tz)} – {formatLocalTime(selectedSlot.end_time, tz)}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Duration:</span> {duration} minutes
+                            </p>
+                            {selectedSlot.available_coaches?.length > 0 && (
+                                <div className="mt-4">
+                                    <p className="font-medium text-text-primary mb-2">Available Coaches:</p>
+                                    <ul className="list-disc list-inside space-y-1">
+                                        {selectedSlot.available_coaches.map((c, idx) => (
+                                            <li key={idx} className="text-text-secondary">{c.name}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {selectedPackageId && (
+                                <p className="text-text-primary">
+                                    <span className="font-medium">Sessions left after booking:</span>{' '}
+                                    {Math.max(sessionsRemaining - 1, 0)}
+                                </p>
+                            )}
+                        </div>
+                        <Button
+                            onClick={handleBooking}
+                            disabled={bookingLoading}
+                            variant="primary"
+                            className="w-full py-3 flex items-center justify-center gap-2"
+                        >
+                            {bookingLoading ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    <span>Processing…</span>
+                                </>
+                            ) : (
+                                'Confirm Booking'
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            <PopupMessage
+                open={popup.open}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+                confirmText={popup.confirmText}
+                cancelText={popup.cancelText}
+                showCancel={popup.showCancel}
+                onConfirm={popup.onConfirm ? async () => { const fn = popup.onConfirm; closePopup(); if (fn) await fn(); } : closePopup}
+                onClose={closePopup}
+            />
         </div>
     );
 }
