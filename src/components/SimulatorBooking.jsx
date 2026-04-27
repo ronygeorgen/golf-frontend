@@ -546,7 +546,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                 const response = result.payload;
 
                 // Check if this is a redirect response (temp booking created for payment)
-                if (response && response.temp_id && response.redirect_url) {
+                if (response && response.temp_id) {
                     console.log('✅ Temp booking created, opening Square payment modal:', response);
 
                     /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------

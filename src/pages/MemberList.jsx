@@ -142,12 +142,12 @@ function MemberList() {
                     const first = active.find((c) => c.legacy_booking_type !== 'simulator') || active[0];
                     setActivePackageTab(
                         first.legacy_booking_type === 'simulator' ? 'simulator'
-                        : first.legacy_booking_type === 'coaching' ? 'coaching'
-                        : `cat-${first.id}`
+                            : first.legacy_booking_type === 'coaching' ? 'coaching'
+                                : `cat-${first.id}`
                     );
                 }
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     // Build tab list for the member-detail modal from categories
@@ -170,7 +170,7 @@ function MemberList() {
         return serviceCategories.map((cat) => ({
             id: cat.legacy_booking_type === 'simulator' ? 'simulator'
                 : cat.legacy_booking_type === 'coaching' ? 'coaching'
-                : `cat-${cat.id}`,
+                    : `cat-${cat.id}`,
             label: cat.customer_label || cat.name,
             categoryId: cat.id,
             legacyType: cat.legacy_booking_type,
@@ -247,7 +247,7 @@ function MemberList() {
                 referral_id: user.id  // Staff user ID
             });
 
-            if (response.data.redirect_url && response.data.temp_id) {
+            if (response.data.temp_id) {
                 /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
                 // Build redirect URL with all required query parameters
                 const url = new URL(response.data.redirect_url);
@@ -695,11 +695,10 @@ function MemberList() {
                                     return (
                                         <button
                                             key={tab.id}
-                                            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-                                                activePackageTab === tab.id
+                                            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${activePackageTab === tab.id
                                                     ? 'border-primary text-primary'
                                                     : 'border-transparent text-text-secondary hover:text-text-primary'
-                                            }`}
+                                                }`}
                                             onClick={() => setActivePackageTab(tab.id)}
                                         >
                                             {tab.label} ({tabPkgs.length})

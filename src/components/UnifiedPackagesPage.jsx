@@ -634,11 +634,10 @@ export default function UnifiedPackagesPage() {
                                                         title={item.is_active ? 'Deactivate' : 'Activate'}
                                                         onClick={() => handleToggle(item)}
                                                         disabled={!!toggling[key]}
-                                                        className={`p-1.5 rounded-button transition-colors ${
-                                                            item.is_active
-                                                                ? 'text-status-confirmed-text hover:bg-status-confirmed-bg'
-                                                                : 'text-text-secondary hover:bg-background'
-                                                        }`}
+                                                        className={`p-1.5 rounded-button transition-colors ${item.is_active
+                                                            ? 'text-status-confirmed-text hover:bg-status-confirmed-bg'
+                                                            : 'text-text-secondary hover:bg-background'
+                                                            }`}
                                                     >
                                                         {toggling[key] ? (
                                                             <span className="text-xs">…</span>
@@ -914,7 +913,7 @@ export default function UnifiedPackagesPage() {
 
                             {/* ══ COMMON FIELDS (always shown at bottom) ═══════════════════════════ */}
 
-                            {/* Redirect URL */}
+                            {/* Redirect URL - Hidden as per request to prioritize Square payments
                             <FieldRow
                                 label="Redirect URL (optional)"
                                 hint="Users are redirected here after purchasing. Used for external payment pages."
@@ -926,6 +925,7 @@ export default function UnifiedPackagesPage() {
                                     placeholder="https://example.com/checkout"
                                 />
                             </FieldRow>
+                            */}
 
                             {/* Active */}
                             <label className="flex items-center gap-2 cursor-pointer">

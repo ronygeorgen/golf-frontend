@@ -101,10 +101,11 @@ function PackagePurchaseModal({
     const handlePurchase = async () => {
         // Check if package has redirect_url - if yes, purchaseName is optional and use temp purchase flow
         const redirectUrl = packageData?.redirect_url;
-        const hasRedirectUrl = redirectUrl && redirectUrl.trim() !== '';
+        // Use temp purchase (Square) flow for all paid packages or if a redirect URL exists
+        const shouldUseTempFlow = (packageData?.price && parseFloat(packageData.price) > 0) || (redirectUrl && redirectUrl.trim() !== '');
 
-        // Only require purchaseName if no redirect URL (normal purchase flow)
-        if (!hasRedirectUrl && !purchaseName.trim()) {
+        // Only require purchaseName if no temp flow (e.g. free packages)
+        if (!shouldUseTempFlow && !purchaseName.trim()) {
             openPopup({
                 type: 'warning',
                 title: 'Purchase Name Required',
@@ -135,7 +136,7 @@ function PackagePurchaseModal({
             }
         }
 
-        if (hasRedirectUrl) {
+        if (shouldUseTempFlow) {
             // Use temp purchase flow
             // Get current logged-in user's phone number
             const buyerPhone = user?.phone;

@@ -683,6 +683,7 @@ function SpecialEventsManagement() {
                                         </p>
                                     </div>
 
+                                    {/* Redirect URL - Hidden as per request to prioritize Square payments
                                     {formData.upfront_payment && (
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-1">
@@ -690,7 +691,7 @@ function SpecialEventsManagement() {
                                             </label>
                                             <input
                                                 type="url"
-                                                required
+                                                required={false}
                                                 placeholder="https://example.com/payment"
                                                 value={formData.redirect_url}
                                                 onChange={(e) => setFormData({ ...formData, redirect_url: e.target.value })}
@@ -701,6 +702,7 @@ function SpecialEventsManagement() {
                                             </p>
                                         </div>
                                     )}
+                                    */}
                                 </div>
                             </div>
 

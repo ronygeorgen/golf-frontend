@@ -67,7 +67,7 @@ function SpecialEvents() {
                 try {
                     const response = await axios.post(endpoints.specialEvents.register(eventId));
 
-                    if (response.data.is_upfront && response.data.redirect_url) {
+                    if (response.data.is_upfront && response.data.temp_id) {
                         /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
                         // Redirect to payment
                         const paymentUrl = new URL(response.data.redirect_url);
