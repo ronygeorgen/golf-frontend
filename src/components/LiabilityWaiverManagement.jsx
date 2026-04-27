@@ -309,8 +309,7 @@ function LiabilityWaiverManagement() {
         <>
             <div>
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                        <h1 className="text-2xl font-bold text-text-primary mb-4 md:mb-0">Manage Liability Waiver</h1>
+                    <div className="flex justify-end">
                         <Button
                             onClick={() => {
                                 // Check if there's already an active waiver

@@ -16,6 +16,8 @@ import StaffAvailability from './components/StaffAvailability';
 import SimulatorManagement from './components/SimulatorManagement';
 import SimulatorAvailability from './components/SimulatorAvailability';
 import PackageManagement from './components/PackageManagement';
+import CategoryManagement from './components/CategoryManagement';
+import UnifiedPackagesPage from './components/UnifiedPackagesPage';
 import SimulatorPackageManagement from './components/SimulatorPackageManagement';
 import UserManagement from './components/UserManagement';
 import CalendarView from './components/CalendarView';
@@ -234,8 +236,12 @@ function AppContent() {
                 <Route path="staff/:id/referrals" element={<StaffReferrals />} />
                 <Route path="simulators" element={<SimulatorManagement />} />
                 <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
-                <Route path="packages" element={<PackageManagement />} />
-                <Route path="simulator-packages" element={<SimulatorPackageManagement />} />
+                <Route path="categories" element={<CategoryManagement />} />
+                {/* Main packages hub — all categories in one place */}
+                <Route path="packages" element={<UnifiedPackagesPage />} />
+                {/* Legacy per-type routes kept for direct linking / backward compat */}
+                <Route path="packages-coaching" element={<PackageManagement />} />
+                <Route path="packages-simulator" element={<SimulatorPackageManagement />} />
                 <Route path="special-events" element={<SpecialEventsManagement />} />
                 <Route path="special-events/:eventId/registrations" element={<EventRegistrations />} />
                 <Route path="banners" element={<BannerManagement />} />

@@ -138,11 +138,14 @@ export const deleteStaff = createAsyncThunk(
 );
 
 // Staff Availability thunks
+// All accept an optional categoryId (number | null).
+// null/undefined → general availability (no service category filter).
 export const getStaffAvailability = createAsyncThunk(
     'admin/getStaffAvailability',
-    async ({ staffId }, { rejectWithValue }) => {
+    async ({ staffId, categoryId }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get(endpoints.admin.staff.availability(staffId));
+            const params = categoryId ? { category_id: categoryId } : {};
+            const response = await apiClient.get(endpoints.admin.staff.availability(staffId), { params });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -152,11 +155,13 @@ export const getStaffAvailability = createAsyncThunk(
 
 export const updateStaffAvailability = createAsyncThunk(
     'admin/updateStaffAvailability',
-    async ({ staffId, availabilityData }, { rejectWithValue }) => {
+    async ({ staffId, availabilityData, categoryId }, { rejectWithValue }) => {
         try {
+            const params = categoryId ? { category_id: categoryId } : {};
             const response = await apiClient.put(
                 endpoints.admin.staff.availability(staffId),
-                availabilityData
+                availabilityData,
+                { params }
             );
             return response.data;
         } catch (error) {
@@ -168,9 +173,10 @@ export const updateStaffAvailability = createAsyncThunk(
 // Staff Day Availability thunks (non-recurring)
 export const getStaffDayAvailability = createAsyncThunk(
     'admin/getStaffDayAvailability',
-    async ({ staffId }, { rejectWithValue }) => {
+    async ({ staffId, categoryId }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get(endpoints.admin.staff.dayAvailability(staffId));
+            const params = categoryId ? { category_id: categoryId } : {};
+            const response = await apiClient.get(endpoints.admin.staff.dayAvailability(staffId), { params });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -180,11 +186,13 @@ export const getStaffDayAvailability = createAsyncThunk(
 
 export const updateStaffDayAvailability = createAsyncThunk(
     'admin/updateStaffDayAvailability',
-    async ({ staffId, availabilityData }, { rejectWithValue }) => {
+    async ({ staffId, availabilityData, categoryId }, { rejectWithValue }) => {
         try {
+            const params = categoryId ? { category_id: categoryId } : {};
             const response = await apiClient.put(
                 endpoints.admin.staff.dayAvailability(staffId),
-                availabilityData
+                availabilityData,
+                { params }
             );
             return response.data;
         } catch (error) {
@@ -196,9 +204,10 @@ export const updateStaffDayAvailability = createAsyncThunk(
 // Staff Blocked Dates thunks
 export const getStaffBlockedDates = createAsyncThunk(
     'admin/getStaffBlockedDates',
-    async ({ staffId }, { rejectWithValue }) => {
+    async ({ staffId, categoryId }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get(endpoints.admin.staff.blockedDates(staffId));
+            const params = categoryId ? { category_id: categoryId } : {};
+            const response = await apiClient.get(endpoints.admin.staff.blockedDates(staffId), { params });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data || error.message);
@@ -208,19 +217,18 @@ export const getStaffBlockedDates = createAsyncThunk(
 
 export const blockStaffDate = createAsyncThunk(
     'admin/blockStaffDate',
-    async ({ staffId, date, start_time, end_time, reason }, { rejectWithValue }) => {
+    async ({ staffId, date, start_time, end_time, reason, categoryId }, { rejectWithValue }) => {
         try {
+            const params = categoryId ? { category_id: categoryId } : {};
             const payload = { date, reason };
-
-            // Only include times if both are provided
             if (start_time && end_time) {
                 payload.start_time = start_time;
                 payload.end_time = end_time;
             }
-
             const response = await apiClient.post(
                 endpoints.admin.staff.blockedDates(staffId),
-                payload
+                payload,
+                { params }
             );
             return response.data;
         } catch (error) {
@@ -231,11 +239,12 @@ export const blockStaffDate = createAsyncThunk(
 
 export const unblockStaffDate = createAsyncThunk(
     'admin/unblockStaffDate',
-    async ({ staffId, date }, { rejectWithValue }) => {
+    async ({ staffId, date, categoryId }, { rejectWithValue }) => {
         try {
+            const params = categoryId ? { category_id: categoryId } : {};
             const response = await apiClient.delete(
                 endpoints.admin.staff.blockedDates(staffId),
-                { data: { date } }
+                { data: { date }, params }
             );
             return response.data;
         } catch (error) {

@@ -161,7 +161,10 @@ function CoachingBooking({ client, onBookingSuccess }) {
             booking_type: 'coaching',
             admin_manual_booking: true,
             client_id: client ? client.id : undefined,
-            client: client ? client.id : undefined
+            client: client ? client.id : undefined,
+            ...(selectedPackageData?.service_category_id
+                ? { service_category: selectedPackageData.service_category_id }
+                : {}),
         };
 
         const coachRecord = coaches.find((c) => c.id === selectedCoach);
@@ -207,6 +210,15 @@ function CoachingBooking({ client, onBookingSuccess }) {
         // Collect packages from various sources
         const packageMap = new Map();
 
+        // Helper: a package belongs to this (legacy coaching) booking flow if:
+        //   - it has no service category (classic legacy package), OR
+        //   - its service category is the legacy coaching type
+        const isCoachingPackage = (pkgData) => {
+            if (!pkgData) return false;
+            if (pkgData.service_category_id === null || pkgData.service_category_id === undefined) return true;
+            return pkgData.service_category_legacy_type === 'coaching';
+        };
+
         // 1. Add packages from personal/gifted purchases
         purchases
             .filter((purchase) =>
@@ -216,10 +228,10 @@ function CoachingBooking({ client, onBookingSuccess }) {
             )
             .forEach((purchase) => {
                 const pkgId = purchase.package;
-                // Prefer the full package object from main list if available, 
-                // otherwise use package_details from purchase
+                // Prefer the full package object from main list if available,
+                // otherwise fall back to purchase.package_details
                 const pkgData = packages.find(p => p.id === pkgId) || purchase.package_details;
-                if (pkgData) {
+                if (pkgData && isCoachingPackage(pkgData)) {
                     packageMap.set(pkgId, pkgData);
                 }
             });
@@ -234,7 +246,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
                 .forEach((orgPkg) => {
                     const pkgId = orgPkg.package;
                     const pkgData = packages.find(p => p.id === pkgId) || orgPkg.package_details;
-                    if (pkgData) {
+                    if (pkgData && isCoachingPackage(pkgData)) {
                         packageMap.set(pkgId, pkgData);
                     }
                 });
@@ -683,6 +695,9 @@ function CoachingBooking({ client, onBookingSuccess }) {
             coaching_package: selectedPackage,
             coach: selectedCoachData.id,
             use_organization_package: packageType === 'organization',
+            ...(selectedPackageData?.service_category_id
+                ? { service_category: selectedPackageData.service_category_id }
+                : {}),
         };
 
         // Add client_id if booking for a client

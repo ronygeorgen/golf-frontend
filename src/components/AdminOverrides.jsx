@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
     getPackages,
@@ -29,6 +29,33 @@ function AdminOverrides() {
     const [bookingFilter, setBookingFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [cancellingBookingId, setCancellingBookingId] = useState(null);
+    const [allCategories, setAllCategories] = useState([]);
+
+    // Load all active service categories once so filter buttons are always visible
+    useEffect(() => {
+        apiClient.get(endpoints.categories.admin.list)
+            .then((res) => {
+                const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+                setAllCategories(data.filter((c) => c.is_active));
+            })
+            .catch(() => {});
+    }, []);
+
+    // Build filter options from the full category list (not just what's in locked bookings)
+    const filterOptions = useMemo(() => {
+        const opts = [{ value: 'all', label: 'All' }];
+        allCategories.forEach((cat) => {
+            if (cat.legacy_booking_type === 'simulator') {
+                opts.push({ value: 'simulator', label: cat.customer_label || cat.name });
+            } else if (cat.legacy_booking_type === 'coaching') {
+                opts.push({ value: 'coaching', label: cat.customer_label || cat.name });
+            } else {
+                // Dynamic / new-sport category
+                opts.push({ value: `cat-${cat.id}`, label: cat.customer_label || cat.name });
+            }
+        });
+        return opts;
+    }, [allCategories]);
 
     useEffect(() => {
         if (packages.list.length === 0) {
@@ -155,17 +182,17 @@ function AdminOverrides() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="inline-flex rounded-full border border-border bg-surface shadow-sm text-xs font-medium">
-                            {['all', 'coaching', 'simulator'].map((filter) => (
+                        <div className="inline-flex rounded-full border border-border bg-surface shadow-sm text-xs font-medium flex-wrap gap-0.5">
+                            {filterOptions.map((opt) => (
                                 <button
-                                    key={filter}
-                                    onClick={() => setBookingFilter(filter)}
-                                    className={`px-3 py-1 rounded-full transition ${bookingFilter === filter
+                                    key={opt.value}
+                                    onClick={() => setBookingFilter(opt.value)}
+                                    className={`px-3 py-1 rounded-full transition ${bookingFilter === opt.value
                                         ? 'bg-primary text-white border border-primary'
                                         : 'text-text-secondary hover:bg-background'
                                         }`}
                                 >
-                                    {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                                    {opt.label}
                                 </button>
                             ))}
                         </div>
@@ -199,7 +226,14 @@ function AdminOverrides() {
                     </div>
                 ) : (() => {
                     const filteredBookings = overrides.lockedBookings.list.filter((booking) => {
-                        if (bookingFilter !== 'all' && booking.booking_type !== bookingFilter) return false;
+                        if (bookingFilter !== 'all') {
+                            if (bookingFilter === 'simulator' && booking.booking_type !== 'simulator') return false;
+                            if (bookingFilter === 'coaching' && (booking.booking_type !== 'coaching' || booking.service_category)) return false;
+                            if (bookingFilter.startsWith('cat-')) {
+                                const catId = Number(bookingFilter.replace('cat-', ''));
+                                if (booking.service_category !== catId) return false;
+                            }
+                        }
                         if (searchQuery.trim()) {
                             const query = searchQuery.toLowerCase().trim();
                             const client = booking.client_details || {};
@@ -223,8 +257,10 @@ function AdminOverrides() {
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Badge status={booking.booking_type === 'coaching' ? 'pending' : 'personal'}>
-                                                    {booking.booking_type === 'coaching' ? 'Coaching' : 'Simulator'}
+                                                <Badge status={booking.booking_type === 'simulator' ? 'personal' : 'pending'}>
+                                                    {booking.booking_type === 'simulator'
+                                                        ? 'Simulator'
+                                                        : (booking.service_category_name || 'Coaching')}
                                                 </Badge>
                                                 <span className="text-xs text-text-secondary">
                                                     Starts in: {getTimeUntilBooking(booking.start_time)}
@@ -450,7 +486,7 @@ function CoachingOverrideForm({ packages, overrides, dispatch, showSuccess, show
     return (
         <div className="bg-surface shadow-card rounded-card p-6 border border-border">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-text-primary">Coaching Sessions</h2>
+                <h2 className="text-xl font-semibold text-text-primary">Sessions (All Categories)</h2>
                 <div className="flex bg-background rounded-lg p-1 border border-border">
                     <button
                         onClick={() => setMode('add')}

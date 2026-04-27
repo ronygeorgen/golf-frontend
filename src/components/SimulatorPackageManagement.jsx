@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../api/axios';
+import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
@@ -20,6 +21,8 @@ function SimulatorPackageManagement() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingPackage, setEditingPackage] = useState(null);
+    const [serviceCategories, setServiceCategories] = useState([]);
+
     const emptyForm = {
         title: '',
         description: '',
@@ -28,7 +31,8 @@ function SimulatorPackageManagement() {
         redirect_url: '',
         is_active: true,
         validity_days: '',
-        time_restrictions: []
+        time_restrictions: [],
+        service_category: '',
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -40,6 +44,9 @@ function SimulatorPackageManagement() {
 
     useEffect(() => {
         fetchPackages();
+        apiClient.get(endpoints.categories.active).then(({ data }) => {
+            if (Array.isArray(data)) setServiceCategories(data);
+        }).catch(() => {});
     }, []);
 
     // Close modal when clicking outside
@@ -158,7 +165,8 @@ function SimulatorPackageManagement() {
             redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active !== undefined ? pkg.is_active : true,
             validity_days: pkg.validity_days || '',
-            time_restrictions: time_restrictions
+            time_restrictions: time_restrictions,
+            service_category: pkg.service_category_id ?? pkg.service_category ?? '',
         });
         setShowForm(true);
     };
@@ -380,6 +388,27 @@ function SimulatorPackageManagement() {
                                             required
                                             className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            Service Category
+                                        </label>
+                                        <select
+                                            value={formData.service_category ?? ''}
+                                            onChange={(e) => setFormData({ ...formData, service_category: e.target.value ? Number(e.target.value) : '' })}
+                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        >
+                                            <option value="">— None / legacy simulator —</option>
+                                            {serviceCategories.map((cat) => (
+                                                <option key={cat.id} value={cat.id}>
+                                                    {cat.name}
+                                                    {cat.legacy_booking_type ? ` (${cat.legacy_booking_type})` : ' (new category)'}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-1 text-xs text-text-secondary">
+                                            Link this package to a service category so it appears in the correct booking flow.
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-1">

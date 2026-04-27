@@ -10,6 +10,8 @@ import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { Edit, Power, PowerOff, Trash2, X, Users, FileText } from 'lucide-react';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function PackageManagement() {
     const dispatch = useAppDispatch();
@@ -21,6 +23,8 @@ function PackageManagement() {
     
     const [showForm, setShowForm] = useState(false);
     const [editingPackage, setEditingPackage] = useState(null);
+    const [serviceCategories, setServiceCategories] = useState([]);
+
     const emptyForm = {
         title: '',
         description: '',
@@ -31,7 +35,8 @@ function PackageManagement() {
         simulator_hours: 0,
         redirect_url: '',
         is_active: true,
-        is_tpi_assessment: false
+        is_tpi_assessment: false,
+        service_category: '',
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -53,6 +58,9 @@ function PackageManagement() {
     useEffect(() => {
         dispatch(getPackages());
         dispatch(getStaff());
+        apiClient.get(endpoints.categories.active).then(({ data }) => {
+            if (Array.isArray(data)) setServiceCategories(data);
+        }).catch(() => {});
     }, [dispatch]);
 
     // Close modal when clicking outside
@@ -137,7 +145,8 @@ function PackageManagement() {
             simulator_hours: pkg.simulator_hours || 0,
             redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active,
-            is_tpi_assessment: pkg.is_tpi_assessment || false
+            is_tpi_assessment: pkg.is_tpi_assessment || false,
+            service_category: pkg.service_category_id ?? pkg.service_category ?? '',
         });
         setShowForm(true);
     };
@@ -246,6 +255,27 @@ function PackageManagement() {
                                             onChange={(e) => setFormData({...formData, title: e.target.value})}
                                             required
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Service Category
+                                        </label>
+                                        <select
+                                            value={formData.service_category ?? ''}
+                                            onChange={(e) => setFormData({ ...formData, service_category: e.target.value ? Number(e.target.value) : '' })}
+                                            className="w-full rounded-button border border-border bg-background px-4 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                        >
+                                            <option value="">— None / legacy coaching —</option>
+                                            {serviceCategories.map((cat) => (
+                                                <option key={cat.id} value={cat.id}>
+                                                    {cat.name}
+                                                    {cat.legacy_booking_type ? ` (${cat.legacy_booking_type})` : ' (new category)'}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-1 text-xs text-text-secondary">
+                                            Assign this package to a service category so it appears in the correct booking flow.
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment-timezone';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -13,7 +13,21 @@ import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import BookForClientModal from './BookForClientModal';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, ChevronDown } from 'lucide-react';
+
+// Palette for dynamic (non-legacy) service categories — one colour per category ID
+const DYNAMIC_CAT_COLORS = [
+    '#7C3AED', // Violet
+    '#DB2777', // Pink
+    '#EA580C', // Orange
+    '#0284C7', // Sky-Blue
+    '#9333EA', // Purple
+    '#B45309', // Amber-Brown
+    '#0F766E', // Teal
+    '#92400E', // Brown
+    '#1D4ED8', // Blue
+    '#15803D', // Green
+];
 
 const localizer = momentLocalizer(moment);
 
@@ -57,8 +71,27 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         const todayStr = getTodayInTimezone(locationTimezone || 'America/Halifax');
         return moment.tz(todayStr, locationTimezone || 'America/Halifax').toDate();
     });
-    const [calendarType, setCalendarType] = useState('all'); // 'all', 'simulator', 'coaching', or 'special_event'
-    const [showCancelledOnly, setShowCancelledOnly] = useState(false); // New state to toggle cancelled bookings
+    // 'all' | 'simulator' | 'coaching' | 'special_event' | 'cat-{id}'
+    const [calendarType, setCalendarType] = useState('all');
+    const [showCancelledOnly, setShowCancelledOnly] = useState(false);
+
+    // Dynamic service categories
+    const [serviceCategories, setServiceCategories] = useState([]);
+    const [catDropdownOpen, setCatDropdownOpen] = useState(false);
+    const catDropdownRef = useRef(null);
+
+    // Non-legacy categories only (legacy = simulator / coaching)
+    const dynamicCategories = useMemo(
+        () => serviceCategories.filter((c) => !c.legacy_booking_type),
+        [serviceCategories],
+    );
+
+    // The currently-selected dynamic category object (or null)
+    const activeDynamicCat = useMemo(() => {
+        if (!calendarType.startsWith('cat-')) return null;
+        const id = parseInt(calendarType.replace('cat-', ''), 10);
+        return dynamicCategories.find((c) => c.id === id) || null;
+    }, [calendarType, dynamicCategories]);
 
     // Special Events State
     const [specialEvents, setSpecialEvents] = useState([]);
@@ -108,6 +141,27 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }
     };
 
+    // Load all active service categories once on mount
+    useEffect(() => {
+        axios.get(endpoints.categories.admin.list)
+            .then((res) => {
+                const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
+                setServiceCategories(data.filter((c) => c.is_active));
+            })
+            .catch(() => { });
+    }, []);
+
+    // Close the category dropdown when clicking outside
+    useEffect(() => {
+        const handler = (e) => {
+            if (catDropdownRef.current && !catDropdownRef.current.contains(e.target)) {
+                setCatDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
     const fetchSimulators = async () => {
         setSimulatorsLoading(true);
         try {
@@ -154,10 +208,16 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }
 
         if (calendarType !== 'special_event') {
+            // For dynamic-category filters, fetch all coaching-type bookings
+            // then filter client-side by service_category id.
+            const effectiveBookingType = calendarType.startsWith('cat-')
+                ? 'coaching'
+                : (calendarType === 'all' ? null : calendarType);
+
             dispatch(getCalendarBookings({
                 startDate,
                 endDate,
-                bookingType: calendarType === 'all' ? null : calendarType,
+                bookingType: effectiveBookingType,
                 coachId: coachId,
                 status: showCancelledOnly ? 'cancelled' : null
             }));
@@ -501,6 +561,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             backgroundColor = '#000000'; // Black for TPI assessment
         } else if (event.type === 'simulator') {
             backgroundColor = '#10B981'; // Emerald-500 for simulator
+        } else if (event.service_category_id && !event.is_legacy_category) {
+            // Dynamic (non-legacy) category — use a per-category colour
+            backgroundColor = DYNAMIC_CAT_COLORS[event.service_category_id % DYNAMIC_CAT_COLORS.length];
         } else if (event.type === 'coaching') {
             backgroundColor = getCoachColor(event.coach);
         }
@@ -560,7 +623,10 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     </p>
                 )}
                 <p>
-                    <span className="font-semibold">Type:</span> {event.type === 'simulator' ? 'Simulator' : 'Coaching'}
+                    <span className="font-semibold">Type:</span>{' '}
+                    {event.type === 'simulator'
+                        ? 'Simulator'
+                        : (event.service_category_name || 'Coaching')}
                 </p>
                 <p>
                     <span className="font-semibold">Time:</span>{' '}
@@ -697,15 +763,18 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     console.log('📊 Raw Events:', events);
 
     const transformedEvents = events
-        .filter(booking => calendarType === 'all' || booking.booking_type === calendarType)
         .filter(booking => {
-            // If showCancelledOnly is true, only show cancelled
-            // If showCancelledOnly is false, show everything EXCEPT cancelled
-            if (showCancelledOnly) {
-                return booking.status === 'cancelled';
-            } else {
-                return booking.status !== 'cancelled';
+            if (calendarType === 'all') return true;
+            if (calendarType.startsWith('cat-')) {
+                // Dynamic category filter — match by service_category id
+                const catId = parseInt(calendarType.replace('cat-', ''), 10);
+                return booking.service_category === catId;
             }
+            return booking.booking_type === calendarType;
+        })
+        .filter(booking => {
+            if (showCancelledOnly) return booking.status === 'cancelled';
+            return booking.status !== 'cancelled';
         })
         .map(booking => {
             // Convert UTC booking times to center's local timezone "fake local" for display
@@ -748,6 +817,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 }
             }
 
+            // Determine if this booking belongs to a dynamic (non-legacy) category
+            const serviceCatId = booking.service_category || null;
+            const serviceCatObj = serviceCatId
+                ? serviceCategories.find((c) => c.id === serviceCatId)
+                : null;
+            const isLegacyCat = serviceCatObj
+                ? !!serviceCatObj.legacy_booking_type
+                : true; // no category → treat as legacy
+
             return {
                 id: booking.id,
                 title: title,
@@ -762,7 +840,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 total_price: booking.total_price,
                 status: booking.status,
                 duration_minutes: booking.duration_minutes,
-                is_tpi_assessment: booking.is_tpi_assessment || false
+                is_tpi_assessment: booking.is_tpi_assessment || false,
+                // Dynamic category fields
+                service_category_id: serviceCatId,
+                service_category_name: booking.service_category_name || null,
+                is_legacy_category: isLegacyCat,
             };
         });
 
@@ -928,51 +1010,78 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 bg-background/40 backdrop-blur-md rounded-2xl p-1.5 shadow-sm border border-border/40">
                                 {/* Type Toggles */}
                                 <div className="flex items-center gap-1 p-1 bg-surface/30 rounded-xl border border-border/20">
+                                    {/* All */}
                                     <button
-                                        onClick={() => {
-                                            setCalendarType('all');
-                                            setShowCancelledOnly(false);
-                                        }}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'all' && !showCancelledOnly
-                                            ? 'bg-primary text-white shadow-sm'
-                                            : 'text-text-secondary hover:bg-surface'
-                                            }`}
+                                        onClick={() => { setCalendarType('all'); setShowCancelledOnly(false); }}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'all' && !showCancelledOnly ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:bg-surface'}`}
                                         title="All active bookings"
                                     >
                                         <span className="text-xs font-semibold">Active</span>
                                     </button>
 
+                                    {/* Simulators */}
                                     {!coachId && (
                                         <button
                                             onClick={() => setCalendarType('simulator')}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'simulator'
-                                                ? 'bg-primary-light text-white shadow-sm'
-                                                : 'text-text-secondary hover:bg-surface'
-                                                }`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'simulator' ? 'bg-primary-light text-white shadow-sm' : 'text-text-secondary hover:bg-surface'}`}
                                             title="Simulator Only"
                                         >
                                             <span className="text-xs font-semibold">Simulators</span>
                                         </button>
                                     )}
 
+                                    {/* Coaching (legacy) */}
                                     <button
                                         onClick={() => setCalendarType('coaching')}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'coaching'
-                                            ? 'bg-primary text-white shadow-sm'
-                                            : 'text-text-secondary hover:bg-surface'
-                                            }`}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'coaching' ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:bg-surface'}`}
                                         title="Coaching Only"
                                     >
                                         <span className="text-xs font-semibold">Coaching</span>
                                     </button>
 
+                                    {/* Dynamic Categories dropdown */}
+                                    {dynamicCategories.length > 0 && (
+                                        <div className="relative" ref={catDropdownRef}>
+                                            <button
+                                                onClick={() => setCatDropdownOpen((o) => !o)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType.startsWith('cat-') ? 'text-white shadow-sm' : 'text-text-secondary hover:bg-surface'}`}
+                                                style={calendarType.startsWith('cat-') && activeDynamicCat
+                                                    ? { backgroundColor: DYNAMIC_CAT_COLORS[activeDynamicCat.id % DYNAMIC_CAT_COLORS.length] }
+                                                    : {}}
+                                                title="Filter by category"
+                                            >
+                                                <span className="text-xs font-semibold">
+                                                    {activeDynamicCat ? (activeDynamicCat.customer_label || activeDynamicCat.name) : 'Categories'}
+                                                </span>
+                                                <ChevronDown className={`w-3 h-3 transition-transform ${catDropdownOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            {catDropdownOpen && (
+                                                <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden min-w-[160px]">
+                                                    {dynamicCategories.map((cat) => {
+                                                        const color = DYNAMIC_CAT_COLORS[cat.id % DYNAMIC_CAT_COLORS.length];
+                                                        const isActive = calendarType === `cat-${cat.id}`;
+                                                        return (
+                                                            <button
+                                                                key={cat.id}
+                                                                onClick={() => { setCalendarType(`cat-${cat.id}`); setCatDropdownOpen(false); setShowCancelledOnly(false); }}
+                                                                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-background ${isActive ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}
+                                                            >
+                                                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                                                {cat.customer_label || cat.name}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Special Events */}
                                     {canViewSpecialEvents && (
                                         <button
                                             onClick={() => setCalendarType('special_event')}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'special_event'
-                                                ? 'bg-amber-500 text-white shadow-sm'
-                                                : 'text-text-secondary hover:bg-surface'
-                                                }`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType === 'special_event' ? 'bg-amber-500 text-white shadow-sm' : 'text-text-secondary hover:bg-surface'}`}
                                             title="Events Only"
                                         >
                                             <span className="text-xs font-semibold">Events</span>
@@ -985,15 +1094,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     <button
                                         onClick={() => {
                                             setShowCancelledOnly(!showCancelledOnly);
-                                            // Reset calendarType to all if exploring cancelled for better overview
-                                            if (!showCancelledOnly && calendarType === 'special_event') {
-                                                setCalendarType('all');
-                                            }
+                                            if (!showCancelledOnly && calendarType === 'special_event') setCalendarType('all');
                                         }}
-                                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg transition-all duration-300 ${showCancelledOnly
-                                            ? 'bg-danger text-white shadow-sm scale-105'
-                                            : 'bg-danger/10 text-danger hover:bg-danger/20'
-                                            }`}
+                                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg transition-all duration-300 ${showCancelledOnly ? 'bg-danger text-white shadow-sm scale-105' : 'bg-danger/10 text-danger hover:bg-danger/20'}`}
                                     >
                                         <span className={`w-2 h-2 rounded-full ${showCancelledOnly ? 'bg-white' : 'bg-danger'} animate-pulse`}></span>
                                         <span className="text-xs font-bold uppercase tracking-wider">Cancelled</span>
@@ -1054,7 +1157,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     {calendarType === 'all' ? 'All Events...' :
                                         calendarType === 'simulator' ? 'Simulator Bookings...' :
                                             calendarType === 'coaching' ? 'Coaching Sessions...' :
-                                                'Special Events...'}
+                                                calendarType.startsWith('cat-')
+                                                    ? `${activeDynamicCat?.customer_label || activeDynamicCat?.name || 'Category'} Bookings...`
+                                                    : 'Special Events...'}
                                 </span>
                             </div>
                         )}
@@ -1064,14 +1169,36 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mt-6">
                     <div className="flex flex-wrap gap-4 md:gap-6">
                         {calendarType === 'special_event' ? (
-                            <div className="group relative flex items-center">
+                            <div className="flex items-center">
                                 <div className="w-4 h-4 rounded-full bg-amber-500"></div>
                                 <div className="ml-2 text-sm text-text-secondary">Special Event</div>
                             </div>
+                        ) : calendarType.startsWith('cat-') && activeDynamicCat ? (
+                            /* ── Dynamic category view legend ── */
+                            <>
+                                <div className="flex items-center">
+                                    <div
+                                        className="w-4 h-4 rounded-full"
+                                        style={{ backgroundColor: DYNAMIC_CAT_COLORS[activeDynamicCat.id % DYNAMIC_CAT_COLORS.length] }}
+                                    />
+                                    <div className="ml-2 text-sm text-text-secondary">
+                                        {activeDynamicCat.customer_label || activeDynamicCat.name}
+                                    </div>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="w-4 h-4 rounded-full bg-[#DC2626]"></div>
+                                    <div className="ml-2 text-sm text-text-secondary">Cancelled</div>
+                                </div>
+                                <div className="flex items-center">
+                                    <div className="w-4 h-4 rounded-full bg-[#6B7280]"></div>
+                                    <div className="ml-2 text-sm text-text-secondary">Completed</div>
+                                </div>
+                            </>
                         ) : (
+                            /* ── Default legend (all / simulator / coaching) ── */
                             <>
                                 {(calendarType === 'all' || calendarType === 'simulator') && (
-                                    <div className="group relative flex items-center">
+                                    <div className="flex items-center">
                                         <div className="w-4 h-4 rounded-full bg-[#10B981]"></div>
                                         <div className="ml-2 text-sm text-text-secondary">Simulator</div>
                                     </div>
@@ -1080,12 +1207,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     <div className="group relative flex items-center cursor-help">
                                         <div className="w-4 h-4 rounded-full bg-[#334155]"></div>
                                         <div className="ml-2 text-sm text-text-secondary">Coaching (Hover for Staff)</div>
-
-                                        {/* Dynamic Staff Color Tooltip */}
+                                        {/* Staff colour tooltip */}
                                         <div className="absolute bottom-full left-0 mb-3 hidden group-hover:block z-[100] bg-surface-light border border-border rounded-xl shadow-2xl p-4 min-w-[240px] backdrop-blur-md bg-opacity-95">
-                                            <div className="text-xs font-bold text-text-muted mb-3 uppercase tracking-widest border-b border-border pb-2">
-                                                Staff Color Guide
-                                            </div>
+                                            <div className="text-xs font-bold text-text-muted mb-3 uppercase tracking-widest border-b border-border pb-2">Staff Color Guide</div>
                                             <div className="space-y-3">
                                                 {coachList.length > 0 ? coachList.map(coach => (
                                                     <div key={coach.id} className="flex items-center group/item transition-transform hover:translate-x-1">
@@ -1101,27 +1225,37 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                     <div className="text-sm text-text-muted italic py-2">No active coaching sessions found for selected view</div>
                                                 )}
                                             </div>
-                                            <div className="mt-3 pt-2 border-t border-border text-[10px] text-text-muted">
-                                                Colors are unique per staff member
-                                            </div>
+                                            <div className="mt-3 pt-2 border-t border-border text-[10px] text-text-muted">Colors are unique per staff member</div>
                                         </div>
                                     </div>
                                 )}
+                                {/* Dynamic categories in "all" view */}
+                                {calendarType === 'all' && dynamicCategories.map((cat) => (
+                                    <div key={cat.id} className="flex items-center">
+                                        <div
+                                            className="w-4 h-4 rounded-full"
+                                            style={{ backgroundColor: DYNAMIC_CAT_COLORS[cat.id % DYNAMIC_CAT_COLORS.length] }}
+                                        />
+                                        <div className="ml-2 text-sm text-text-secondary">
+                                            {cat.customer_label || cat.name}
+                                        </div>
+                                    </div>
+                                ))}
                                 {calendarType === 'all' && (
-                                    <div className="group relative flex items-center">
+                                    <div className="flex items-center">
                                         <div className="w-4 h-4 rounded-full bg-[#F59E0B]"></div>
                                         <div className="ml-2 text-sm text-text-secondary">Special Event</div>
                                     </div>
                                 )}
-                                <div className="group relative flex items-center">
+                                <div className="flex items-center">
                                     <div className="w-4 h-4 rounded-full bg-[#000000]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">TPI Assessment</div>
                                 </div>
-                                <div className="group relative flex items-center">
+                                <div className="flex items-center">
                                     <div className="w-4 h-4 rounded-full bg-[#DC2626]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">Cancelled</div>
                                 </div>
-                                <div className="group relative flex items-center">
+                                <div className="flex items-center">
                                     <div className="w-4 h-4 rounded-full bg-[#6B7280]"></div>
                                     <div className="ml-2 text-sm text-text-secondary">Completed</div>
                                 </div>
