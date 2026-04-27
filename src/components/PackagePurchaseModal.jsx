@@ -4,6 +4,7 @@ import { createPackagePurchase, createSimulatorPackagePurchase, createTempPurcha
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
+import SquarePaymentModal from './SquarePaymentModal';
 
 function PackagePurchaseModal({
     isOpen,
@@ -20,13 +21,21 @@ function PackagePurchaseModal({
     const { popup, openPopup, closePopup } = usePopup();
     const { purchaseSubmitting } = useAppSelector((state) => state.coaching);
     const { user } = useAppSelector((state) => state.auth);
-    
+
     const [purchaseType, setPurchaseType] = useState(defaultType);
     const [purchaseName, setPurchaseName] = useState('');
     const [recipientPhone, setRecipientPhone] = useState('');
     const [notes, setNotes] = useState('');
     const [memberPhones, setMemberPhones] = useState([]); // [{phone: string, validated: boolean, name: string}]
     const [newMemberPhone, setNewMemberPhone] = useState('');
+
+    // Square payment modal state
+    const [squarePayment, setSquarePayment] = useState({
+        isOpen: false,
+        tempId: null,
+        amount: null,
+        packageTitle: '',
+    });
 
     useEffect(() => {
         if (isOpen) {
@@ -93,7 +102,7 @@ function PackagePurchaseModal({
         // Check if package has redirect_url - if yes, purchaseName is optional and use temp purchase flow
         const redirectUrl = packageData?.redirect_url;
         const hasRedirectUrl = redirectUrl && redirectUrl.trim() !== '';
-        
+
         // Only require purchaseName if no redirect URL (normal purchase flow)
         if (!hasRedirectUrl && !purchaseName.trim()) {
             openPopup({
@@ -125,7 +134,7 @@ function PackagePurchaseModal({
                 return;
             }
         }
-        
+
         if (hasRedirectUrl) {
             // Use temp purchase flow
             // Get current logged-in user's phone number
@@ -138,7 +147,7 @@ function PackagePurchaseModal({
                 });
                 return;
             }
-            
+
             // Prepare recipients array
             let recipients = [];
             if (purchaseType === 'gift' && recipientPhone.trim()) {
@@ -146,7 +155,7 @@ function PackagePurchaseModal({
             } else if (purchaseType === 'organization' && memberPhones.length > 0) {
                 recipients = memberPhones.map(m => m.phone);
             }
-            
+
             // Create temp purchase
             // Determine package type from backend category field
             // Category can be: 'simulator', 'coaching', or 'combo'
@@ -170,7 +179,7 @@ function PackagePurchaseModal({
             }
             // Map category to package_type for URL: combo packages should use 'coaching' as package_type
             const packageTypeForUrl = packageCategory === 'simulator' ? 'simulator' : 'coaching';
-            
+
             // Debug logging to trace the issue
             console.log('🔍 Package Purchase Debug:', {
                 packageId,
@@ -187,7 +196,7 @@ function PackagePurchaseModal({
                 'packageData?.category exists': !!packageData?.category,
                 'packageData?.category value': packageData?.category
             });
-            
+
             const tempResult = await dispatch(createTempPurchase({
                 packageId,
                 buyerPhone,
@@ -195,41 +204,45 @@ function PackagePurchaseModal({
                 recipients,
                 packageType: packageTypeForUrl,
             }));
-            
+
             if (createTempPurchase.fulfilled.match(tempResult)) {
                 const tempId = tempResult.payload.temp_id;
                 const redirectUrlFromResponse = tempResult.payload.redirect_url;
-                
+                const packagePrice = packageData?.price;
+
+                /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
                 // Build redirect URL with query params
-                // phone parameter contains the current logged-in user's phone number
                 const url = new URL(redirectUrlFromResponse);
-                url.searchParams.set('phone', buyerPhone); // Current user's phone
+                url.searchParams.set('phone', buyerPhone);
                 url.searchParams.set('package_id', packageId.toString());
                 url.searchParams.set('purchase_type', purchaseType);
-                url.searchParams.set('recipient_phone', tempId); // recipient_phone contains temp_id
-                // Use packageTypeForUrl: 'simulator' for simulator packages, 'coaching' for coaching/combo packages
+                url.searchParams.set('recipient_phone', tempId);
                 url.searchParams.set('package_type', packageTypeForUrl);
-                
-                // Reset form state
                 setRecipientPhone('');
-                // setPhoneValidated(false);
                 setNotes('');
                 setMemberPhones([]);
-                
                 openPopup({
                     type: 'success',
                     title: 'Redirecting to Payment...',
                     message: 'You will be redirected to complete your purchase.',
                 });
-                
-                // Redirect after short delay
-                setTimeout(() => {
-                    window.location.href = url.toString();
-                }, 1000);
+                setTimeout(() => { window.location.href = url.toString(); }, 1000);
+                ------- END GHL Redirect ------- */
+
+                // Square: open the payment modal
+                setRecipientPhone('');
+                setNotes('');
+                setMemberPhones([]);
+                setSquarePayment({
+                    isOpen: true,
+                    tempId: tempId,
+                    amount: packagePrice,
+                    packageTitle: packageData?.title || 'Package',
+                });
             } else {
-                const errorMsg = tempResult.payload?.error || 
-                               tempResult.payload?.detail ||
-                               'Unable to create temporary purchase.';
+                const errorMsg = tempResult.payload?.error ||
+                    tempResult.payload?.detail ||
+                    'Unable to create temporary purchase.';
                 openPopup({
                     type: 'error',
                     title: 'Error',
@@ -246,12 +259,12 @@ function PackagePurchaseModal({
                 recipientPhone: purchaseType === 'gift' ? recipientPhone.trim() : undefined,
                 purchaseName: purchaseName.trim(),
             };
-            
+
             // Only add memberPhones for coaching packages (organization type)
             if (!isSimulatorPackage && purchaseType === 'organization') {
                 purchasePayload.memberPhones = memberPhones.map(m => m.phone);
             }
-            
+
             const result = await dispatch(purchaseAction(purchasePayload));
 
             const fulfilledAction = isSimulatorPackage ? createSimulatorPackagePurchase.fulfilled : createPackagePurchase.fulfilled;
@@ -260,7 +273,7 @@ function PackagePurchaseModal({
                 setRecipientPhone('');
                 // setPhoneValidated(false);
                 setNotes('');
-                
+
                 openPopup({
                     type: 'success',
                     title: purchaseType === 'gift' ? 'Gift Purchased!' : 'Package Purchased!',
@@ -276,9 +289,9 @@ function PackagePurchaseModal({
                     onClose();
                 }, 1500);
             } else {
-                const errorMsg = result.payload?.error || 
-                               result.payload?.detail ||
-                               'Unable to complete purchase.';
+                const errorMsg = result.payload?.error ||
+                    result.payload?.detail ||
+                    'Unable to complete purchase.';
                 openPopup({
                     type: 'error',
                     title: 'Error',
@@ -533,6 +546,31 @@ function PackagePurchaseModal({
                     }
                 } : closePopup}
                 onClose={closePopup}
+            />
+
+            {/* Square Payment Modal */}
+            <SquarePaymentModal
+                isOpen={squarePayment.isOpen}
+                onClose={() => setSquarePayment({ isOpen: false, tempId: null, amount: null, packageTitle: '' })}
+                onSuccess={(data) => {
+                    setSquarePayment({ isOpen: false, tempId: null, amount: null, packageTitle: '' });
+                    openPopup({
+                        type: 'success',
+                        title: 'Purchase Successful!',
+                        message: 'Your package has been purchased. You can now book your sessions.',
+                    });
+                    if (onSuccess) onSuccess(data);
+                    setTimeout(() => {
+                        closePopup();
+                        onClose();
+                    }, 1500);
+                }}
+                tempId={squarePayment.tempId}
+                amount={squarePayment.amount}
+                currency="CAD"
+                paymentType="package"
+                description={squarePayment.packageTitle}
+                disableCoupons={!user}
             />
         </div>
     );

@@ -21,7 +21,8 @@ import {
     Clock,
     CalendarOff,
     MapPin,
-    Megaphone
+    Megaphone,
+    Ticket
 } from 'lucide-react';
 import logo from '../assets/hole9golf-logo.png';
 
@@ -82,6 +83,7 @@ function AdminLayout() {
                 ...((isAdmin || isSuperadmin) ? [{ path: '/admin/banners', label: 'Manage Banners', icon: Megaphone }] : []),
                 { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },
                 { path: '/admin/liability-waiver', label: 'Manage Liability Waiver', icon: ShieldCheck },
+                { path: '/admin/coupons', label: 'Manage Coupons', icon: Ticket },
                 ...(isSuperadmin ? [{ path: '/admin/ghl-locations', label: 'Manage GHL Locations', icon: MapPin }] : []),
             ]
         },

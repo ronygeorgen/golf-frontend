@@ -27,6 +27,7 @@ import BannerManagement from './components/BannerManagement';
 import ClosedDaysManagement from './components/ClosedDaysManagement';
 import LiabilityWaiverManagement from './components/LiabilityWaiverManagement';
 import GHLLocationManagement from './components/GHLLocationManagement';
+import CouponManagement from './components/CouponManagement';
 import EventRegistrations from './pages/EventRegistrations';
 import Packages from './pages/Packages';
 import SpecialEvents from './pages/SpecialEvents';
@@ -241,6 +242,7 @@ function AppContent() {
                 <Route path="closed-days" element={<ClosedDaysManagement />} />
                 <Route path="liability-waiver" element={<LiabilityWaiverManagement />} />
                 <Route path="ghl-locations" element={<GHLLocationManagement />} />
+                <Route path="coupons" element={<CouponManagement />} />
                 <Route path="bookings" element={<BookingManagement />} />
                 <Route path="calendar" element={<CalendarView />} />
                 <Route path="overrides" element={<AdminOverrides />} />

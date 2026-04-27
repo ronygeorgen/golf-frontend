@@ -10,6 +10,7 @@ import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
 import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
+import SquarePaymentModal from './SquarePaymentModal';
 
 function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
@@ -34,6 +35,13 @@ function SimulatorBooking({ client, onBookingSuccess }) {
     const [fetchingMaxSimulators, setFetchingMaxSimulators] = useState(false); // Loading state for fetching max simulators
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [usePrepaidHours, setUsePrepaidHours] = useState(null); // null = not selected, true = use prepaid, false = pay
+
+    // Square payment modal state
+    const [squarePayment, setSquarePayment] = useState({
+        isOpen: false,
+        tempId: null,
+        amount: null,
+    });
 
     // Step management: 'form' -> 'slots' -> 'payment'
     const [currentStep, setCurrentStep] = useState('form');
@@ -539,37 +547,36 @@ function SimulatorBooking({ client, onBookingSuccess }) {
 
                 // Check if this is a redirect response (temp booking created for payment)
                 if (response && response.temp_id && response.redirect_url) {
-                    console.log('✅ Redirect response detected:', response);
-                    // Build redirect URL with query params
+                    console.log('✅ Temp booking created, opening Square payment modal:', response);
+
+                    /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
                     const buyerPhone = user?.phone;
                     if (!buyerPhone) {
                         showError('Phone number not found. Please ensure you are logged in.');
                         return;
                     }
-
                     const url = new URL(response.redirect_url);
                     url.searchParams.set('phone', buyerPhone);
                     url.searchParams.set('recipient_phone', response.temp_id);
-
                     const validSimulatorCount = simulatorCount && simulatorCount >= 1 ? simulatorCount : 1;
                     const count = (duration / 60) * validSimulatorCount;
                     url.searchParams.set('count', count.toString());
-
                     openPopup({
                         type: 'success',
                         title: 'Redirecting to Payment...',
                         message: 'You will be redirected to complete your booking payment.',
                     });
+                    if (onBookingSuccess) { onBookingSuccess(); }
+                    setTimeout(() => { window.location.href = url.toString(); }, 1000);
+                    return;
+                    ------- END GHL Redirect ------- */
 
-                    // Call onBookingSuccess to close modal before redirect
-                    if (onBookingSuccess) {
-                        onBookingSuccess();
-                    }
-
-                    // Redirect after short delay
-                    setTimeout(() => {
-                        window.location.href = url.toString();
-                    }, 1000);
+                    // Square: open the payment modal
+                    setSquarePayment({
+                        isOpen: true,
+                        tempId: response.temp_id,
+                        amount: response.total_price,
+                    });
                     return;
                 }
 
@@ -1104,6 +1111,36 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                     }
                 } : closePopup}
                 onClose={closePopup}
+            />
+
+            {/* Square Payment Modal */}
+            <SquarePaymentModal
+                isOpen={squarePayment.isOpen}
+                onClose={() => setSquarePayment({ isOpen: false, tempId: null, amount: null })}
+                onSuccess={(data) => {
+                    setSquarePayment({ isOpen: false, tempId: null, amount: null });
+                    dispatch(clearAvailability());
+                    setSelectedSlot(null);
+                    setBookingSuccess(true);
+                    setUsePrepaidHours(null);
+                    setCurrentStep('form');
+                    setDate('');
+                    setDuration(60);
+                    const params = { use_organization: true };
+                    if (client) params.user_id = client.id;
+                    dispatch(getSimulatorCredits(client ? { user_id: client.id } : {}));
+                    dispatch(getAvailableSimulatorHours(params));
+                    showSuccess('Booking confirmed and payment successful!');
+                    if (onBookingSuccess) {
+                        setTimeout(() => onBookingSuccess(), 1500);
+                    }
+                }}
+                tempId={squarePayment.tempId}
+                amount={squarePayment.amount}
+                currency="CAD"
+                paymentType="simulator"
+                disableCoupons={!user}
+                description={`Simulator Booking — ${duration / 60} hr${duration > 60 ? 's' : ''} × ${simulatorCount} bay${simulatorCount > 1 ? 's' : ''}`}
             />
         </div>
     );
