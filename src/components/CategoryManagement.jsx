@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
@@ -8,7 +9,7 @@ import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
-import { Edit, Trash2, Power, PowerOff, Plus } from 'lucide-react';
+import { Edit, Trash2, Power, PowerOff, Plus, Layers } from 'lucide-react';
 
 const LEGACY_TYPE_LABELS = {
     simulator: 'Simulator (legacy)',
@@ -34,6 +35,7 @@ function toSlug(str) {
 }
 
 function CategoryManagement() {
+    const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const modalRef = useRef(null);
@@ -263,6 +265,15 @@ function CategoryManagement() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center justify-end gap-2">
+                                                {!cat.legacy_booking_type && (
+                                                    <button
+                                                        title="Manage Assets"
+                                                        onClick={() => navigate(`/admin/categories/${cat.id}/assets`)}
+                                                        className="p-1.5 rounded hover:bg-teal-100 text-text-secondary hover:text-teal-700 transition-colors"
+                                                    >
+                                                        <Layers className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button
                                                     title="Edit"
                                                     onClick={() => handleEdit(cat)}

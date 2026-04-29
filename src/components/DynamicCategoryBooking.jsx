@@ -33,6 +33,18 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     // ── Step management (mirrors CoachingBooking) ────────────────────────── //
     const [currentStep, setCurrentStep] = useState('form');
 
+    // ── Category Assets ──────────────────────────────────────────────────── //
+    const [assets, setAssets] = useState([]);
+    const [selectedAssetId, setSelectedAssetId] = useState('');
+    const [loadingAssets, setLoadingAssets] = useState(false);
+
+    const selectedAsset = useMemo(
+        () => assets.find((a) => a.id === Number(selectedAssetId)) || null,
+        [assets, selectedAssetId],
+    );
+    // When an asset-only (needs_staff=False) asset is selected, no package/coach needed
+    const isAssetOnly = selectedAsset && !selectedAsset.needs_staff;
+
     // ── Catalog packages + user purchases ───────────────────────────────── //
     const [packages, setPackages] = useState([]);
     const [purchasedPackages, setPurchasedPackages] = useState([]);
@@ -121,7 +133,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         : moment.tz(todayStr, tz).add(1, 'days').format('YYYY-MM-DD');
     const maxDateString = moment.tz(todayStr, tz).add(30, 'days').format('YYYY-MM-DD');
 
-    // ── Load catalog + purchases ─────────────────────────────────────────── //
+    // ── Load catalog + purchases + assets ────────────────────────────────── //
     useEffect(() => {
         if (!category?.id) return;
         let cancelled = false;
@@ -160,8 +172,28 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             }
         }
 
+        async function loadAssets() {
+            setLoadingAssets(true);
+            try {
+                const res = await apiClient.get(endpoints.categories.assets.list(category.id));
+                if (!cancelled) {
+                    const data = (Array.isArray(res.data) ? res.data : res.data?.results || []).filter(a => a.is_active);
+                    setAssets(data);
+                    // Auto-select first asset if only asset-only assets exist
+                    if (data.length > 0 && !selectedAssetId) {
+                        setSelectedAssetId(String(data[0].id));
+                    }
+                }
+            } catch {
+                if (!cancelled) setAssets([]);
+            } finally {
+                if (!cancelled) setLoadingAssets(false);
+            }
+        }
+
         loadCatalog();
         loadPurchases();
+        loadAssets();
         return () => { cancelled = true; };
     }, [category?.id, client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -206,13 +238,17 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             openPopup({ type: 'warning', title: 'Select a date', message: 'Please choose a date before checking availability.' });
             return;
         }
-        if (!selectedPackageId) {
-            openPopup({ type: 'warning', title: 'Select a package', message: 'Please choose a package before checking availability.' });
-            return;
-        }
-        if (!hasSessions) {
-            openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package to continue.' });
-            return;
+
+        // Asset-only booking: no package needed
+        if (!isAssetOnly) {
+            if (!selectedPackageId) {
+                openPopup({ type: 'warning', title: 'Select a package', message: 'Please choose a package before checking availability.' });
+                return;
+            }
+            if (!hasSessions) {
+                openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package to continue.' });
+                return;
+            }
         }
 
         // Store for back-navigation
@@ -228,8 +264,11 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
 
         try {
             const params = { date };
-            if (selectedPackageId) params.package_id = selectedPackageId;
-            if (selectedCoachId) params.coach_id = selectedCoachId;
+            if (selectedAssetId) params.asset_id = selectedAssetId;
+            if (!isAssetOnly) {
+                if (selectedPackageId) params.package_id = selectedPackageId;
+                if (selectedCoachId) params.coach_id = selectedCoachId;
+            }
             const { data } = await apiClient.get(endpoints.categories.slots(category.id), { params });
             const fetched = data?.available_slots || [];
             setSlots(fetched);
@@ -249,7 +288,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         } finally {
             setLoadingSlots(false);
         }
-    }, [category?.id, date, selectedPackageId, selectedCoachId, hasSessions, openPopup]);
+    }, [category?.id, date, selectedPackageId, selectedCoachId, selectedAssetId, isAssetOnly, hasSessions, openPopup]);
 
     // ── Back navigation (mirrors CoachingBooking) ────────────────────────── //
     const handleBack = () => {
@@ -282,12 +321,17 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             const target = client || user;
             const payload = {
                 booking_type: 'coaching',
-                coaching_package: selectedPkg?.id || null,
-                coach: coachData?.id,
+                coaching_package: isAssetOnly ? null : (selectedPkg?.id || null),
+                coach: isAssetOnly ? null : (coachData?.id || null),
                 start_time: selectedSlot.start_time,
                 end_time: selectedSlot.end_time,
-                total_price: selectedPkg?.price || 0,
+                total_price: isAssetOnly
+                    ? (selectedAsset?.price_per_hour
+                        ? (parseFloat(selectedAsset.price_per_hour) * ((selectedPkg?.session_duration_minutes || 60) / 60)).toFixed(2)
+                        : 0)
+                    : (selectedPkg?.price || 0),
                 service_category: category.id,
+                ...(selectedAssetId && { category_asset: parseInt(selectedAssetId) }),
             };
             if (target?.id && isAdminOrStaff) {
                 payload.client = target.id;
@@ -425,7 +469,44 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                 />
                             </div>
 
-                            {/* Package selector */}
+                            {/* Asset selector — shown when category has assets */}
+                            {assets.length > 0 && (
+                                <div>
+                                    <label className="block text-sm font-medium text-text-primary mb-2">Select Asset</label>
+                                    {loadingAssets ? (
+                                        <p className="text-sm text-text-secondary">Loading assets…</p>
+                                    ) : (
+                                        <select
+                                            value={selectedAssetId}
+                                            onChange={(e) => {
+                                                setSelectedAssetId(e.target.value);
+                                                setSelectedPackageId('');
+                                                setSelectedCoachId('');
+                                                setSlots([]);
+                                                setSelectedSlot(null);
+                                            }}
+                                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                        >
+                                            <option value="">-- Select an asset --</option>
+                                            {assets.map((a) => (
+                                                <option key={a.id} value={a.id}>
+                                                    {a.name}{a.price_per_hour ? ` — $${parseFloat(a.price_per_hour).toFixed(2)}/hr` : ''}
+                                                    {a.needs_staff ? ' (with staff)' : ' (self-booking)'}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {selectedAsset && !selectedAsset.needs_staff && (
+                                        <p className="text-xs text-text-secondary mt-1">
+                                            This asset is bookable without a coach. Pick a time slot below to confirm.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Package selector — only shown when no asset selected, or asset needs_staff=True */}
+                            {!isAssetOnly && (
+                            <>
                             <div>
                                 <label className="block text-sm font-medium text-text-primary mb-2">Select Package</label>
                                 {availablePackages.length === 0 ? (
@@ -541,6 +622,19 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                     </Button>
                                 </>
                             )}
+                            </> )} {/* end !isAssetOnly */}
+
+                            {/* Check availability button for asset-only bookings */}
+                            {isAssetOnly && (
+                                <Button
+                                    onClick={checkAvailability}
+                                    disabled={loadingSlots || !date}
+                                    variant="primary"
+                                    className="w-full py-3"
+                                >
+                                    {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -652,6 +746,12 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                             <p className="text-text-primary">
                                 <span className="font-medium">Category:</span> {category.customer_label || category.name}
                             </p>
+                            {selectedAsset && (
+                                <p className="text-text-primary">
+                                    <span className="font-medium">Asset:</span> {selectedAsset.name}
+                                    {selectedAsset.price_per_hour && ` ($${parseFloat(selectedAsset.price_per_hour).toFixed(2)}/hr)`}
+                                </p>
+                            )}
                             <p className="text-text-primary">
                                 <span className="font-medium">Date:</span> {formatLocalDate(selectedSlot.start_time, tz)}
                             </p>
@@ -662,7 +762,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                             <p className="text-text-primary">
                                 <span className="font-medium">Duration:</span> {duration} minutes
                             </p>
-                            {selectedSlot.available_coaches?.length > 0 && (
+                            {!isAssetOnly && selectedSlot.available_coaches?.length > 0 && (
                                 <div className="mt-4">
                                     <p className="font-medium text-text-primary mb-2">Available Coaches:</p>
                                     <ul className="list-disc list-inside space-y-1">
@@ -672,7 +772,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                     </ul>
                                 </div>
                             )}
-                            {selectedPackageId && (
+                            {!isAssetOnly && selectedPackageId && (
                                 <p className="text-text-primary">
                                     <span className="font-medium">Sessions left after booking:</span>{' '}
                                     {Math.max(sessionsRemaining - 1, 0)}

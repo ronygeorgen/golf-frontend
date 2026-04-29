@@ -123,6 +123,14 @@ export const endpoints = {
             detail: (id) => `/admin/categories/${id}/`,
             toggleActive: (id) => `/admin/categories/${id}/toggle_active/`,
         },
+        // Category Assets
+        assets: {
+            list: (categoryId) => `/admin/category-assets/?category_id=${categoryId}`,
+            create: '/admin/category-assets/',
+            detail: (id) => `/admin/category-assets/${id}/`,
+            toggleActive: (id) => `/admin/category-assets/${id}/toggle_active/`,
+            availability: (id) => `/admin/category-assets/${id}/availability/`,
+        },
     },
 
     // Booking endpoints

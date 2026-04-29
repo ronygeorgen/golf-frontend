@@ -17,6 +17,7 @@ import SimulatorManagement from './components/SimulatorManagement';
 import SimulatorAvailability from './components/SimulatorAvailability';
 import PackageManagement from './components/PackageManagement';
 import CategoryManagement from './components/CategoryManagement';
+import CategoryAssetManagement from './components/CategoryAssetManagement';
 import UnifiedPackagesPage from './components/UnifiedPackagesPage';
 import SimulatorPackageManagement from './components/SimulatorPackageManagement';
 import UserManagement from './components/UserManagement';
@@ -237,6 +238,7 @@ function AppContent() {
                 <Route path="simulators" element={<SimulatorManagement />} />
                 <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
                 <Route path="categories" element={<CategoryManagement />} />
+                <Route path="categories/:categoryId/assets" element={<CategoryAssetManagement />} />
                 {/* Main packages hub — all categories in one place */}
                 <Route path="packages" element={<UnifiedPackagesPage />} />
                 {/* Legacy per-type routes kept for direct linking / backward compat */}
