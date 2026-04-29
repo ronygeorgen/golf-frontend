@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment-timezone';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -79,6 +80,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [serviceCategories, setServiceCategories] = useState([]);
     const [catDropdownOpen, setCatDropdownOpen] = useState(false);
     const catDropdownRef = useRef(null);
+    const catButtonRef = useRef(null);
+    const catPortalRef = useRef(null);
+    const [catDropdownPos, setCatDropdownPos] = useState({ top: 0, right: 0 });
 
     // Non-legacy categories only (legacy = simulator / coaching)
     const dynamicCategories = useMemo(
@@ -100,6 +104,9 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     // Simulators State
     const [simulators, setSimulators] = useState([]);
     const [simulatorsLoading, setSimulatorsLoading] = useState(false);
+
+    // Assets for the active dynamic category (Day view columns)
+    const [categoryAssets, setCategoryAssets] = useState([]);
 
     // Reschedule State
     const [rescheduleState, setRescheduleState] = useState({
@@ -151,16 +158,25 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             .catch(() => { });
     }, []);
 
-    // Close the category dropdown when clicking outside
+    // Close the category dropdown when clicking outside or scrolling
     useEffect(() => {
-        const handler = (e) => {
-            if (catDropdownRef.current && !catDropdownRef.current.contains(e.target)) {
+        const handleMouseDown = (e) => {
+            const insideButton = catDropdownRef.current && catDropdownRef.current.contains(e.target);
+            const insidePortal = catPortalRef.current && catPortalRef.current.contains(e.target);
+            if (!insideButton && !insidePortal) {
                 setCatDropdownOpen(false);
             }
         };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => document.removeEventListener('mousedown', handleMouseDown);
     }, []);
+
+    useEffect(() => {
+        if (!catDropdownOpen) return;
+        const handleScroll = () => setCatDropdownOpen(false);
+        window.addEventListener('scroll', handleScroll, true);
+        return () => window.removeEventListener('scroll', handleScroll, true);
+    }, [catDropdownOpen]);
 
     const fetchSimulators = async () => {
         setSimulatorsLoading(true);
@@ -177,6 +193,20 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     useEffect(() => {
         fetchSimulators();
     }, []);
+
+    // Fetch assets for the selected dynamic category so we can build Day-view columns
+    useEffect(() => {
+        if (!activeDynamicCat) {
+            setCategoryAssets([]);
+            return;
+        }
+        axios.get(endpoints.categories.assets.list(activeDynamicCat.id))
+            .then((res) => {
+                const active = (res.data.results ?? res.data).filter((a) => a.is_active);
+                setCategoryAssets(active.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+            })
+            .catch(() => setCategoryAssets([]));
+    }, [activeDynamicCat]);
 
     useEffect(() => {
         // Calculate date range based on current view using the center's timezone boundaries
@@ -809,7 +839,14 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             // Determine resource ID for day view
             let resourceId = null;
             if (view === 'day') {
-                if (booking.booking_type === 'simulator') {
+                if (calendarType.startsWith('cat-')) {
+                    // Map to the specific asset column; fall back to staff or generic column
+                    if (booking.category_asset) {
+                        resourceId = `asset-${booking.category_asset}`;
+                    } else {
+                        resourceId = categoryAssets.some((a) => a.needs_staff) ? 'cat-staff' : 'dynamic-cat';
+                    }
+                } else if (booking.booking_type === 'simulator') {
                     resourceId = `simulator-${booking.simulator_details?.id}`;
                 } else {
                     // Coaching or TPI
@@ -845,6 +882,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 service_category_id: serviceCatId,
                 service_category_name: booking.service_category_name || null,
                 is_legacy_category: isLegacyCat,
+                category_asset_id: booking.category_asset || null,
+                category_asset_name: booking.category_asset_name || null,
             };
         });
 
@@ -942,23 +981,38 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     });
 
     // Prepare Resources for Day View
-    const resources = view === 'day' ? [
-        ...simulators
-            .filter(sim => !sim.is_coaching_bay)
-            .sort((a, b) => a.bay_number - b.bay_number)
-            .map(sim => ({
-                id: `simulator-${sim.id}`,
-                title: sim.name
-            })),
-        {
-            id: 'coaching-bay',
-            title: simulators.find(sim => sim.is_coaching_bay)?.name || 'Coaching Bay Simulator'
-        },
-        {
-            id: 'special-events',
-            title: 'Special Events'
-        }
-    ] : null;
+    const resources = view === 'day'
+        ? calendarType.startsWith('cat-') && activeDynamicCat
+            ? [
+                // One column per asset; fall back to a single category column if no assets loaded
+                ...(categoryAssets.length > 0
+                    ? categoryAssets.map((a) => ({ id: `asset-${a.id}`, title: a.name }))
+                    : [{ id: 'dynamic-cat', title: activeDynamicCat.customer_label || activeDynamicCat.name }]
+                ),
+                // Extra column for staff-based bookings that have no specific asset
+                ...(categoryAssets.some((a) => a.needs_staff)
+                    ? [{ id: 'cat-staff', title: 'Staff Sessions' }]
+                    : []
+                ),
+              ]
+            : [
+                ...simulators
+                    .filter(sim => !sim.is_coaching_bay)
+                    .sort((a, b) => a.bay_number - b.bay_number)
+                    .map(sim => ({
+                        id: `simulator-${sim.id}`,
+                        title: sim.name
+                    })),
+                {
+                    id: 'coaching-bay',
+                    title: simulators.find(sim => sim.is_coaching_bay)?.name || 'Coaching Bay Simulator'
+                },
+                {
+                    id: 'special-events',
+                    title: 'Special Events'
+                }
+              ]
+        : null;
 
     return (
         <div className="p-4 md:p-6 lg:p-8 w-full">
@@ -1043,7 +1097,17 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     {dynamicCategories.length > 0 && (
                                         <div className="relative" ref={catDropdownRef}>
                                             <button
-                                                onClick={() => setCatDropdownOpen((o) => !o)}
+                                                ref={catButtonRef}
+                                                onClick={() => {
+                                                    if (!catDropdownOpen && catButtonRef.current) {
+                                                        const rect = catButtonRef.current.getBoundingClientRect();
+                                                        setCatDropdownPos({
+                                                            top: rect.bottom + 4,
+                                                            right: window.innerWidth - rect.right,
+                                                        });
+                                                    }
+                                                    setCatDropdownOpen((o) => !o);
+                                                }}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${calendarType.startsWith('cat-') ? 'text-white shadow-sm' : 'text-text-secondary hover:bg-surface'}`}
                                                 style={calendarType.startsWith('cat-') && activeDynamicCat
                                                     ? { backgroundColor: DYNAMIC_CAT_COLORS[activeDynamicCat.id % DYNAMIC_CAT_COLORS.length] }
@@ -1056,8 +1120,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                 <ChevronDown className={`w-3 h-3 transition-transform ${catDropdownOpen ? 'rotate-180' : ''}`} />
                                             </button>
 
-                                            {catDropdownOpen && (
-                                                <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden min-w-[160px]">
+                                            {catDropdownOpen && createPortal(
+                                                <div
+                                                    ref={catPortalRef}
+                                                    style={{ position: 'fixed', top: catDropdownPos.top, right: catDropdownPos.right, zIndex: 9999 }}
+                                                    className="bg-surface border border-border rounded-xl shadow-2xl min-w-[160px] max-h-60 overflow-y-auto"
+                                                >
                                                     {dynamicCategories.map((cat) => {
                                                         const color = DYNAMIC_CAT_COLORS[cat.id % DYNAMIC_CAT_COLORS.length];
                                                         const isActive = calendarType === `cat-${cat.id}`;
@@ -1072,7 +1140,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                                             </button>
                                                         );
                                                     })}
-                                                </div>
+                                                </div>,
+                                                document.body
                                             )}
                                         </div>
                                     )}

@@ -327,8 +327,8 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                 end_time: selectedSlot.end_time,
                 total_price: isAssetOnly
                     ? (selectedAsset?.price_per_hour
-                        ? (parseFloat(selectedAsset.price_per_hour) * ((selectedPkg?.session_duration_minutes || 60) / 60)).toFixed(2)
-                        : 0)
+                        ? (parseFloat(selectedAsset.price_per_hour) * ((selectedSlot?.duration_minutes || 60) / 60)).toFixed(2)
+                        : '0.00')
                     : (selectedPkg?.price || 0),
                 service_category: category.id,
                 ...(selectedAssetId && { category_asset: parseInt(selectedAssetId) }),
@@ -363,13 +363,16 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             openPopup({ type: 'warning', title: 'Select a slot', message: 'Please choose a time slot before confirming.' });
             return;
         }
-        if (!selectedSlot.available_coaches?.length) {
-            openPopup({ type: 'warning', title: 'No coach available', message: 'No coach is available for this slot. Please select another time.' });
-            return;
-        }
-        if (!hasSessions) {
-            openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package.' });
-            return;
+        // Only check coach + session requirements for staff-based bookings
+        if (!isAssetOnly) {
+            if (!selectedSlot.available_coaches?.length) {
+                openPopup({ type: 'warning', title: 'No coach available', message: 'No coach is available for this slot. Please select another time.' });
+                return;
+            }
+            if (!hasSessions) {
+                openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package.' });
+                return;
+            }
         }
         if (client) {
             openPopup({
