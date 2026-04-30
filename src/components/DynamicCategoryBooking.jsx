@@ -19,6 +19,7 @@ import DateInput from './ui/DateInput';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
+import SquarePaymentModal from './SquarePaymentModal';
 
 function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     const { user: reduxUser, locationTimezone } = useAppSelector((s) => s.auth);
@@ -44,6 +45,14 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     );
     // When an asset-only (needs_staff=False) asset is selected, no package/coach needed
     const isAssetOnly = selectedAsset && !selectedAsset.needs_staff;
+
+    // Square payment modal state
+    const [squarePayment, setSquarePayment] = useState({
+        isOpen: false,
+        tempId: null,
+        amount: null,
+        paymentType: 'asset',
+    });
 
     // ── Catalog packages + user purchases ───────────────────────────────── //
     const [packages, setPackages] = useState([]);
@@ -346,7 +355,20 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             if (target?.id && isAdminOrStaff) {
                 payload.client = target.id;
             }
-            await apiClient.post(endpoints.bookings.create, payload);
+            const response = await apiClient.post(endpoints.bookings.create, payload);
+
+            // Check if this is a redirect response (temp booking created for payment)
+            if (response.data && response.data.temp_id) {
+                console.log('✅ Temp booking created, opening Square payment modal:', response.data);
+                setSquarePayment({
+                    isOpen: true,
+                    tempId: response.data.temp_id,
+                    amount: response.data.total_price,
+                    paymentType: isAssetOnly ? `asset:${selectedAsset?.id}` : (response.data.payment_type || 'asset'),
+                });
+                return;
+            }
+
             setBookingSuccess(true);
             setCurrentStep('form');
             setDate('');
@@ -520,123 +542,123 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
 
                             {/* Package selector — only shown when no asset selected, or asset needs_staff=True */}
                             {!isAssetOnly && (
-                            <>
-                            <div>
-                                <label className="block text-sm font-medium text-text-primary mb-2">Select Package</label>
-                                {availablePackages.length === 0 ? (
-                                    <div className="border border-border rounded-button p-6 text-center bg-background">
-                                        <p className="text-text-secondary mb-4">
-                                            {client
-                                                ? `${client.first_name} doesn't have any packages with available sessions for ${category.customer_label || category.name}.`
-                                                : `You don't have any packages with available sessions for ${category.customer_label || category.name}.`}
-                                        </p>
-                                        {!client && (
-                                            <Button onClick={() => navigate('/packages')} variant="primary" className="w-full">
-                                                Add Package
-                                            </Button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <select
-                                        value={selectedPackageId}
-                                        onChange={(e) => {
-                                            setSelectedPackageId(e.target.value);
-                                            setSelectedCoachId('');
-                                        }}
-                                        className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                    >
-                                        <option value="" disabled>Select a package</option>
-                                        {availablePackages.map((pkg) => (
-                                            <option key={pkg.id} value={pkg.id}>{pkg.title}</option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-
-                            {availablePackages.length > 0 && (
                                 <>
-                                    {/* Session duration (read-only) */}
                                     <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-2">
-                                            Your session duration will be
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={selectedPkg ? `${duration} minutes` : 'Select a package to see session length'}
-                                            disabled
-                                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
-                                        />
-                                        <p className="text-xs text-text-secondary mt-1">
-                                            Duration is locked to your package and consumes one session.
-                                        </p>
-                                    </div>
-
-                                    {/* Sessions remaining */}
-                                    {selectedPackageId && (
-                                        <div className="border border-border rounded-card bg-background p-4 space-y-2">
-                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                                <div>
-                                                    <p className="text-sm text-text-secondary">Sessions remaining</p>
-                                                    <p className={`text-2xl font-bold ${hasSessions ? 'text-status-confirmed-text' : 'text-danger'}`}>
-                                                        {sessionsRemaining}
-                                                    </p>
-                                                </div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">Select Package</label>
+                                        {availablePackages.length === 0 ? (
+                                            <div className="border border-border rounded-button p-6 text-center bg-background">
+                                                <p className="text-text-secondary mb-4">
+                                                    {client
+                                                        ? `${client.first_name} doesn't have any packages with available sessions for ${category.customer_label || category.name}.`
+                                                        : `You don't have any packages with available sessions for ${category.customer_label || category.name}.`}
+                                                </p>
                                                 {!client && (
-                                                    <Button
-                                                        type="button"
-                                                        onClick={() => navigate('/packages')}
-                                                        variant="accent"
-                                                    >
-                                                        {hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
+                                                    <Button onClick={() => navigate('/packages')} variant="primary" className="w-full">
+                                                        Add Package
                                                     </Button>
                                                 )}
                                             </div>
-                                            {!hasSessions && (
-                                                <p className="text-sm text-danger">
-                                                    {client
-                                                        ? 'Cannot access packages while booking for a client. Please reset booking flow first.'
-                                                        : 'You are out of sessions. Add another package bundle before booking.'}
+                                        ) : (
+                                            <select
+                                                value={selectedPackageId}
+                                                onChange={(e) => {
+                                                    setSelectedPackageId(e.target.value);
+                                                    setSelectedCoachId('');
+                                                }}
+                                                className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                            >
+                                                <option value="" disabled>Select a package</option>
+                                                {availablePackages.map((pkg) => (
+                                                    <option key={pkg.id} value={pkg.id}>{pkg.title}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+
+                                    {availablePackages.length > 0 && (
+                                        <>
+                                            {/* Session duration (read-only) */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                                    Your session duration will be
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={selectedPkg ? `${duration} minutes` : 'Select a package to see session length'}
+                                                    disabled
+                                                    className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-secondary"
+                                                />
+                                                <p className="text-xs text-text-secondary mt-1">
+                                                    Duration is locked to your package and consumes one session.
                                                 </p>
-                                            )}
-                                        </div>
-                                    )}
+                                            </div>
 
-                                    {/* Coach selector */}
-                                    {selectedPackageId && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                                Select Coach
-                                            </label>
-                                            {coaches.length > 0 ? (
-                                                <select
-                                                    value={selectedCoachId}
-                                                    onChange={(e) => setSelectedCoachId(e.target.value)}
-                                                    className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                                >
-                                                    <option value="">All Coaches in Package</option>
-                                                    {coaches.map((c) => (
-                                                        <option key={c.id} value={c.id}>
-                                                            {c.first_name} {c.last_name} ({c.email})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <p className="text-sm text-danger">No coaches are assigned to this package yet.</p>
+                                            {/* Sessions remaining */}
+                                            {selectedPackageId && (
+                                                <div className="border border-border rounded-card bg-background p-4 space-y-2">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                        <div>
+                                                            <p className="text-sm text-text-secondary">Sessions remaining</p>
+                                                            <p className={`text-2xl font-bold ${hasSessions ? 'text-status-confirmed-text' : 'text-danger'}`}>
+                                                                {sessionsRemaining}
+                                                            </p>
+                                                        </div>
+                                                        {!client && (
+                                                            <Button
+                                                                type="button"
+                                                                onClick={() => navigate('/packages')}
+                                                                variant="accent"
+                                                            >
+                                                                {hasSessions ? 'Add More Sessions' : 'Add Package Sessions'}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                    {!hasSessions && (
+                                                        <p className="text-sm text-danger">
+                                                            {client
+                                                                ? 'Cannot access packages while booking for a client. Please reset booking flow first.'
+                                                                : 'You are out of sessions. Add another package bundle before booking.'}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             )}
-                                        </div>
-                                    )}
 
-                                    <Button
-                                        onClick={checkAvailability}
-                                        disabled={loadingSlots || (!!selectedPackageId && !hasSessions)}
-                                        variant="primary"
-                                        className="w-full py-3"
-                                    >
-                                        {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
-                                    </Button>
-                                </>
-                            )}
-                            </> )} {/* end !isAssetOnly */}
+                                            {/* Coach selector */}
+                                            {selectedPackageId && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-text-primary mb-2">
+                                                        Select Coach
+                                                    </label>
+                                                    {coaches.length > 0 ? (
+                                                        <select
+                                                            value={selectedCoachId}
+                                                            onChange={(e) => setSelectedCoachId(e.target.value)}
+                                                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                        >
+                                                            <option value="">All Coaches in Package</option>
+                                                            {coaches.map((c) => (
+                                                                <option key={c.id} value={c.id}>
+                                                                    {c.first_name} {c.last_name} ({c.email})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <p className="text-sm text-danger">No coaches are assigned to this package yet.</p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <Button
+                                                onClick={checkAvailability}
+                                                disabled={loadingSlots || (!!selectedPackageId && !hasSessions)}
+                                                variant="primary"
+                                                className="w-full py-3"
+                                            >
+                                                {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
+                                            </Button>
+                                        </>
+                                    )}
+                                </>)} {/* end !isAssetOnly */}
 
                             {/* Duration selector + Check availability for asset-only bookings */}
                             {isAssetOnly && (
@@ -720,18 +742,17 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                     const isSelected =
                                         selectedSlot &&
                                         new Date(selectedSlot.start_time).getTime() ===
-                                            new Date(slot.start_time).getTime();
+                                        new Date(slot.start_time).getTime();
 
                                     return (
                                         <div
                                             key={index}
-                                            className={`p-4 border-2 rounded-card transition duration-200 relative group ${
-                                                disabled
-                                                    ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
-                                                    : isSelected
+                                            className={`p-4 border-2 rounded-card transition duration-200 relative group ${disabled
+                                                ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
+                                                : isSelected
                                                     ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
                                                     : 'border-border hover:border-primary hover:bg-background cursor-pointer'
-                                            }`}
+                                                }`}
                                             onClick={() => !disabled && handleSlotSelect(slot)}
                                         >
                                             <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
@@ -849,6 +870,26 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                 showCancel={popup.showCancel}
                 onConfirm={popup.onConfirm ? async () => { const fn = popup.onConfirm; closePopup(); if (fn) await fn(); } : closePopup}
                 onClose={closePopup}
+            />
+
+            {/* Square Payment Modal */}
+            <SquarePaymentModal
+                isOpen={squarePayment.isOpen}
+                onClose={() => setSquarePayment({ ...squarePayment, isOpen: false })}
+                tempId={squarePayment.tempId}
+                amount={squarePayment.amount}
+                paymentType={squarePayment.paymentType}
+                onSuccess={() => {
+                    setSquarePayment({ ...squarePayment, isOpen: false });
+                    setBookingSuccess(true);
+                    setCurrentStep('form');
+                    setDate('');
+                    setSelectedPackageId('');
+                    setSelectedCoachId('');
+                    setSlots([]);
+                    setSelectedSlot(null);
+                    if (onBookingSuccess) onBookingSuccess();
+                }}
             />
         </div>
     );

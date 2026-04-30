@@ -111,7 +111,7 @@ function StaffAvailability() {
                 const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
                 setServiceCategories(data.filter((c) => c.is_active));
             })
-            .catch(() => {});
+            .catch(() => { });
     }, [dispatch]);
 
     useEffect(() => {
@@ -295,6 +295,16 @@ function StaffAvailability() {
     const availabilityArray = Array.isArray(availability) ? availability : [];
     const dayAvailabilityArray = Array.isArray(dayAvailability) ? dayAvailability : [];
 
+    const activeBlockedDates = useMemo(() => {
+        if (!blockedDates) return [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return blockedDates.filter(bd => {
+            const blockDate = new Date(bd.date + 'T00:00:00');
+            return blockDate >= today;
+        });
+    }, [blockedDates]);
+
     const weeklyFormatted = availabilityArray.map((a) => ({ ...a, type: 'weekly', displayKey: `weekly-${a.id}`, sortKey: `${a.day_of_week}-${a.start_time}` }));
     const daySpecificFormatted = dayAvailabilityArray.map((a) => ({ ...a, type: 'day_specific', displayKey: `day-${a.id}`, sortKey: `${a.date}-${a.start_time}` }));
     const allAvailability = [...weeklyFormatted, ...daySpecificFormatted];
@@ -371,11 +381,10 @@ function StaffAvailability() {
                                             setShowAddForm(false);
                                             setAvailabilityType(null);
                                         }}
-                                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                                            isActive
-                                                ? 'border-blue-600 text-blue-600 bg-blue-50'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        } ${tab.isGeneral ? 'italic' : ''}`}
+                                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${isActive
+                                            ? 'border-blue-600 text-blue-600 bg-blue-50'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            } ${tab.isGeneral ? 'italic' : ''}`}
                                     >
                                         {tab.label}
                                     </button>
@@ -445,15 +454,14 @@ function StaffAvailability() {
 
                     {/* Add form */}
                     {showAddForm && (
-                        <div className={`mb-6 p-4 rounded-lg border ${
-                            availabilityType === 'weekly' ? 'bg-blue-50 border-blue-200' :
+                        <div className={`mb-6 p-4 rounded-lg border ${availabilityType === 'weekly' ? 'bg-blue-50 border-blue-200' :
                             availabilityType === 'day_specific' ? 'bg-green-50 border-green-200' :
-                            'bg-red-50 border-red-200'
-                        }`}>
+                                'bg-red-50 border-red-200'
+                            }`}>
                             <h3 className="text-base font-semibold text-gray-900 mb-3">
                                 {availabilityType === 'weekly' ? 'Add Weekly Recurring Availability' :
-                                 availabilityType === 'day_specific' ? 'Add Day-Specific Availability' :
-                                 'Block a Date'}
+                                    availabilityType === 'day_specific' ? 'Add Day-Specific Availability' :
+                                        'Block a Date'}
                                 {!activeTab.isGeneral && (
                                     <span className="ml-2 text-sm font-normal text-gray-500">
                                         — for {activeTab.label}
@@ -516,11 +524,10 @@ function StaffAvailability() {
                                     <button
                                         onClick={handleAddAvailability}
                                         disabled={addingAvailability}
-                                        className={`flex-1 text-white font-semibold py-2 px-4 rounded-lg transition disabled:cursor-not-allowed text-sm ${
-                                            availabilityType === 'weekly' ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300' :
+                                        className={`flex-1 text-white font-semibold py-2 px-4 rounded-lg transition disabled:cursor-not-allowed text-sm ${availabilityType === 'weekly' ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300' :
                                             availabilityType === 'day_specific' ? 'bg-green-600 hover:bg-green-700 disabled:bg-green-300' :
-                                            'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
-                                        }`}
+                                                'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
+                                            }`}
                                     >
                                         {addingAvailability ? (availabilityType === 'block_date' ? 'Blocking…' : 'Adding…') : (availabilityType === 'block_date' ? 'Block Date' : 'Add')}
                                     </button>
@@ -601,7 +608,7 @@ function StaffAvailability() {
                     )}
 
                     {/* Blocked Dates */}
-                    {!loading && blockedDates && blockedDates.length > 0 && (
+                    {!loading && activeBlockedDates.length > 0 && (
                         <div className="mt-8">
                             <h3 className="text-base font-semibold text-gray-900 mb-3">
                                 Blocked Dates
@@ -619,7 +626,7 @@ function StaffAvailability() {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {blockedDates.map((bd) => (
+                                        {activeBlockedDates.map((bd) => (
                                             <tr key={bd.id} className="hover:bg-gray-50">
                                                 <td className="px-4 py-4 whitespace-nowrap text-gray-900 font-medium text-sm">
                                                     {new Date(bd.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}

@@ -20,9 +20,29 @@ import PopupMessage from './PopupMessage';
 export default function CouponManagement() {
     const [coupons, setCoupons] = useState([]);
     const [usages, setUsages] = useState([]);
+    const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('coupons'); // 'coupons' | 'usages'
-    const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
+    const [popup, setPopup] = useState({
+        show: false,
+        message: '',
+        type: 'success',
+        title: '',
+        showCancel: false,
+        onConfirm: null,
+        confirmText: 'OK'
+    });
+
+    const [usageFilters, setUsageFilters] = useState({
+        user: '',
+        coupon: '',
+        startDate: '',
+        endDate: '',
+        purpose: '',
+        label: ''
+    });
+
+    const [allPackages, setAllPackages] = useState([]);
 
     // Modal states
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -42,18 +62,69 @@ export default function CouponManagement() {
 
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Preload assets to resolve names in usage history
     useEffect(() => {
-        fetchData();
+        const preloadAssets = async () => {
+            try {
+                const res = await apiClient.get(endpoints.categories.assets.list(''));
+                setAssets(res.data || []);
+
+                // Fetch packages for filters
+                const [cPackages, sPackages] = await Promise.all([
+                    apiClient.get(endpoints.coaching.active),
+                    apiClient.get(endpoints.coaching.simulatorPackagesActive)
+                ]);
+                setAllPackages([...(cPackages.data || []), ...(sPackages.data || [])]);
+            } catch (err) {
+                console.error('Failed to preload assets:', err);
+            }
+        };
+        preloadAssets();
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'coupons') {
+            fetchData();
+        }
     }, [activeTab]);
+
+    // Backend Search with Debounce for Usage History
+    useEffect(() => {
+        if (activeTab === 'usages') {
+            const timer = setTimeout(() => {
+                fetchData();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [usageFilters.user, usageFilters.coupon, usageFilters.label]);
+
+    // Immediate fetch for Selects/Dates
+    useEffect(() => {
+        if (activeTab === 'usages') {
+            fetchData();
+        }
+    }, [usageFilters.purpose, usageFilters.startDate, usageFilters.endDate, activeTab]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             if (activeTab === 'coupons') {
-                const res = await apiClient.get(endpoints.coupons.list);
-                setCoupons(res.data);
+                const [couponRes, assetRes] = await Promise.all([
+                    apiClient.get(endpoints.coupons.list),
+                    apiClient.get(endpoints.categories.assets.list(''))
+                ]);
+                setCoupons(couponRes.data);
+                setAssets(assetRes.data || []);
             } else {
-                const res = await apiClient.get(endpoints.coupons.usages);
+                const params = {
+                    user: usageFilters.user,
+                    coupon: usageFilters.coupon,
+                    purpose: usageFilters.purpose,
+                    start_date: usageFilters.startDate,
+                    end_date: usageFilters.endDate,
+                    label: usageFilters.label
+                };
+                const res = await apiClient.get(endpoints.coupons.usages, { params });
                 setUsages(res.data);
             }
         } catch (err) {
@@ -63,9 +134,21 @@ export default function CouponManagement() {
         }
     };
 
-    const showPopup = (message, type = 'success') => {
-        setPopup({ show: true, message, type });
-        setTimeout(() => setPopup({ ...popup, show: false }), 3000);
+    const showPopup = (message, type = 'success', options = {}) => {
+        setPopup({
+            show: true,
+            message,
+            type,
+            title: options.title || '',
+            showCancel: options.showCancel || false,
+            onConfirm: options.onConfirm || null,
+            confirmText: options.confirmText || 'OK'
+        });
+
+        // Auto-close toast messages (non-confirmation)
+        if (!options.onConfirm && !options.showCancel) {
+            setTimeout(() => setPopup(p => ({ ...p, show: false })), 3000);
+        }
     };
 
     const handleOpenEditModal = (coupon = null) => {
@@ -127,15 +210,27 @@ export default function CouponManagement() {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this coupon?')) return;
-        try {
-            await apiClient.delete(endpoints.coupons.detail(id));
-            showPopup('Coupon deleted.');
-            fetchData();
-        } catch (err) {
-            showPopup('Failed to delete coupon.', 'error');
-        }
+    const handleDelete = (id) => {
+        showPopup(
+            'Are you sure you want to delete this coupon? This action cannot be undone.',
+            'warning',
+            {
+                title: 'Delete Coupon',
+                showCancel: true,
+                confirmText: 'Delete',
+                onConfirm: async () => {
+                    try {
+                        await apiClient.delete(endpoints.coupons.detail(id));
+                        setPopup(p => ({ ...p, show: false }));
+                        // Short delay to let the confirm modal close before showing success
+                        setTimeout(() => showPopup('Coupon deleted successfully!'), 300);
+                        fetchData();
+                    } catch (err) {
+                        showPopup('Failed to delete coupon.', 'error');
+                    }
+                }
+            }
+        );
     };
 
     const toggleStatus = async (coupon) => {
@@ -147,10 +242,14 @@ export default function CouponManagement() {
         }
     };
 
-    const filteredCoupons = coupons.filter(c =>
-        c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredCoupons = coupons
+        .filter(c =>
+            c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const filteredUsages = usages;
 
     return (
         <div className="space-y-6">
@@ -191,13 +290,12 @@ export default function CouponManagement() {
                 <div className="bg-surface rounded-card border border-border overflow-hidden">
                     <div className="p-4 border-b border-border bg-background/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
                         <div className="relative w-full sm:max-w-xs">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
                             <input
                                 type="text"
                                 placeholder="Search coupons..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-surface border border-border rounded-button text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                                className="w-full px-4 py-2 bg-surface border border-border rounded-button text-sm focus:ring-2 focus:ring-primary/20 outline-none"
                             />
                         </div>
                         <button
@@ -253,7 +351,22 @@ export default function CouponManagement() {
                                                     {coupon.discount_type === 'percentage' ? `${coupon.discount_value}% OFF` : `$${coupon.discount_value} OFF`}
                                                 </span>
                                                 <span className="text-[10px] font-semibold text-text-secondary uppercase">
-                                                    {coupon.applicable_to === 'all' ? 'Global Coupon' : `${coupon.applicable_to} only`}
+                                                    {coupon.applicable_to === 'all' ? 'Global Coupon' :
+                                                        coupon.applicable_to.split(',').map(t => {
+                                                            const map = {
+                                                                'simulator': 'Simulator',
+                                                                'package': 'Packages',
+                                                                'event': 'Events',
+                                                                'asset': 'All Assets'
+                                                            };
+                                                            if (t.trim().startsWith('asset:')) {
+                                                                const aid = t.trim().split(':')[1];
+                                                                const asset = assets.find(a => a.id.toString() === aid);
+                                                                return asset ? `Asset: ${asset.name}` : `Asset #${aid}`;
+                                                            }
+                                                            return map[t.trim()] || t;
+                                                        }).join(' | ')
+                                                    }
                                                 </span>
                                             </div>
                                         </td>
@@ -316,64 +429,172 @@ export default function CouponManagement() {
                     </div>
                 </div>
             ) : (
-                <div className="bg-surface rounded-card border border-border overflow-hidden">
-                    <div className="p-4 border-b border-border bg-background/50">
-                        <h3 className="font-semibold text-text-primary flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-primary" />
-                            Recent Coupon Applications
-                        </h3>
+                <div className="space-y-4">
+                    <div className="bg-surface rounded-card border border-border p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">User</label>
+                                <input
+                                    type="text"
+                                    placeholder="Search user..."
+                                    value={usageFilters.user}
+                                    onChange={(e) => setUsageFilters({ ...usageFilters, user: e.target.value })}
+                                    className="w-full px-3 py-1.5 bg-background border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Coupon</label>
+                                <input
+                                    type="text"
+                                    placeholder="Search code..."
+                                    value={usageFilters.coupon}
+                                    onChange={(e) => setUsageFilters({ ...usageFilters, coupon: e.target.value })}
+                                    className="w-full px-3 py-1.5 bg-background border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Purpose</label>
+                                <select
+                                    value={usageFilters.purpose}
+                                    onChange={(e) => setUsageFilters({ ...usageFilters, purpose: e.target.value, label: '' })}
+                                    className="w-full px-3 py-1.5 bg-background border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
+                                >
+                                    <option value="">All Purposes</option>
+                                    <option value="simulator">Simulator</option>
+                                    <option value="package">Packages</option>
+                                    <option value="event">Events</option>
+                                    <option value="asset">Assets</option>
+                                </select>
+                            </div>
+                            {usageFilters.purpose === 'package' && (
+                                <div>
+                                    <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Package Type</label>
+                                    <select
+                                        value={usageFilters.label}
+                                        onChange={(e) => setUsageFilters({ ...usageFilters, label: e.target.value })}
+                                        className="w-full px-3 py-1.5 bg-background border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary font-medium"
+                                    >
+                                        <option value="">All Packages</option>
+                                        {allPackages.map(pkg => (
+                                            <option key={pkg.id} value={pkg.title}>{pkg.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={usageFilters.startDate}
+                                    onChange={(e) => setUsageFilters({ ...usageFilters, startDate: e.target.value })}
+                                    className="w-full px-3 py-1.5 bg-background border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">End Date</label>
+                                <input
+                                    type="date"
+                                    value={usageFilters.endDate}
+                                    onChange={(e) => setUsageFilters({ ...usageFilters, endDate: e.target.value })}
+                                    className="w-full px-3 py-1.5 bg-background border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                            </div>
+                        </div>
+                        {(usageFilters.user || usageFilters.coupon || usageFilters.purpose || usageFilters.startDate || usageFilters.endDate || usageFilters.label) && (
+                            <button
+                                onClick={() => setUsageFilters({ user: '', coupon: '', startDate: '', endDate: '', purpose: '', label: '' })}
+                                className="mt-3 text-xs text-primary hover:underline font-medium"
+                            >
+                                Clear all filters
+                            </button>
+                        )}
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-background/80 text-text-secondary text-xs uppercase font-semibold">
-                                <tr>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Coupon</th>
-                                    <th className="px-6 py-4">User</th>
-                                    <th className="px-6 py-4">Order Info</th>
-                                    <th className="px-6 py-4">Savings</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {loading && usages.length === 0 ? (
+
+                    <div className="bg-surface rounded-card border border-border overflow-hidden">
+                        <div className="p-4 border-b border-border bg-background/50 flex items-center justify-between">
+                            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-primary" />
+                                Coupon Usage History
+                                <span className="text-xs font-normal text-text-secondary ml-2">
+                                    ({filteredUsages.length} records)
+                                </span>
+                            </h3>
+                            <button
+                                onClick={fetchData}
+                                className="p-1 text-text-secondary hover:text-primary transition-colors"
+                                title="Refresh"
+                            >
+                                <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-background/80 text-text-secondary text-xs uppercase font-semibold">
                                     <tr>
-                                        <td colSpan="5" className="px-6 py-12 text-center text-text-secondary">
-                                            Loading history...
-                                        </td>
+                                        <th className="px-6 py-4">Date</th>
+                                        <th className="px-6 py-4">Coupon</th>
+                                        <th className="px-6 py-4">User</th>
+                                        <th className="px-6 py-4">Order Info</th>
+                                        <th className="px-6 py-4">Savings</th>
                                     </tr>
-                                ) : usages.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="px-6 py-12 text-center text-text-secondary">
-                                            No usage records found.
-                                        </td>
-                                    </tr>
-                                ) : usages.map((usage) => (
-                                    <tr key={usage.id} className="hover:bg-background/40">
-                                        <td className="px-6 py-4 text-sm text-text-secondary whitespace-nowrap">
-                                            {new Date(usage.used_at).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 font-bold text-primary">
-                                            {usage.coupon_code}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-7 h-7 bg-background rounded-full flex items-center justify-center border border-border">
-                                                    <Users className="w-3.5 h-3.5 text-text-secondary" />
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {loading && filteredUsages.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="px-6 py-12 text-center text-text-secondary">
+                                                Loading history...
+                                            </td>
+                                        </tr>
+                                    ) : filteredUsages.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="px-6 py-12 text-center text-text-secondary">
+                                                No usage records match your filters.
+                                            </td>
+                                        </tr>
+                                    ) : filteredUsages.map((usage) => (
+                                        <tr key={usage.id} className="hover:bg-background/40">
+                                            <td className="px-6 py-4 text-sm text-text-secondary whitespace-nowrap">
+                                                {new Date(usage.used_at).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 font-bold text-primary">
+                                                {usage.coupon_code}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 bg-background rounded-full flex items-center justify-center border border-border">
+                                                        <Users className="w-3.5 h-3.5 text-text-secondary" />
+                                                    </div>
+                                                    <div className="text-sm text-text-primary font-medium">{usage.user_name}</div>
                                                 </div>
-                                                <div className="text-sm text-text-primary font-medium">{usage.user_name}</div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs uppercase text-text-secondary mb-1">{usage.payment_type}</div>
-                                            <div className="text-sm font-medium">${usage.original_amount} → ${usage.final_amount}</div>
-                                        </td>
-                                        <td className="px-6 py-4 font-bold text-green-600">
-                                            -${usage.discount_amount}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-xs uppercase text-text-secondary mb-1">
+                                                    {(() => {
+                                                        if (usage.item_label) return usage.item_label;
+                                                        if (usage.payment_type?.startsWith('asset:')) {
+                                                            const aid = usage.payment_type.split(':')[1];
+                                                            const asset = assets.find(a => a.id.toString() === aid);
+                                                            return asset ? `Asset: ${asset.name}` : `Asset #${aid}`;
+                                                        }
+                                                        const map = {
+                                                            'package': 'Package Purchase',
+                                                            'simulator': 'Simulator Booking',
+                                                            'event': 'Event Registration',
+                                                            'asset': 'Asset Booking'
+                                                        };
+                                                        return map[usage.payment_type?.toLowerCase()] || usage.payment_type;
+                                                    })()}
+                                                </div>
+                                                <div className="text-sm font-medium">${usage.original_amount} → ${usage.final_amount}</div>
+                                            </td>
+                                            <td className="px-6 py-4 font-bold text-green-600">
+                                                -${usage.discount_amount}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
@@ -381,7 +602,7 @@ export default function CouponManagement() {
             {/* Edit/Create Modal */}
             {isEditModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-surface rounded-card shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="bg-surface rounded-card shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="bg-primary px-6 py-4 flex items-center justify-between">
                             <h2 className="text-white text-xl font-bold">
                                 {editingCoupon ? 'Edit Coupon' : 'Create New Coupon'}
@@ -420,17 +641,102 @@ export default function CouponManagement() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-1.5">Coupon Purpose (Applicable To) *</label>
-                                        <select
-                                            value={formData.applicable_to}
-                                            onChange={(e) => setFormData({ ...formData, applicable_to: e.target.value })}
-                                            className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
-                                        >
-                                            <option value="all">Global (All Services)</option>
-                                            <option value="simulator">Simulator Bookings Only</option>
-                                            <option value="package">Package Purchases Only</option>
-                                            <option value="event">Special Event Registrations Only</option>
-                                        </select>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">Coupon Purpose (Applicable To) *</label>
+                                        <div className="space-y-3 p-4 bg-background border border-border rounded-button">
+                                            <div className="flex items-center gap-3 pb-2 border-b border-border mb-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="all_services"
+                                                    checked={formData.applicable_to === 'all'}
+                                                    onChange={(e) => setFormData({ ...formData, applicable_to: e.target.checked ? 'all' : '' })}
+                                                    className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                                                />
+                                                <label htmlFor="all_services" className="text-sm font-bold text-primary">Global (All Services)</label>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                                                {[
+                                                    { id: 'simulator', label: 'Simulator Bookings' },
+                                                    { id: 'package', label: 'Package Purchases' },
+                                                    { id: 'event', label: 'Special Events' },
+                                                ].map((opt) => (
+                                                    <div key={opt.id} className="flex items-center gap-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`purpose_${opt.id}`}
+                                                            disabled={formData.applicable_to === 'all'}
+                                                            checked={formData.applicable_to === 'all' || formData.applicable_to.split(',').includes(opt.id)}
+                                                            onChange={(e) => {
+                                                                let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x);
+                                                                if (e.target.checked) {
+                                                                    current.push(opt.id);
+                                                                } else {
+                                                                    current = current.filter(k => k !== opt.id);
+                                                                }
+                                                                setFormData({ ...formData, applicable_to: current.join(',') });
+                                                            }}
+                                                            className="w-4 h-4 text-primary rounded border-border focus:ring-primary disabled:opacity-40"
+                                                        />
+                                                        <label
+                                                            htmlFor={`purpose_${opt.id}`}
+                                                            className={`text-sm ${formData.applicable_to === 'all' ? 'text-text-secondary opacity-60' : 'text-text-primary'}`}
+                                                        >
+                                                            {opt.label}
+                                                        </label>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="pt-3 border-t border-border/50">
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="purpose_asset"
+                                                        disabled={formData.applicable_to === 'all'}
+                                                        checked={formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('asset')}
+                                                        onChange={(e) => {
+                                                            let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x);
+                                                            if (e.target.checked) {
+                                                                current.push('asset');
+                                                                current = current.filter(t => !t.startsWith('asset:'));
+                                                            } else {
+                                                                current = current.filter(k => k !== 'asset');
+                                                            }
+                                                            setFormData({ ...formData, applicable_to: current.join(',') });
+                                                        }}
+                                                        className="w-4 h-4 text-primary rounded border-border focus:ring-primary disabled:opacity-40"
+                                                    />
+                                                    <label htmlFor="purpose_asset" className="text-sm font-bold text-text-primary">All Generic Assets</label>
+                                                </div>
+
+                                                {assets.filter(a => !a.needs_staff).length > 0 && (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-2 pl-7">
+                                                        {assets.filter(a => !a.needs_staff).map(asset => (
+                                                            <div key={asset.id} className="flex items-center gap-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`asset_${asset.id}`}
+                                                                    disabled={formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('asset')}
+                                                                    checked={formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('asset') || formData.applicable_to.split(',').includes(`asset:${asset.id}`)}
+                                                                    onChange={(e) => {
+                                                                        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x);
+                                                                        const key = `asset:${asset.id}`;
+                                                                        if (e.target.checked) {
+                                                                            current.push(key);
+                                                                        } else {
+                                                                            current = current.filter(k => k !== key);
+                                                                        }
+                                                                        setFormData({ ...formData, applicable_to: current.join(',') });
+                                                                    }}
+                                                                    className="w-3.5 h-3.5 text-primary rounded border-border focus:ring-primary disabled:opacity-40"
+                                                                />
+                                                                <label htmlFor={`asset_${asset.id}`} className="text-xs text-text-secondary truncate">{asset.name}</label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center gap-3 p-3 bg-background rounded-button border border-border">
@@ -448,20 +754,20 @@ export default function CouponManagement() {
                                 <div className="space-y-4">
                                     <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">Discount & Limits</h3>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-1.5">Discount Type</label>
                                             <select
                                                 value={formData.discount_type}
                                                 onChange={(e) => setFormData({ ...formData, discount_type: e.target.value })}
-                                                className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
+                                                className="w-full px-3 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                                             >
                                                 <option value="percentage">Percentage (%)</option>
                                                 <option value="fixed">Fixed Amount ($)</option>
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-1.5">
+                                            <label className="block text-sm font-medium text-text-primary mb-1.5 whitespace-nowrap">
                                                 {formData.discount_type === 'percentage' ? 'Percent OFF' : 'Amount OFF'} *
                                             </label>
                                             <input
@@ -472,12 +778,12 @@ export default function CouponManagement() {
                                                 placeholder={formData.discount_type === 'percentage' ? '20' : '15'}
                                                 value={formData.discount_value}
                                                 onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
-                                                className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
+                                                className="w-full px-3 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-1.5">Total Usage Limit</label>
                                             <input
@@ -485,7 +791,7 @@ export default function CouponManagement() {
                                                 placeholder="Unlimited"
                                                 value={formData.max_uses}
                                                 onChange={(e) => setFormData({ ...formData, max_uses: e.target.value })}
-                                                className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
+                                                className="w-full px-3 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
                                             />
                                             <p className="text-[10px] text-text-secondary mt-1">Total times code can be used.</p>
                                         </div>
@@ -496,20 +802,20 @@ export default function CouponManagement() {
                                                 placeholder="Unlimited"
                                                 value={formData.per_user_limit}
                                                 onChange={(e) => setFormData({ ...formData, per_user_limit: e.target.value })}
-                                                className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
+                                                className="w-full px-3 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20"
                                             />
                                             <p className="text-[10px] text-text-secondary mt-1">Times a single customer can use it.</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-1.5">Start Date</label>
                                             <input
                                                 type="datetime-local"
                                                 value={formData.valid_from}
                                                 onChange={(e) => setFormData({ ...formData, valid_from: e.target.value })}
-                                                className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                                                className="w-full px-3 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                                             />
                                         </div>
                                         <div>
@@ -518,7 +824,7 @@ export default function CouponManagement() {
                                                 type="datetime-local"
                                                 value={formData.valid_until}
                                                 onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
-                                                className="w-full px-4 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                                                className="w-full px-3 py-2 bg-background border border-border rounded-button outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                                             />
                                         </div>
                                     </div>
@@ -550,7 +856,11 @@ export default function CouponManagement() {
                     open={popup.show}
                     message={popup.message}
                     type={popup.type}
-                    onClose={() => setPopup({ ...popup, show: false })}
+                    title={popup.title}
+                    showCancel={popup.showCancel}
+                    confirmText={popup.confirmText}
+                    onConfirm={popup.onConfirm}
+                    onClose={() => setPopup(p => ({ ...p, show: false }))}
                 />
             )}
         </div>
