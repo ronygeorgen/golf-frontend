@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import Button from './ui/Button';
+import { useAppSelector } from '../store/hooks';
 
 function EditUserModal({ isOpen, onClose, onSave, user }) {
+    const { user: currentUser } = useAppSelector((state) => state.auth);
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -12,6 +14,16 @@ function EditUserModal({ isOpen, onClose, onSave, user }) {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // Permission check for role editing
+    const canChangeRole = currentUser?.role === 'admin' || currentUser?.is_superuser === true;
+
+    // Roles that can be assigned
+    const roleOptions = [
+        { value: 'client', label: 'Client' },
+        { value: 'staff', label: 'Staff' },
+        { value: 'admin', label: 'Admin' }
+    ];
 
     useEffect(() => {
         if (user) {
@@ -61,7 +73,7 @@ function EditUserModal({ isOpen, onClose, onSave, user }) {
 
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
                     {error && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm whitespace-pre-wrap">
                             {typeof error === 'object' ? JSON.stringify(error) : error}
                         </div>
                     )}
@@ -115,18 +127,29 @@ function EditUserModal({ isOpen, onClose, onSave, user }) {
                         />
                     </div>
 
-                    <div className="space-y-1">
-                        <label className="text-sm font-medium text-text-secondary">Role</label>
-                        <select
-                            name="role"
-                            value={formData.role}
-                            onChange={handleChange}
-                            required
-                            className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            <option value="client">Client</option>
-                        </select>
-                    </div>
+                    {canChangeRole ? (
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-text-secondary">Role</label>
+                            <select
+                                name="role"
+                                value={formData.role}
+                                onChange={handleChange}
+                                required
+                                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                            >
+                                {roleOptions.map(r => (
+                                    <option key={r.value} value={r.value}>{r.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    ) : (
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-text-secondary">Role</label>
+                            <div className="px-3 py-2 border border-border rounded-lg bg-muted text-text-secondary select-none">
+                                {user?.role || 'client'}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-3 pt-4">
                         <Button

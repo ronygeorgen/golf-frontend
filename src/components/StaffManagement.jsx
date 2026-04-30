@@ -227,7 +227,7 @@ function StaffManagement() {
             last_name: staffMember.last_name,
             email: staffMember.email,
             phone: staffMember.phone,
-            role: isSuperadmin ? staffMember.role : 'staff', // Regular admin can only edit as staff
+            role: staffMember.role || 'staff',
             date_of_birth: staffMember.date_of_birth || '',
             ghl_location_id: staffMember.ghl_location_id || '',
             calendar_color: staffMember.calendar_color || '#2563EB'
@@ -346,7 +346,7 @@ function StaffManagement() {
                                             required
                                         />
                                     </div>
-                                    {!isSuperadmin && (
+                                    {(isSuperadmin || user?.role === 'admin') ? (
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-2">
                                                 Role
@@ -354,9 +354,20 @@ function StaffManagement() {
                                             <select
                                                 value={formData.role}
                                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
                                             >
-                                                <option value="staff">Staff</option>
+                                                <option value="staff">Staff Member</option>
+                                                <option value="admin">Administrator</option>
                                             </select>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">
+                                                Role
+                                            </label>
+                                            <div className="w-full px-4 py-3 border border-border rounded-button bg-muted text-text-secondary select-none">
+                                                {formData.role === 'admin' ? 'Administrator' : 'Staff Member'}
+                                            </div>
                                         </div>
                                     )}
                                     {isSuperadmin && !editingStaff && (
