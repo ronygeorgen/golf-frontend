@@ -54,6 +54,8 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     const [selectedPackageId, setSelectedPackageId] = useState('');
     const [date, setDate] = useState('');
     const [selectedCoachId, setSelectedCoachId] = useState('');
+    // Duration for asset-only bookings (mirrors simulator duration selector)
+    const [assetDuration, setAssetDuration] = useState(60);
 
     // ── Slots ────────────────────────────────────────────────────────────── //
     const [slots, setSlots] = useState([]);
@@ -124,7 +126,8 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     }, [selectedPackageId, purchasedPackages]);
 
     const hasSessions = selectedPackageId ? sessionsRemaining > 0 : false;
-    const duration = selectedPkg?.session_duration_minutes || 60;
+    // For package-based bookings use the package's session length; for asset-only use the user-chosen duration
+    const duration = isAssetOnly ? assetDuration : (selectedPkg?.session_duration_minutes || 60);
 
     // Date bounds (mirrors CoachingBooking: clients must book ≥1 day ahead)
     const todayStr = getTodayInTimezone(tz);
@@ -268,6 +271,9 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             if (!isAssetOnly) {
                 if (selectedPackageId) params.package_id = selectedPackageId;
                 if (selectedCoachId) params.coach_id = selectedCoachId;
+            } else {
+                // Send chosen duration so backend generates correctly-sized slots
+                params.duration = assetDuration;
             }
             const { data } = await apiClient.get(endpoints.categories.slots(category.id), { params });
             const fetched = data?.available_slots || [];
@@ -288,7 +294,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         } finally {
             setLoadingSlots(false);
         }
-    }, [category?.id, date, selectedPackageId, selectedCoachId, selectedAssetId, isAssetOnly, hasSessions, openPopup]);
+    }, [category?.id, date, selectedPackageId, selectedCoachId, selectedAssetId, assetDuration, isAssetOnly, hasSessions, openPopup]);
 
     // ── Back navigation (mirrors CoachingBooking) ────────────────────────── //
     const handleBack = () => {
@@ -319,15 +325,19 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         try {
             const coachData = selectedSlot.available_coaches?.[0];
             const target = client || user;
+            // For asset-only bookings recalculate end_time from chosen duration (mirrors simulator pattern)
+            const computedEndTime = isAssetOnly
+                ? new Date(new Date(selectedSlot.start_time).getTime() + duration * 60000).toISOString()
+                : selectedSlot.end_time;
             const payload = {
                 booking_type: 'coaching',
                 coaching_package: isAssetOnly ? null : (selectedPkg?.id || null),
                 coach: isAssetOnly ? null : (coachData?.id || null),
                 start_time: selectedSlot.start_time,
-                end_time: selectedSlot.end_time,
+                end_time: computedEndTime,
                 total_price: isAssetOnly
                     ? (selectedAsset?.price_per_hour
-                        ? (parseFloat(selectedAsset.price_per_hour) * ((selectedSlot?.duration_minutes || 60) / 60)).toFixed(2)
+                        ? (parseFloat(selectedAsset.price_per_hour) * (duration / 60)).toFixed(2)
                         : '0.00')
                     : (selectedPkg?.price || 0),
                 service_category: category.id,
@@ -485,6 +495,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                                 setSelectedAssetId(e.target.value);
                                                 setSelectedPackageId('');
                                                 setSelectedCoachId('');
+                                                setAssetDuration(60);
                                                 setSlots([]);
                                                 setSelectedSlot(null);
                                             }}
@@ -627,16 +638,35 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                             )}
                             </> )} {/* end !isAssetOnly */}
 
-                            {/* Check availability button for asset-only bookings */}
+                            {/* Duration selector + Check availability for asset-only bookings */}
                             {isAssetOnly && (
-                                <Button
-                                    onClick={checkAvailability}
-                                    disabled={loadingSlots || !date}
-                                    variant="primary"
-                                    className="w-full py-3"
-                                >
-                                    {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
-                                </Button>
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Session Duration
+                                        </label>
+                                        <select
+                                            value={assetDuration}
+                                            onChange={(e) => {
+                                                setAssetDuration(parseInt(e.target.value));
+                                                setSelectedSlot(null);
+                                            }}
+                                            className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary"
+                                        >
+                                            <option value={60}>1 hour</option>
+                                            <option value={120}>2 hours</option>
+                                            <option value={180}>3 hours</option>
+                                        </select>
+                                    </div>
+                                    <Button
+                                        onClick={checkAvailability}
+                                        disabled={loadingSlots || !date}
+                                        variant="primary"
+                                        className="w-full py-3"
+                                    >
+                                        {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
+                                    </Button>
+                                </>
                             )}
                         </div>
                     )}
@@ -760,7 +790,12 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                             </p>
                             <p className="text-text-primary">
                                 <span className="font-medium">Time:</span>{' '}
-                                {formatLocalTime(selectedSlot.start_time, tz)} – {formatLocalTime(selectedSlot.end_time, tz)}
+                                {formatLocalTime(selectedSlot.start_time, tz)} – {formatLocalTime(
+                                    isAssetOnly
+                                        ? new Date(new Date(selectedSlot.start_time).getTime() + duration * 60000).toISOString()
+                                        : selectedSlot.end_time,
+                                    tz
+                                )}
                             </p>
                             <p className="text-text-primary">
                                 <span className="font-medium">Duration:</span> {duration} minutes
