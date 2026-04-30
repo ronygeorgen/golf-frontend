@@ -105,8 +105,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [simulators, setSimulators] = useState([]);
     const [simulatorsLoading, setSimulatorsLoading] = useState(false);
 
-    // Assets for the active dynamic category (Day view columns)
+    // Assets for the active dynamic category (Day view columns — cat-filter mode)
     const [categoryAssets, setCategoryAssets] = useState([]);
+
+    // All assets across every dynamic category (Day view columns — "all" mode)
+    const [allCategoryAssets, setAllCategoryAssets] = useState([]);
 
     // Reschedule State
     const [rescheduleState, setRescheduleState] = useState({
@@ -194,7 +197,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         fetchSimulators();
     }, []);
 
-    // Fetch assets for the selected dynamic category so we can build Day-view columns
+    // Fetch assets for the selected dynamic category so we can build Day-view columns (cat-filter mode)
     useEffect(() => {
         if (!activeDynamicCat) {
             setCategoryAssets([]);
@@ -207,6 +210,24 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             })
             .catch(() => setCategoryAssets([]));
     }, [activeDynamicCat]);
+
+    // Fetch assets for ALL dynamic categories for the "all bookings" Day-view columns
+    useEffect(() => {
+        if (dynamicCategories.length === 0) {
+            setAllCategoryAssets([]);
+            return;
+        }
+        Promise.all(
+            dynamicCategories.map((cat) =>
+                axios.get(endpoints.categories.assets.list(cat.id))
+                    .then((res) => (res.data.results ?? res.data).filter((a) => a.is_active))
+                    .catch(() => [])
+            )
+        ).then((results) => {
+            const all = results.flat().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+            setAllCategoryAssets(all);
+        });
+    }, [dynamicCategories]);
 
     useEffect(() => {
         // Calculate date range based on current view using the center's timezone boundaries
@@ -671,12 +692,21 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     </p>
                 ) : (
                     <>
+                        {/* Hide coach row for asset-only dynamic category bookings (needs_staff=false) */}
+                        {(event.is_legacy_category || !event.category_asset_name || event.coach) && (
                         <p>
                             <span className="font-semibold">Coach:</span> {event.coach?.first_name || 'Any'} {event.coach?.last_name || ''}
                         </p>
-                        {event.simulator && (
+                        )}
+                        {/* Only show Assigned Bay for legacy coaching bookings, not dynamic category ones */}
+                        {event.simulator && event.is_legacy_category && (
                             <p>
                                 <span className="font-semibold">Assigned Bay:</span> {event.simulator.name}
+                            </p>
+                        )}
+                        {event.category_asset_name && (
+                            <p>
+                                <span className="font-semibold">Asset:</span> {event.category_asset_name}
                             </p>
                         )}
                     </>
@@ -839,13 +869,15 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             // Determine resource ID for day view
             let resourceId = null;
             if (view === 'day') {
-                if (calendarType.startsWith('cat-')) {
-                    // Map to the specific asset column; fall back to staff or generic column
-                    if (booking.category_asset) {
-                        resourceId = `asset-${booking.category_asset}`;
-                    } else {
-                        resourceId = categoryAssets.some((a) => a.needs_staff) ? 'cat-staff' : 'dynamic-cat';
-                    }
+                if (booking.category_asset && calendarType.startsWith('cat-')) {
+                    // Dynamic category booking with a specific asset — cat-filter mode
+                    resourceId = `asset-${booking.category_asset}`;
+                } else if (calendarType.startsWith('cat-') && !booking.category_asset) {
+                    // Dynamic category booking without a specific asset (staff-only session)
+                    resourceId = categoryAssets.some((a) => a.needs_staff) ? 'cat-staff' : 'dynamic-cat';
+                } else if (booking.category_asset) {
+                    // Dynamic category asset booking in "all" mode — goes into its asset column
+                    resourceId = `asset-${booking.category_asset}`;
                 } else if (booking.booking_type === 'simulator') {
                     resourceId = `simulator-${booking.simulator_details?.id}`;
                 } else {
@@ -1021,7 +1053,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 {
                     id: 'special-events',
                     title: 'Special Events'
-                }
+                },
+                ...allCategoryAssets.map((a) => ({
+                    id: `asset-${a.id}`,
+                    title: a.name
+                }))
               ]
         : null;
 
