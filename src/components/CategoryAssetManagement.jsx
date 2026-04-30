@@ -516,6 +516,7 @@ function CategoryAssetManagement() {
                                     autoFocus
                                 />
                             </div>
+                            {!addForm.needs_staff && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Price / Hour ($)</label>
                                 <input
@@ -528,6 +529,7 @@ function CategoryAssetManagement() {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
                             </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                                 <input
@@ -593,7 +595,9 @@ function CategoryAssetManagement() {
                                             {asset.description && <div className="text-xs text-gray-500 mt-0.5">{asset.description}</div>}
                                         </td>
                                         <td className="px-4 py-4 text-sm text-gray-700">
-                                            {asset.price_per_hour ? `$${parseFloat(asset.price_per_hour).toFixed(2)}` : '—'}
+                                            {asset.needs_staff
+                                                ? <span className="text-gray-400 text-xs italic">Via package</span>
+                                                : (asset.price_per_hour ? `$${parseFloat(asset.price_per_hour).toFixed(2)}` : '—')}
                                         </td>
                                         <td className="px-4 py-4">
                                             {asset.needs_staff ? (
@@ -664,6 +668,7 @@ function CategoryAssetManagement() {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
+                            {!editForm.needs_staff && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Price / Hour ($)</label>
                                 <input
@@ -675,6 +680,7 @@ function CategoryAssetManagement() {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                 <input

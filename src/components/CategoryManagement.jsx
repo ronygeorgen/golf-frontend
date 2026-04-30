@@ -265,10 +265,14 @@ function CategoryManagement() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center justify-end gap-2">
-                                                {!cat.legacy_booking_type && (
+                                                {(!cat.legacy_booking_type || cat.legacy_booking_type === 'simulator') && (
                                                     <button
                                                         title="Manage Assets"
-                                                        onClick={() => navigate(`/admin/categories/${cat.id}/assets`)}
+                                                        onClick={() =>
+                                                            cat.legacy_booking_type === 'simulator'
+                                                                ? navigate('/admin/simulators')
+                                                                : navigate(`/admin/categories/${cat.id}/assets`)
+                                                        }
                                                         className="p-1.5 rounded hover:bg-teal-100 text-text-secondary hover:text-teal-700 transition-colors"
                                                     >
                                                         <Layers className="w-4 h-4" />

@@ -6,7 +6,6 @@ import { endpoints } from '../api/endpoints';
 import {
     LayoutDashboard,
     Users,
-    Gamepad2,
     Package,
     Calendar,
     CalendarDays,
@@ -78,7 +77,6 @@ function AdminLayout() {
                 { path: '/admin/categories', label: 'Manage Categories', icon: Layers },
                 { path: '/admin/users', label: 'Manage Users', icon: UserCog },
                 { path: '/admin/staff', label: isSuperadmin ? 'Manage Admin' : 'Manage Staff', icon: Users },
-                { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
                 { path: '/admin/packages', label: 'Manage Packages', icon: Package },
                 { path: '/admin/special-events', label: 'Manage Special Events', icon: CalendarDays },
                 ...((isAdmin || isSuperadmin) ? [{ path: '/admin/banners', label: 'Manage Banners', icon: Megaphone }] : []),
