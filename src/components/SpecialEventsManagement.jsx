@@ -34,6 +34,9 @@ function SpecialEventsManagement() {
     const [editingEvent, setEditingEvent] = useState(null);
     const [viewType, setViewType] = useState('upcoming'); // 'upcoming' or 'conducted'
 
+    // All active category assets (for linking group sessions to an asset)
+    const [allAssets, setAllAssets] = useState([]);
+
     // Pause Modal State
     const [showPauseModal, setShowPauseModal] = useState(false);
     const [pauseEventData, setPauseEventData] = useState(null);
@@ -57,7 +60,8 @@ function SpecialEventsManagement() {
         is_private: false,
         is_auto_enroll: false,
         upfront_payment: false,
-        redirect_url: ''
+        redirect_url: '',
+        category_asset: '',
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -65,6 +69,16 @@ function SpecialEventsManagement() {
     useEffect(() => {
         fetchEvents();
     }, [viewType]);
+
+    // Load all active assets across all categories for the group-session dropdown
+    useEffect(() => {
+        axios.get('/admin/category-assets/?is_active=true&page_size=200')
+            .then((res) => {
+                const data = res.data.results ?? res.data;
+                setAllAssets(Array.isArray(data) ? data : []);
+            })
+            .catch(() => setAllAssets([]));
+    }, []);
 
     // Close modal when clicking outside
     useEffect(() => {
@@ -188,6 +202,8 @@ function SpecialEventsManagement() {
             price: formData.price ? parseFloat(formData.price) : null,
             // Only include recurring_end_date for recurring events
             recurring_end_date: formData.event_type !== 'one_time' && formData.recurring_end_date ? formData.recurring_end_date : null,
+            // null (not '') for a facility-wide event
+            category_asset: formData.category_asset || null,
         };
 
         setSubmitLoading(true);
@@ -249,7 +265,8 @@ function SpecialEventsManagement() {
             is_private: event.is_private !== undefined ? event.is_private : false,
             is_auto_enroll: event.is_auto_enroll !== undefined ? event.is_auto_enroll : false,
             upfront_payment: event.upfront_payment !== undefined ? event.upfront_payment : false,
-            redirect_url: event.redirect_url || ''
+            redirect_url: event.redirect_url || '',
+            category_asset: event.category_asset || '',
         });
         setShowForm(true);
     };
@@ -351,7 +368,14 @@ function SpecialEventsManagement() {
                             ) : (
                                 events.map((event) => (
                                     <tr key={event.display_id || event.id} className="hover:bg-background">
-                                        <td className="px-4 py-3 text-sm text-text-primary">{event.title}</td>
+                                        <td className="px-4 py-3 text-sm text-text-primary">
+                                            <div>{event.title}</div>
+                                            {event.category_asset_name && (
+                                                <div className="text-xs text-text-secondary mt-0.5">
+                                                    Asset: {event.category_asset_name}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-text-secondary">
                                             {EVENT_TYPES.find(t => t.value === event.event_type)?.label || event.event_type}
                                         </td>
@@ -379,7 +403,7 @@ function SpecialEventsManagement() {
                                             <div className="flex items-center space-x-2">
                                                 <button
                                                     onClick={() => handleEdit(event)}
-                                                    className="p-1 text-primary hover:bg-primary-light rounded"
+                                                    className="p-1 text-primary hover:bg-background rounded"
                                                     title="Edit"
                                                 >
                                                     <Edit className="w-4 h-4" />
@@ -703,6 +727,28 @@ function SpecialEventsManagement() {
                                         </div>
                                     )}
                                     */}
+                                </div>
+
+                                {/* Category Asset (Group Session) */}
+                                <div>
+                                    <label className="block text-sm font-medium text-text-primary mb-1">
+                                        Linked Asset (Group Session)
+                                    </label>
+                                    <select
+                                        value={formData.category_asset}
+                                        onChange={(e) => setFormData({ ...formData, category_asset: e.target.value })}
+                                        className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
+                                    >
+                                        <option value="">None — Facility-wide event</option>
+                                        {allAssets.map((asset) => (
+                                            <option key={asset.id} value={asset.id}>
+                                                {asset.category_name ? `${asset.category_name} — ` : ''}{asset.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-text-secondary mt-1">
+                                        Link to a specific asset (e.g. Fitness Room A) to create a group session. This event will only block that asset, not simulator bays.
+                                    </p>
                                 </div>
                             </div>
 

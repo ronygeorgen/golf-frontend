@@ -903,10 +903,21 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             localEnd = new Date(localEnd.getTime() + 24 * 60 * 60 * 1000);
         }
 
+        // Asset group events appear in their asset column (when a dynamic cat is selected);
+        // facility-wide events appear in the legacy 'special-events' column.
+        let specialEventResourceId = null;
+        if (view === 'day') {
+            if (event.category_asset && calendarType.startsWith('cat-')) {
+                specialEventResourceId = `asset-${event.category_asset}`;
+            } else {
+                specialEventResourceId = 'special-events';
+            }
+        }
+
         const baseEvent = {
             id: `special-${event.display_id}`,
             title: event.title,
-            resourceId: view === 'day' ? 'special-events' : null,
+            resourceId: specialEventResourceId,
             type: 'special_event',
             is_special_event: true,
             original_event: event,

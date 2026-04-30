@@ -724,7 +724,7 @@ function CategoryAssetManagement() {
                 onConfirm={popup.onConfirm ? async () => { const fn = popup.onConfirm; closePopup(); if (fn) await fn(); } : closePopup}
                 onClose={closePopup}
             />
-            <Toast toast={toast} onClose={hideToast} />
+            {toast && <Toast {...toast} onClose={hideToast} />}
         </div>
     );
 }
