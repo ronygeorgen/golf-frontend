@@ -1039,17 +1039,22 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                 ),
               ]
             : [
-                ...simulators
-                    .filter(sim => !sim.is_coaching_bay)
-                    .sort((a, b) => a.bay_number - b.bay_number)
-                    .map(sim => ({
-                        id: `simulator-${sim.id}`,
-                        title: sim.name
-                    })),
-                {
-                    id: 'coaching-bay',
-                    title: simulators.find(sim => sim.is_coaching_bay)?.name || 'Coaching Bay Simulator'
-                },
+                // Simulator bay columns — hidden when Coaching tab is active
+                ...(calendarType !== 'coaching'
+                    ? simulators
+                        .filter(sim => !sim.is_coaching_bay)
+                        .sort((a, b) => a.bay_number - b.bay_number)
+                        .map(sim => ({ id: `simulator-${sim.id}`, title: sim.name }))
+                    : []
+                ),
+                // Coaching bay column — hidden when Simulators tab is active
+                ...(calendarType !== 'simulator'
+                    ? [{
+                        id: 'coaching-bay',
+                        title: simulators.find(sim => sim.is_coaching_bay)?.name || 'Coaching Bay Simulator'
+                    }]
+                    : []
+                ),
                 {
                     id: 'special-events',
                     title: 'Special Events'
