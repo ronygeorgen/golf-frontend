@@ -19,8 +19,9 @@ function GuestLanding() {
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { popup, openPopup, closePopup } = usePopup();
 
-    const { locationLogoUrl } = useAppSelector((state) => state.auth);
-    // Logo is no longer shown on this page
+    // Logo shown only after registration, resolved from the selected location
+    const [selectedLogoUrl, setSelectedLogoUrl] = useState(null);
+    const currentLogo = selectedLogoUrl;
 
     const [step, setStep] = useState('booking-type'); // 'booking-type', 'coaching-package-question', 'tpi-packages', 'registration'
     const [selectedBookingType, setSelectedBookingType] = useState(null); // 'simulator' or 'coaching'
@@ -175,6 +176,9 @@ function GuestLanding() {
                     showSuccess('Registration successful! You can now purchase a TPI Assessment package.');
                     // Store the registered phone number for purchase
                     setRegisteredPhone(registrationData.phone);
+                    // Resolve and store the location logo
+                    const matchedLocation = locations.find(l => l.location_id === registrationData.ghl_location_id);
+                    setSelectedLogoUrl(matchedLocation?.logo_url || null);
                     // Stay on TPI packages page
                     setStep('tpi-packages');
                 }
@@ -313,10 +317,22 @@ function GuestLanding() {
 
     return (
         <div className="min-h-screen bg-background">
-            {/* Header with Login button only */}
+            {/* Header: logo (after registration) on left, Login on right */}
             <header className="bg-surface shadow-sm border-b border-border sticky top-0 z-50 w-full">
                 <div className="max-w-full px-4 sm:px-6 lg:px-8 mx-auto">
-                    <div className="flex items-center justify-end h-14 w-full">
+                    <div className="flex items-center justify-between h-14 w-full">
+                        {/* Logo — only visible after guest registers and a logo is set */}
+                        {currentLogo ? (
+                            <div className="bg-white p-1 rounded-md">
+                                <img
+                                    src={currentLogo}
+                                    alt="Company Logo"
+                                    className="h-10 w-auto object-contain max-w-[180px]"
+                                />
+                            </div>
+                        ) : (
+                            <div />
+                        )}
                         <button
                             onClick={() => navigate('/signin')}
                             className="px-4 py-2 rounded-button text-sm font-medium transition-colors bg-primary text-white hover:bg-primary-light"
@@ -329,7 +345,7 @@ function GuestLanding() {
 
             <div className="flex items-center justify-center p-4 min-h-[calc(100vh-3.5rem)]">
                 <div className="w-full max-w-2xl">
-                    {/* Logo removed - only shown after login */}
+                    {/* Logo shown in the header after registration */}
 
                     {step === 'booking-type' && (
                         <div className="bg-surface rounded-card shadow-card p-8 text-center">
