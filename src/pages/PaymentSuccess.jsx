@@ -1,13 +1,10 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
-import logo from '../assets/hole9golf-logo.png';
-
 function PaymentSuccess() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { user, token, locationLogoUrl } = useAppSelector((state) => state.auth);
-    const currentLogo = locationLogoUrl || logo;
+    const { user, token } = useAppSelector((state) => state.auth);
 
     useEffect(() => {
         const message = searchParams.get('message');

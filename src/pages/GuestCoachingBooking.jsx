@@ -11,7 +11,7 @@ import DateInput from '../components/ui/DateInput';
 import { BookingSlotsSkeleton, FormSkeleton } from '../components/skeletons/SkeletonLoader';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
-import logo from '../assets/hole9golf-logo.png';
+
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
 import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 
@@ -23,8 +23,7 @@ function GuestCoachingBooking() {
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { locationLogoUrl } = useAppSelector((state) => state.auth);
     const [locations, setLocations] = useState([]);
-    const [selectedLogoUrl, setSelectedLogoUrl] = useState(locationLogoUrl || null);
-    const currentLogo = selectedLogoUrl || logo;
+    const currentLogo = selectedLogoUrl;
 
     const phone = searchParams.get('phone');
     const [packages, setPackages] = useState([]);
@@ -137,9 +136,7 @@ function GuestCoachingBooking() {
                     // Update logo based on locId
                     if (locId && locRes.data?.locations) {
                         const match = locRes.data.locations.find(l => l.location_id === locId);
-                        if (match?.logo_url) {
-                            setSelectedLogoUrl(match.logo_url);
-                        }
+                        setSelectedLogoUrl(match?.logo_url || null);
                     }
                 }
             } catch (error) {
@@ -405,7 +402,7 @@ function GuestCoachingBooking() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
-                    <img src={currentLogo} alt="Company Logo" className="h-20 w-auto object-contain mx-auto mb-4 max-w-[250px]" />
+                    {currentLogo && <img src={currentLogo} alt="Company Logo" className="h-20 w-auto object-contain mx-auto mb-4 max-w-[250px]" />}
                     <p className="text-text-secondary">Loading packages...</p>
                 </div>
             </div>
@@ -416,7 +413,7 @@ function GuestCoachingBooking() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center p-4">
                 <div className="bg-surface rounded-card shadow-card p-8 text-center max-w-md w-full">
-                    <img src={currentLogo} alt="Company Logo" className="h-20 w-auto object-contain mx-auto mb-4 max-w-[250px]" />
+                    {currentLogo && <img src={currentLogo} alt="Company Logo" className="h-20 w-auto object-contain mx-auto mb-4 max-w-[250px]" />}
                     <h2 className="text-2xl font-bold text-text-primary mb-4">No Packages Available</h2>
                     <p className="text-text-secondary mb-6">
                         You don't have any active TPI Assessment packages with remaining sessions.
@@ -435,7 +432,7 @@ function GuestCoachingBooking() {
             <header className="bg-surface shadow-sm border-b border-border sticky top-0 z-50 w-full">
                 <div className="max-w-full px-4 sm:px-6 lg:px-8 mx-auto">
                     <div className="flex items-center justify-between h-14 w-full">
-                        <img src={currentLogo} alt="Company Logo" className="h-10 w-auto object-contain max-w-[150px]" />
+                        {currentLogo && <img src={currentLogo} alt="Company Logo" className="h-10 w-auto object-contain max-w-[150px]" />}
                         <button
                             onClick={() => navigate('/signin')}
                             className="px-4 py-2 rounded-button text-sm font-medium transition-colors bg-primary text-white hover:bg-primary-light"

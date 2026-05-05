@@ -26,7 +26,7 @@ import {
     Layers,
     Building2,
 } from 'lucide-react';
-import defaultLogo from '../assets/hole9golf-logo.png';
+
 
 function AdminLayout() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -48,8 +48,8 @@ function AdminLayout() {
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
     const isSuperadmin = user?.role === 'superadmin';
 
-    // Resolve logo: prefer location-specific, fall back to bundled default
-    const currentLogo = locationLogoUrl || defaultLogo;
+    // Resolve logo: location-specific logo only (no fallback)
+    const currentLogo = locationLogoUrl;
 
     // Detect if page is loaded in an iframe
     useEffect(() => {
@@ -191,11 +191,13 @@ function AdminLayout() {
                                 onClick={() => navigate('/admin')}
                                 className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity"
                             >
-                                <img
-                                    src={currentLogo}
-                                    alt="Company Logo"
-                                    className="h-10 sm:h-8 md:h-10 w-auto object-contain max-w-[200px]"
-                                />
+                                {currentLogo && (
+                                    <img
+                                        src={currentLogo}
+                                        alt="Company Logo"
+                                        className="h-10 sm:h-8 md:h-10 w-auto object-contain max-w-[200px]"
+                                    />
+                                )}
                                 <h1 className="text-lg sm:text-xl font-bold text-primary hidden sm:block">
                                     Admin Panel
                                 </h1>

@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout, getProfile } from '../store/slices/authSlice';
 import { LogOut, Calendar, Home, User, ChevronDown, Settings, Users, Package, UserCheck, AlertCircle } from 'lucide-react';
-import logo from '../assets/hole9golf-logo.png';
+
 import DOBPopup from './DOBPopup';
 import LiabilityWaiverPopup from './LiabilityWaiverPopup';
 import useToast from '../hooks/useToast';
@@ -17,7 +17,7 @@ function UserLayout() {
     const location = useLocation();
     const dispatch = useAppDispatch();
     const { user, locationLogoUrl } = useAppSelector((state) => state.auth);
-    const currentLogo = locationLogoUrl || logo;
+    const currentLogo = locationLogoUrl;
     const { toast, showError, hideToast } = useToast();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
@@ -190,14 +190,18 @@ function UserLayout() {
                     <div className="flex items-center justify-between h-14 w-full">
                         {/* Left side - Logo/Title */}
                         <div className="flex items-center space-x-2 md:space-x-4">
-                            <div className="bg-white p-1 rounded-md">
-                                <img
-                                    src={currentLogo}
-                                    alt="Company Logo"
-                                    className="h-10 w-auto md:h-10 object-contain max-w-[180px]"
-                                />
-                            </div>
-                            <div className="hidden md:block h-6 w-px bg-border"></div>
+                            {currentLogo && (
+                                <>
+                                    <div className="bg-white p-1 rounded-md">
+                                        <img
+                                            src={currentLogo}
+                                            alt="Company Logo"
+                                            className="h-10 w-auto md:h-10 object-contain max-w-[180px]"
+                                        />
+                                    </div>
+                                    <div className="hidden md:block h-6 w-px bg-border"></div>
+                                </>
+                            )}
                             <h2 className="text-sm md:text-lg font-semibold text-text-primary">
                                 {getPageTitle()}
                             </h2>
