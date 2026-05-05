@@ -1054,10 +1054,11 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                     id: 'special-events',
                     title: 'Special Events'
                 },
-                ...allCategoryAssets.map((a) => ({
-                    id: `asset-${a.id}`,
-                    title: a.name
-                }))
+                // Asset columns only in "Active" (all-bookings) mode
+                ...(calendarType === 'all'
+                    ? allCategoryAssets.map((a) => ({ id: `asset-${a.id}`, title: a.name }))
+                    : []
+                )
               ]
         : null;
 
