@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, verifyOTP, requestOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
-import logo from '../assets/hole9golf-logo.png';
+// import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import DateInput from '../components/ui/DateInput';
 import LiabilityWaiverPopup from '../components/LiabilityWaiverPopup';
@@ -12,7 +12,8 @@ import { endpoints } from '../api/endpoints';
 
 function SignUp() {
     const dispatch = useAppDispatch();
-    const { loading, error, otpSent, otpMessage, user } = useAppSelector((state) => state.auth);
+    const { loading, error, otpSent, otpMessage, user, locationLogoUrl } = useAppSelector((state) => state.auth);
+    // Logo is no longer shown on this page
 
     const [showWaiverPopup, setShowWaiverPopup] = useState(false);
     const [activeWaiver, setActiveWaiver] = useState(null);
@@ -177,13 +178,7 @@ function SignUp() {
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
             <div className="bg-surface rounded-card shadow-card w-full max-w-md p-6 md:p-8">
-                <div className="flex justify-center mb-6">
-                    <img
-                        src={logo}
-                        alt="Hole 9 Golf Logo"
-                        className="h-16 w-auto object-contain"
-                    />
-                </div>
+                {/* Logo removed - only shown after login */}
                 <h2 className="text-2xl md:text-3xl font-bold text-text-primary mb-6 text-center">
                     Sign Up
                 </h2>

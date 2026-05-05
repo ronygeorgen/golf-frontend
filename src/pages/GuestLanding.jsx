@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signupWithoutOTP } from '../store/slices/authSlice';
 import { createTempPurchase } from '../store/slices/coachingSlice';
-import logo from '../assets/hole9golf-logo.png';
+// import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
@@ -18,6 +18,9 @@ function GuestLanding() {
     const dispatch = useAppDispatch();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { popup, openPopup, closePopup } = usePopup();
+
+    const { locationLogoUrl } = useAppSelector((state) => state.auth);
+    // Logo is no longer shown on this page
 
     const [step, setStep] = useState('booking-type'); // 'booking-type', 'coaching-package-question', 'tpi-packages', 'registration'
     const [selectedBookingType, setSelectedBookingType] = useState(null); // 'simulator' or 'coaching'
@@ -292,26 +295,6 @@ function GuestLanding() {
 
             if (createTempPurchase.fulfilled.match(tempResult)) {
                 const tempId = tempResult.payload.temp_id;
-                const redirectUrlFromResponse = tempResult.payload.redirect_url;
-
-                /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
-                const url = new URL(redirectUrlFromResponse);
-                url.searchParams.set('phone', registeredPhone);
-                url.searchParams.set('package_id', pkg.id.toString());
-                url.searchParams.set('purchase_type', 'normal');
-                url.searchParams.set('recipient_phone', tempId);
-                url.searchParams.set('package_type', 'coaching');
-                const frontendBaseUrl = window.location.origin;
-                const successRedirectUrl = `${frontendBaseUrl}/payment-success?phone=${encodeURIComponent(registeredPhone)}&message=${encodeURIComponent('Package purchased successfully! You can now book a coaching session.')}`;
-                url.searchParams.set('success_redirect', encodeURIComponent(successRedirectUrl));
-                openPopup({
-                    type: 'success',
-                    title: 'Redirecting to Payment...',
-                    message: 'You will be redirected to complete your purchase. After payment, you will be asked to login.',
-                });
-                setTimeout(() => { window.location.href = url.toString(); }, 1000);
-                ------- END GHL Redirect ------- */
-
                 // Square: open the payment modal
                 setSquarePayment({
                     isOpen: true,
@@ -346,13 +329,7 @@ function GuestLanding() {
 
             <div className="flex items-center justify-center p-4 min-h-[calc(100vh-3.5rem)]">
                 <div className="w-full max-w-2xl">
-                    <div className="flex justify-center mb-8">
-                        <img
-                            src={logo}
-                            alt="Hole 9 Golf Logo"
-                            className="h-20 w-auto object-contain"
-                        />
-                    </div>
+                    {/* Logo removed - only shown after login */}
 
                     {step === 'booking-type' && (
                         <div className="bg-surface rounded-card shadow-card p-8 text-center">
@@ -625,10 +602,10 @@ function GuestLanding() {
                     openPopup({
                         type: 'success',
                         title: 'Purchase Successful!',
-                        message: 'Your package has been purchased! Please login to book your sessions.',
-                        confirmText: 'Login Now',
+                        message: 'Your package has been purchased! You can now book your coaching session.',
+                        confirmText: 'Book Now',
                         showCancel: false,
-                        onConfirm: () => navigate('/signin', { state: { message: 'Your package is ready. Please login to book your coaching session.' } })
+                        onConfirm: () => navigate(`/guest-booking?phone=${encodeURIComponent(registeredPhone)}&message=${encodeURIComponent('Package purchased successfully! Please book your coaching session.')}`)
                     });
                 }}
                 tempId={squarePayment.tempId}
@@ -638,6 +615,7 @@ function GuestLanding() {
                 description={squarePayment.packageTitle}
                 disableCoupons={true}
             />
+
         </div>
     );
 }

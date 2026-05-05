@@ -110,7 +110,7 @@ export const endpoints = {
             acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
         },
     },
-    
+
     // Service categories
     categories: {
         // Public (Phase A)
@@ -204,6 +204,8 @@ export const endpoints = {
             locations: '/ghlpage/admin/locations/',
             updateCompanyName: (locationId) => `/ghlpage/admin/locations/${locationId}/company-name/`,
             setCompanyName: '/ghlpage/admin/locations/set-company-name/',
+            uploadLogo: (locationId) => `/ghlpage/admin/locations/${locationId}/logo/`,
+            deleteLogo: (locationId) => `/ghlpage/admin/locations/${locationId}/logo/delete/`,
         },
     },
 

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppSelector } from '../store/hooks';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
-import { Edit, X, Globe } from 'lucide-react';
+import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
@@ -33,10 +33,50 @@ const COMMON_TIMEZONES = [
     { value: 'UTC', label: "UTC — Universal Coordinated Time" },
 ];
 
+// Target logo dimensions (same as the current design)
+const LOGO_WIDTH = 912;
+const LOGO_HEIGHT = 273;
+const MAX_LOGO_BYTES = 1 * 1024 * 1024; // 1 MB
+
+/**
+ * Resize an image File to LOGO_WIDTH × LOGO_HEIGHT using an offscreen canvas
+ * then return a new Blob (PNG).  Returns a Promise<Blob>.
+ */
+function resizeImageToBlob(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const canvas = document.createElement('canvas');
+            canvas.width = LOGO_WIDTH;
+            canvas.height = LOGO_HEIGHT;
+            const ctx = canvas.getContext('2d');
+            // Fill white background (handles transparent PNGs)
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, LOGO_WIDTH, LOGO_HEIGHT);
+            // Draw image scaled to fit, centred, preserving aspect ratio
+            const scale = Math.min(LOGO_WIDTH / img.width, LOGO_HEIGHT / img.height);
+            const drawW = img.width * scale;
+            const drawH = img.height * scale;
+            const offsetX = (LOGO_WIDTH - drawW) / 2;
+            const offsetY = (LOGO_HEIGHT - drawH) / 2;
+            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Canvas toBlob failed'));
+            }, 'image/png');
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+        img.src = url;
+    });
+}
+
 function GHLLocationManagement() {
     const { user } = useAppSelector((state) => state.auth);
     const { popup, openPopup, closePopup } = usePopup();
     const modalRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     const [locations, setLocations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -46,6 +86,14 @@ function GHLLocationManagement() {
     const [timezone, setTimezone] = useState('America/Halifax');
     const [timezoneSearch, setTimezoneSearch] = useState('');
     const [submitLoading, setSubmitLoading] = useState(false);
+
+    // Logo upload state
+    const [logoPreview, setLogoPreview] = useState(null);      // data URL for preview
+    const [logoBlob, setLogoBlob] = useState(null);             // resized Blob ready to upload
+    const [logoBlobSize, setLogoBlobSize] = useState(null);     // byte size after resize
+    const [logoError, setLogoError] = useState('');
+    const [logoUploading, setLogoUploading] = useState(false);
+    const [logoDeleting, setLogoDeleting] = useState(false);
 
     const isSuperadmin = user?.role === 'superadmin';
 
@@ -89,6 +137,10 @@ function GHLLocationManagement() {
         setCompanyName(location.company_name || '');
         setTimezone(location.timezone || 'America/Halifax');
         setTimezoneSearch('');
+        setLogoPreview(null);
+        setLogoBlob(null);
+        setLogoBlobSize(null);
+        setLogoError('');
         setShowForm(true);
     };
 
@@ -104,7 +156,6 @@ function GHLLocationManagement() {
             );
 
             if (response.data) {
-                // Update the location in the list
                 setLocations(locations.map(loc =>
                     loc.location_id === editingLocation.location_id
                         ? { ...loc, company_name: companyName, timezone }
@@ -144,6 +195,120 @@ function GHLLocationManagement() {
         setCompanyName('');
         setTimezone('America/Halifax');
         setTimezoneSearch('');
+        setLogoPreview(null);
+        setLogoBlob(null);
+        setLogoBlobSize(null);
+        setLogoError('');
+    };
+
+    // ── Logo helpers ─────────────────────────────────────────────────────────
+
+    const handleLogoFileChange = useCallback(async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setLogoError('');
+        setLogoPreview(null);
+        setLogoBlob(null);
+        setLogoBlobSize(null);
+
+        // Basic type check
+        if (!file.type.startsWith('image/')) {
+            setLogoError('Please select a valid image file (PNG, JPG, WebP, GIF).');
+            return;
+        }
+
+        try {
+            const blob = await resizeImageToBlob(file);
+            if (blob.size > MAX_LOGO_BYTES) {
+                setLogoError(`Resized image is ${(blob.size / 1024).toFixed(0)} KB — must be under 1 MB. Try a simpler image.`);
+                return;
+            }
+            const preview = URL.createObjectURL(blob);
+            setLogoPreview(preview);
+            setLogoBlob(blob);
+            setLogoBlobSize(blob.size);
+        } catch (err) {
+            setLogoError('Failed to process image. Please try a different file.');
+        }
+    }, []);
+
+    const handleLogoUpload = async () => {
+        if (!logoBlob || !editingLocation) return;
+        setLogoUploading(true);
+        setLogoError('');
+        try {
+            const formData = new FormData();
+            formData.append('logo', logoBlob, `logo_${editingLocation.location_id}.png`);
+            const response = await apiClient.post(
+                endpoints.ghl.admin.uploadLogo(editingLocation.location_id),
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
+            const updatedLocation = response.data.location;
+            // Update the location in the list
+            setLocations(prev => prev.map(loc =>
+                loc.location_id === editingLocation.location_id
+                    ? { ...loc, logo_url: updatedLocation.logo_url }
+                    : loc
+            ));
+            setEditingLocation(prev => ({ ...prev, logo_url: updatedLocation.logo_url }));
+            setLogoPreview(null);
+            setLogoBlob(null);
+            setLogoBlobSize(null);
+            openPopup({
+                type: 'success',
+                title: 'Logo Uploaded',
+                message: 'Company logo uploaded successfully.',
+                confirmText: 'OK',
+                showCancel: false,
+            });
+        } catch (err) {
+            setLogoError(err.response?.data?.error || 'Upload failed. Please try again.');
+        } finally {
+            setLogoUploading(false);
+        }
+    };
+
+    const handleLogoDelete = async () => {
+        if (!editingLocation) return;
+        openPopup({
+            type: 'warning',
+            title: 'Delete Logo',
+            message: 'Are you sure you want to remove the logo for this location?',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            showCancel: true,
+            onConfirm: async () => {
+                closePopup();
+                setLogoDeleting(true);
+                try {
+                    await apiClient.delete(endpoints.ghl.admin.deleteLogo(editingLocation.location_id));
+                    setLocations(prev => prev.map(loc =>
+                        loc.location_id === editingLocation.location_id
+                            ? { ...loc, logo_url: null }
+                            : loc
+                    ));
+                    setEditingLocation(prev => ({ ...prev, logo_url: null }));
+                    openPopup({
+                        type: 'success',
+                        title: 'Logo Removed',
+                        message: 'The logo has been removed.',
+                        confirmText: 'OK',
+                        showCancel: false,
+                    });
+                } catch (err) {
+                    openPopup({
+                        type: 'error',
+                        title: 'Error',
+                        message: err.response?.data?.error || 'Failed to delete logo.',
+                        confirmText: 'OK',
+                        showCancel: false,
+                    });
+                } finally {
+                    setLogoDeleting(false);
+                }
+            },
+        });
     };
 
     // Get a user-friendly timezone label
@@ -163,14 +328,13 @@ function GHLLocationManagement() {
     return (
         <>
             <div>
-
                 {/* Edit Form Modal */}
                 {showForm && editingLocation && (
                     <div className="fixed inset-0 flex items-center justify-center p-4 z-50"
                         style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(3px)' }}
                         onClick={handleClose}>
                         <div ref={modalRef}
-                            className="bg-surface rounded-card shadow-xl max-w-lg w-full"
+                            className="bg-surface rounded-card shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
                             onClick={(e) => e.stopPropagation()}>
                             <div className="p-6">
                                 <div className="flex items-center justify-between mb-6">
@@ -184,7 +348,8 @@ function GHLLocationManagement() {
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <form onSubmit={handleSubmit} className="space-y-4">
+                                <form onSubmit={handleSubmit} className="space-y-5">
+                                    {/* Location ID (read-only) */}
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
                                             Location ID
@@ -196,6 +361,8 @@ function GHLLocationManagement() {
                                             className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary cursor-not-allowed"
                                         />
                                     </div>
+
+                                    {/* Company Name */}
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
                                             Company Name
@@ -219,7 +386,6 @@ function GHLLocationManagement() {
                                         <p className="text-xs text-text-secondary mb-2">
                                             All bookings and availability for this center will use this timezone. DST is handled automatically.
                                         </p>
-                                        {/* Search box */}
                                         <input
                                             type="text"
                                             value={timezoneSearch}
@@ -249,14 +415,111 @@ function GHLLocationManagement() {
                                         )}
                                     </div>
 
-                                    <div className="flex gap-4 pt-4">
+                                    {/* ── Company Logo Section ── */}
+                                    <div className="border border-border rounded-button p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <ImageIcon className="w-4 h-4 text-primary" />
+                                            <span className="text-sm font-semibold text-text-primary">Company Logo</span>
+                                        </div>
+                                        <p className="text-xs text-text-secondary">
+                                            Recommended size: <strong>912 × 273 px</strong>. Must be under <strong>1 MB</strong>.
+                                            Your image will be automatically resized and centred to fit.
+                                        </p>
+
+                                        {/* Current / preview image */}
+                                        <div className="relative w-full rounded-button overflow-hidden bg-background border border-border"
+                                            style={{ height: '90px' }}>
+                                            {logoPreview ? (
+                                                <img
+                                                    src={logoPreview}
+                                                    alt="Logo preview"
+                                                    className="w-full h-full object-contain"
+                                                />
+                                            ) : editingLocation.logo_url ? (
+                                                <img
+                                                    src={editingLocation.logo_url}
+                                                    alt="Current logo"
+                                                    className="w-full h-full object-contain"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full gap-2 text-text-secondary">
+                                                    <ImageIcon className="w-6 h-6" />
+                                                    <span className="text-sm">No logo set</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Size indicator after resize */}
+                                        {logoBlobSize && (
+                                            <p className="text-xs flex items-center gap-1">
+                                                <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                                <span className="text-text-secondary">
+                                                    Resized to 912 × 273 px — <strong>{(logoBlobSize / 1024).toFixed(1)} KB</strong>
+                                                </span>
+                                            </p>
+                                        )}
+
+                                        {/* Error */}
+                                        {logoError && (
+                                            <p className="text-xs text-danger">{logoError}</p>
+                                        )}
+
+                                        {/* Hidden file input */}
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={handleLogoFileChange}
+                                        />
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {/* Choose file */}
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-button hover:bg-background transition-colors text-text-primary"
+                                            >
+                                                <Upload className="w-4 h-4" />
+                                                {logoPreview ? 'Change Image' : 'Choose Image'}
+                                            </button>
+
+                                            {/* Upload (only after a new file is selected) */}
+                                            {logoBlob && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLogoUpload}
+                                                    disabled={logoUploading}
+                                                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary text-white rounded-button hover:opacity-90 transition-opacity disabled:opacity-60"
+                                                >
+                                                    {logoUploading ? 'Uploading…' : 'Upload Logo'}
+                                                </button>
+                                            )}
+
+                                            {/* Delete current logo (only if one exists and no new file pending) */}
+                                            {editingLocation.logo_url && !logoBlob && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLogoDelete}
+                                                    disabled={logoDeleting}
+                                                    className="flex items-center gap-1.5 px-3 py-2 text-sm border border-danger text-danger rounded-button hover:bg-danger/10 transition-colors disabled:opacity-60"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    {logoDeleting ? 'Removing…' : 'Remove Logo'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action buttons */}
+                                    <div className="flex gap-4 pt-2">
                                         <Button
                                             type="submit"
                                             disabled={submitLoading}
                                             variant="primary"
                                             className="flex-1"
                                         >
-                                            {submitLoading ? 'Updating...' : 'Update'}
+                                            {submitLoading ? 'Updating...' : 'Update Settings'}
                                         </Button>
                                         <Button
                                             type="button"
@@ -275,7 +538,7 @@ function GHLLocationManagement() {
 
                 {/* Locations List */}
                 {loading ? (
-                    <TableSkeleton rows={5} cols={5} />
+                    <TableSkeleton rows={5} cols={6} />
                 ) : (
                     <div className="bg-surface rounded-card shadow-card overflow-hidden">
                         {locations.length === 0 ? (
@@ -292,6 +555,9 @@ function GHLLocationManagement() {
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Company Name
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Logo
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Timezone
@@ -312,6 +578,17 @@ function GHLLocationManagement() {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
                                                     {location.company_name || <span className="text-text-secondary italic">Not set</span>}
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    {location.logo_url ? (
+                                                        <img
+                                                            src={location.logo_url}
+                                                            alt="logo"
+                                                            className="h-8 w-auto object-contain rounded"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-text-secondary italic">No logo</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-text-secondary">
                                                     <span className="inline-flex items-center gap-1">

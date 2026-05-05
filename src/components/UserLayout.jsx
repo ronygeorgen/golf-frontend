@@ -16,7 +16,8 @@ function UserLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
-    const { user } = useAppSelector((state) => state.auth);
+    const { user, locationLogoUrl } = useAppSelector((state) => state.auth);
+    const currentLogo = locationLogoUrl || logo;
     const { toast, showError, hideToast } = useToast();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [packagesMenuOpen, setPackagesMenuOpen] = useState(false);
@@ -191,9 +192,9 @@ function UserLayout() {
                         <div className="flex items-center space-x-2 md:space-x-4">
                             <div className="bg-white p-1 rounded-md">
                                 <img
-                                    src={logo}
-                                    alt="Hole 9 Golf Logo"
-                                    className="h-10 w-auto md:h-10 object-contain"
+                                    src={currentLogo}
+                                    alt="Company Logo"
+                                    className="h-10 w-auto md:h-10 object-contain max-w-[180px]"
                                 />
                             </div>
                             <div className="hidden md:block h-6 w-px bg-border"></div>
