@@ -25,6 +25,7 @@ import {
     Ticket,
     Layers,
     Building2,
+    CreditCard,
 } from 'lucide-react';
 
 
@@ -106,6 +107,7 @@ function AdminLayout() {
                 { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },
                 { path: '/admin/liability-waiver', label: 'Manage Liability Waiver', icon: ShieldCheck },
                 { path: '/admin/coupons', label: 'Manage Coupons', icon: Ticket },
+                { path: '/admin/square-connect', label: 'Square Connect', icon: CreditCard },
                 ...(isSuperadmin ? [{ path: '/admin/ghl-locations', label: 'Manage GHL Locations', icon: MapPin }] : []),
             ]
         },
@@ -168,6 +170,7 @@ function AdminLayout() {
         if (isActive(navigationItems.dashboard.path)) return 'Dashboard';
         if (isActive(navigationItems.overrides.path)) return 'Admin Overrides';
         if (isActive('/admin/ghl-locations')) return 'GHL Location Management';
+        if (isActive('/admin/square-connect')) return 'Square Connect';
 
         return 'Admin Dashboard';
     };
