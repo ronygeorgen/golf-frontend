@@ -2,8 +2,8 @@
  * Staff Availability Management
  *
  * Each staff member can have separate availability settings per service category:
- *   • "General" (null) — applies to all categories that have no specific override
- *   • Per-category — overrides general for that specific booking type
+ *   • "Coaching" (null) — used exclusively for Coaching sessions
+ *   • Per-dynamic-category — used only for that specific category; no fallback to Coaching
  *
  * The top of the page shows category tabs.  Switching tabs reloads the
  * weekly recurring, day-specific, and blocked-dates data for that scope.
@@ -62,17 +62,16 @@ function StaffAvailability() {
     const [activeCategoryId, setActiveCategoryId] = useState(null);
 
     const categoryTabs = useMemo(() => {
-        const tabs = [{ id: null, label: 'General (All Categories)', isGeneral: true }];
-        // Only add truly dynamic categories (non-legacy) as tabs.
-        // Legacy types ('coaching', 'simulator') are handled by the existing booking flows
-        // which already read from general (null) availability — no per-category tab needed.
+        // "Coaching" tab (null category) is for coaching sessions only.
+        // Dynamic categories each get their own tab with no fallback to Coaching.
+        const tabs = [{ id: null, label: 'Coaching', isCoaching: true }];
         serviceCategories
             .filter((cat) => !cat.legacy_booking_type)
             .forEach((cat) => {
                 tabs.push({
                     id: cat.id,
                     label: cat.customer_label || cat.name,
-                    isGeneral: false,
+                    isCoaching: false,
                 });
             });
         return tabs;
@@ -364,7 +363,7 @@ function StaffAvailability() {
                             Availability for {selectedStaff.first_name} {selectedStaff.last_name}
                         </h2>
                         <p className="text-sm text-gray-500">
-                            Set different availability hours for each service category. "General" applies to all categories that have no specific override.
+                            Set different availability hours for each service category. "Coaching" applies to coaching sessions only; dynamic categories use their own schedule.
                         </p>
                     </div>
 
@@ -384,7 +383,7 @@ function StaffAvailability() {
                                         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${isActive
                                             ? 'border-blue-600 text-blue-600 bg-blue-50'
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            } ${tab.isGeneral ? 'italic' : ''}`}
+                                            } ${tab.isCoaching ? 'italic' : ''}`}
                                     >
                                         {tab.label}
                                     </button>
@@ -397,13 +396,9 @@ function StaffAvailability() {
                     <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div>
                             <p className="text-sm text-gray-600">
-                                {activeTab.isGeneral ? (
+                                {!activeTab.isCoaching && (
                                     <>
-                                        <span className="font-semibold">General availability</span> — used for Coaching, Simulator, and any dynamic category that doesn't have its own schedule set.
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="font-semibold">{activeTab.label} availability</span> — overrides general for <span className="font-semibold">{activeTab.label}</span> sessions only. If left empty, general availability is used as a fallback.
+                                        <span className="font-semibold">{activeTab.label} availability</span> — used only for <span className="font-semibold">{activeTab.label}</span> sessions. If left empty, no slots will be available for this category.
                                     </>
                                 )}
                             </p>
@@ -462,7 +457,7 @@ function StaffAvailability() {
                                 {availabilityType === 'weekly' ? 'Add Weekly Recurring Availability' :
                                     availabilityType === 'day_specific' ? 'Add Day-Specific Availability' :
                                         'Block a Date'}
-                                {!activeTab.isGeneral && (
+                                {!activeTab.isCoaching && (
                                     <span className="ml-2 text-sm font-normal text-gray-500">
                                         — for {activeTab.label}
                                     </span>
@@ -548,9 +543,9 @@ function StaffAvailability() {
                     ) : sortedAvailability.length === 0 ? (
                         <div className="text-center py-10 border border-dashed border-gray-200 rounded-lg">
                             <p className="text-gray-500 mb-3">
-                                {activeTab.isGeneral
-                                    ? 'No general availability set. Add weekly or day-specific slots above.'
-                                    : `No ${activeTab.label}-specific availability set. If left empty, general availability will be used as a fallback.`}
+                                {activeTab.isCoaching
+                                    ? 'No coaching availability set. Add weekly or day-specific slots above.'
+                                    : `No ${activeTab.label}-specific availability set. Add slots to make this category bookable.`}
                             </p>
                             <button
                                 onClick={() => setShowAddDropdown(true)}
@@ -612,7 +607,7 @@ function StaffAvailability() {
                         <div className="mt-8">
                             <h3 className="text-base font-semibold text-gray-900 mb-3">
                                 Blocked Dates
-                                {!activeTab.isGeneral && (
+                                {!activeTab.isCoaching && (
                                     <span className="ml-2 text-sm font-normal text-gray-500">— {activeTab.label}</span>
                                 )}
                             </h3>
