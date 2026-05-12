@@ -316,9 +316,10 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         if (currentStep === 'payment' && selectedSlot && isAssetOnly) {
             const params = { use_organization: true };
             if (client?.id) params.user_id = client.id;
+            if (category?.id) params.category_id = category.id;
             dispatch(getAvailableSimulatorHours(params));
         }
-    }, [currentStep, selectedSlot, isAssetOnly, dispatch, client]);
+    }, [currentStep, selectedSlot, isAssetOnly, dispatch, client, category?.id]);
 
     // ── Back navigation (mirrors CoachingBooking) ────────────────────────── //
     const handleBack = () => {
