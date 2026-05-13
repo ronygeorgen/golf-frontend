@@ -11,7 +11,6 @@ import Toast from '../components/ui/Toast';
 import CreateUserModal from '../components/CreateUserModal';
 import { createUser } from '../store/slices/adminSlice';
 import { getUserPurchases, getUserSimulatorPurchases } from '../store/slices/coachingSlice';
-import SquarePaymentModal from '../components/SquarePaymentModal';
 
 function MemberList() {
     const authState = useAppSelector((state) => state.auth);
@@ -42,14 +41,6 @@ function MemberList() {
     const [packagesLoading, setPackagesLoading] = useState(false);
     const [purchasingPackageId, setPurchasingPackageId] = useState(null);
     const [packageTypeFilter, setPackageTypeFilter] = useState('coaching'); // 'coaching' or 'simulator'
-
-    // Square payment modal state
-    const [squarePayment, setSquarePayment] = useState({
-        isOpen: false,
-        tempId: null,
-        amount: null,
-        packageTitle: '',
-    });
     const [page, setPage] = useState(1);
     const [pagination, setPagination] = useState({
         count: 0,
@@ -198,28 +189,19 @@ function MemberList() {
             });
 
             if (response.data.redirect_url && response.data.temp_id) {
-                /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
                 // Build redirect URL with all required query parameters
                 const url = new URL(response.data.redirect_url);
-                url.searchParams.set('phone', selectedMember.phone);
+                url.searchParams.set('phone', selectedMember.phone); // Client's phone
                 url.searchParams.set('package_id', packageId.toString());
                 url.searchParams.set('purchase_type', 'normal');
-                url.searchParams.set('recipient_phone', response.data.temp_id);
+                url.searchParams.set('recipient_phone', response.data.temp_id); // recipient_phone contains temp_id
                 url.searchParams.set('package_type', packageType);
-                if (user.id) { url.searchParams.set('referral_id', user.id.toString()); }
-                window.location.href = url.toString();
-                ------- END GHL Redirect ------- */
+                if (user.id) {
+                    url.searchParams.set('referral_id', user.id.toString());
+                }
 
-                // Square: open the payment modal
-                // Find the package price from the fetched packages list
-                const pkgList = packageType === 'simulator' ? simulatorPackages : packages;
-                const pkgData = pkgList.find(p => p.id === packageId);
-                setSquarePayment({
-                    isOpen: true,
-                    tempId: response.data.temp_id,
-                    amount: pkgData?.price,
-                    packageTitle: pkgData?.title || 'Package',
-                });
+                // Redirect to payment page
+                window.location.href = url.toString();
             } else {
                 showError('Failed to initiate purchase');
             }
@@ -628,19 +610,21 @@ function MemberList() {
                             {/* Package Type Filter Tabs */}
                             <div className="flex border-b border-border mb-4">
                                 <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${packageTypeFilter === 'coaching'
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                        packageTypeFilter === 'coaching'
                                             ? 'border-primary text-primary'
                                             : 'border-transparent text-text-secondary hover:text-text-primary'
-                                        }`}
+                                    }`}
                                     onClick={() => setPackageTypeFilter('coaching')}
                                 >
                                     Coaching Packages ({packages.length})
                                 </button>
                                 <button
-                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${packageTypeFilter === 'simulator'
+                                    className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                                        packageTypeFilter === 'simulator'
                                             ? 'border-primary text-primary'
                                             : 'border-transparent text-text-secondary hover:text-text-primary'
-                                        }`}
+                                    }`}
                                     onClick={() => setPackageTypeFilter('simulator')}
                                 >
                                     Simulator Packages ({simulatorPackages.length})
@@ -798,23 +782,6 @@ function MemberList() {
                 isOpen={showCreateModal}
                 onClose={() => setShowCreateModal(false)}
                 onSave={handleCreateUser}
-            />
-
-            {/* Square Payment Modal */}
-            <SquarePaymentModal
-                isOpen={squarePayment.isOpen}
-                onClose={() => setSquarePayment({ isOpen: false, tempId: null, amount: null, packageTitle: '' })}
-                onSuccess={() => {
-                    setSquarePayment({ isOpen: false, tempId: null, amount: null, packageTitle: '' });
-                    showSuccess('Package purchased successfully!');
-                    setShowPackageModal(false);
-                    fetchMembers(page);
-                }}
-                tempId={squarePayment.tempId}
-                amount={squarePayment.amount}
-                currency="CAD"
-                paymentType="package"
-                description={squarePayment.packageTitle}
             />
         </div>
     );

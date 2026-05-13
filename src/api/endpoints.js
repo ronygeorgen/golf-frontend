@@ -19,7 +19,7 @@ export const endpoints = {
         checkWaiverAcceptance: '/auth/liability-waiver/check/',
         acceptWaiver: '/auth/liability-waiver/accept/',
     },
-
+    
     // Admin endpoints
     admin: {
         dashboard: {
@@ -70,7 +70,7 @@ export const endpoints = {
             upcoming: '/admin/bookings/upcoming/',
             calendarEvents: '/admin/bookings/calendar_events/',
             stats: '/admin/bookings/stats/',
-
+            
         },
         overrides: {
             coachingSessions: '/admin/overrides/coaching-sessions/',
@@ -109,7 +109,7 @@ export const endpoints = {
             acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
         },
     },
-
+    
     // Booking endpoints
     bookings: {
         list: '/bookings/',
@@ -131,7 +131,7 @@ export const endpoints = {
         staffDailySchedule: '/bookings/staff-daily-schedule/',
         guestCreate: '/bookings/guest-create/',
     },
-
+    
     // Simulator endpoints (public)
     simulators: {
         list: '/simulators/simulators/',
@@ -139,7 +139,7 @@ export const endpoints = {
         durationPrices: '/simulators/duration-prices/',
         credits: '/simulators/credits/',
     },
-
+    
     // Coaching endpoints (public)
     coaching: {
         packages: '/coaching/packages/',
@@ -183,7 +183,7 @@ export const endpoints = {
             setCompanyName: '/ghlpage/admin/locations/set-company-name/',
         },
     },
-
+    
     // Special Events endpoints
     specialEvents: {
         list: '/special-events/events/',
@@ -213,20 +213,5 @@ export const endpoints = {
         staffSales: '/dashboard/staff-sales/',
         tpiConversion: '/dashboard/tpi-conversion/',
         kpiStats: '/dashboard/kpi-stats/',
-    },
-
-    // Square Payment endpoints
-    square: {
-        config: '/square/config/',
-        initiatePayment: '/square/initiate-payment/',
-        webhook: '/square/webhook/',
-    },
-
-    // Coupon endpoints
-    coupons: {
-        list: '/coupons/',
-        detail: (id) => `/coupons/${id}/`,
-        validate: '/coupons/validate/',
-        usages: '/coupons/usages/',
     },
 };

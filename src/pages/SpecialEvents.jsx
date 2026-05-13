@@ -11,7 +11,6 @@ import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
 import { EventCardSkeleton } from '../components/skeletons/SkeletonLoader';
 import { Calendar, Clock, Users, CheckCircle, XCircle } from 'lucide-react';
-import SquarePaymentModal from '../components/SquarePaymentModal';
 
 
 function SpecialEvents() {
@@ -21,15 +20,6 @@ function SpecialEvents() {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [registering, setRegistering] = useState({});
-
-    // Square payment modal state
-    const [squarePayment, setSquarePayment] = useState({
-        isOpen: false,
-        tempId: null,
-        amount: null,
-        eventTitle: '',
-        eventId: null,
-    });
 
     useEffect(() => {
         fetchEvents();
@@ -68,27 +58,17 @@ function SpecialEvents() {
                     const response = await axios.post(endpoints.specialEvents.register(eventId));
 
                     if (response.data.is_upfront && response.data.redirect_url) {
-                        /* ------- GHL Redirect (COMMENTED OUT for Square migration) -------
                         // Redirect to payment
                         const paymentUrl = new URL(response.data.redirect_url);
+                        // Consistent with simulator booking: recipient_phone stores the temp_id
                         paymentUrl.searchParams.append('recipient_phone', response.data.temp_id);
+
+                        // Also append phone if available, often used by external payment providers
                         if (user?.phone) {
                             paymentUrl.searchParams.append('phone', user.phone);
                         }
-                        window.location.href = paymentUrl.toString();
-                        return;
-                        ------- END GHL Redirect ------- */
 
-                        // Square: open the payment modal
-                        const eventData = events.find(e => e.id === eventId);
-                        setSquarePayment({
-                            isOpen: true,
-                            tempId: response.data.temp_id,
-                            amount: response.data.price || eventData?.price,
-                            eventTitle: eventData?.title || 'Special Event',
-                            eventId: eventId,
-                        });
-                        setRegistering({ ...registering, [eventId]: false });
+                        window.location.href = paymentUrl.toString();
                         return;
                     }
 
@@ -320,23 +300,6 @@ function SpecialEvents() {
                 showCancel={popup.showCancel}
                 onConfirm={popup.onConfirm}
                 onClose={closePopup}
-            />
-
-            {/* Square Payment Modal */}
-            <SquarePaymentModal
-                isOpen={squarePayment.isOpen}
-                onClose={() => setSquarePayment({ isOpen: false, tempId: null, amount: null, eventTitle: '', eventId: null })}
-                onSuccess={() => {
-                    setSquarePayment({ isOpen: false, tempId: null, amount: null, eventTitle: '', eventId: null });
-                    showSuccess('Registration confirmed and payment successful!');
-                    fetchEvents();
-                }}
-                tempId={squarePayment.tempId}
-                amount={squarePayment.amount}
-                currency="CAD"
-                paymentType="event"
-                description={squarePayment.eventTitle}
-                disableCoupons={!user}
             />
         </div>
     );
