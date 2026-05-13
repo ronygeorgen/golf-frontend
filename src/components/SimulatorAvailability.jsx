@@ -31,6 +31,10 @@ function SimulatorAvailability() {
         end_time: '17:00'
     });
 
+    // Local edit state: { [availId]: { start_time?, end_time? } }
+    // Tracks in-progress time edits so we don't fire API on every keystroke.
+    const [localEdits, setLocalEdits] = useState({});
+
     useEffect(() => {
         dispatch(getSimulators());
     }, [dispatch]);
@@ -61,6 +65,11 @@ function SimulatorAvailability() {
             dispatch(getSimulatorAvailability({ simulatorId: selectedSimulator.id }));
         }
     }, [dispatch, selectedSimulator]);
+
+    // Clear local edits whenever we switch simulators
+    useEffect(() => {
+        setLocalEdits({});
+    }, [selectedSimulator?.id]);
 
     const handleSimulatorSelect = (simulatorId) => {
         const simulator = simulators.find(s => s.id === simulatorId);
@@ -131,20 +140,67 @@ function SimulatorAvailability() {
         setShowAddDay(false);
     };
 
-    const handleUpdateAvailability = async (availabilityId, field, value) => {
+    // --- Local edit helpers ---
+
+    /** Get the display value for a time field: prefer local edit, fall back to Redux. */
+    const getTimeValue = (avail, field, defaultVal) => {
+        return localEdits[avail.id]?.[field] ?? avail[field] ?? defaultVal;
+    };
+
+    /** On every keystroke — only update local state, NO API call. */
+    const handleTimeChange = (availId, field, value) => {
+        setLocalEdits(prev => ({
+            ...prev,
+            [availId]: { ...(prev[availId] || {}), [field]: value }
+        }));
+    };
+
+    /**
+     * On blur — save the locally-edited value to the server.
+     * Passes the entire merged entry so the backend can match by ID.
+     */
+    const handleTimeBlur = async (avail) => {
+        if (!localEdits[avail.id]) return; // nothing changed
+
+        const availabilityArray = selectedSimulator?.id in availability
+            ? availability[selectedSimulator.id]
+            : [];
+
+        // Merge local edits into this entry
+        const mergedEntry = { ...avail, ...(localEdits[avail.id] || {}) };
+
+        const updatedAvailability = availabilityArray.map(a =>
+            a.id === avail.id ? mergedEntry : a
+        );
+
+        await dispatch(updateSimulatorAvailability({
+            simulatorId: selectedSimulator.id,
+            availabilityData: updatedAvailability
+        }));
+
+        // Clear the local edit — Redux state is now authoritative
+        setLocalEdits(prev => {
+            const next = { ...prev };
+            delete next[avail.id];
+            return next;
+        });
+    };
+
+    /**
+     * Day-of-week select: single discrete click, safe to save immediately.
+     * Backend now updates by ID so it won't create a duplicate.
+     */
+    const handleDayChange = async (avail, value) => {
         if (!selectedSimulator) return;
 
         const availabilityArray = selectedSimulator.id in availability
             ? availability[selectedSimulator.id]
             : [];
 
-        // Use time value as-is (wall-clock time)
-        const updatedValue = field === 'day_of_week' ? parseInt(value) : value;
-
-        const updatedAvailability = availabilityArray.map(avail =>
-            avail.id === availabilityId
-                ? { ...avail, [field]: updatedValue }
-                : avail
+        const updatedAvailability = availabilityArray.map(a =>
+            a.id === avail.id
+                ? { ...a, day_of_week: parseInt(value) }
+                : a
         );
 
         await dispatch(updateSimulatorAvailability({
@@ -343,9 +399,10 @@ function SimulatorAvailability() {
                                     {sortedAvailability.map((avail) => (
                                         <tr key={avail.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                {/* Day select: single discrete action → save immediately */}
                                                 <select
                                                     value={avail.day_of_week}
-                                                    onChange={(e) => handleUpdateAvailability(avail.id, 'day_of_week', e.target.value)}
+                                                    onChange={(e) => handleDayChange(avail, e.target.value)}
                                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                                                 >
                                                     {DAYS_OF_WEEK.map(day => (
@@ -356,18 +413,27 @@ function SimulatorAvailability() {
                                                 </select>
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
+                                                {/*
+                                                    Time inputs: onChange → local state only (no API).
+                                                    onBlur → save to server. This prevents:
+                                                    - "creates new day" (backend now updates by ID)
+                                                    - "resets to 1 PM" (API only fires after typing is done)
+                                                    - "sets then changes back" (no mid-typing API calls)
+                                                */}
                                                 <input
                                                     type="time"
-                                                    value={avail.start_time || '09:00'}
-                                                    onChange={(e) => handleUpdateAvailability(avail.id, 'start_time', e.target.value)}
+                                                    value={getTimeValue(avail, 'start_time', '09:00')}
+                                                    onChange={(e) => handleTimeChange(avail.id, 'start_time', e.target.value)}
+                                                    onBlur={() => handleTimeBlur(avail)}
                                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
                                                 <input
                                                     type="time"
-                                                    value={avail.end_time || '17:00'}
-                                                    onChange={(e) => handleUpdateAvailability(avail.id, 'end_time', e.target.value)}
+                                                    value={getTimeValue(avail, 'end_time', '17:00')}
+                                                    onChange={(e) => handleTimeChange(avail.id, 'end_time', e.target.value)}
+                                                    onBlur={() => handleTimeBlur(avail)}
                                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                             </td>
@@ -411,4 +477,3 @@ function SimulatorAvailability() {
 }
 
 export default SimulatorAvailability;
-
