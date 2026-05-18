@@ -33,6 +33,7 @@ function PackageManagement() {
         session_count: 5,
         session_duration_minutes: 60,
         simulator_hours: 0,
+        category_hours: 0,
         redirect_url: '',
         is_active: true,
         is_tpi_assessment: false,
@@ -143,6 +144,7 @@ function PackageManagement() {
             session_count: pkg.session_count || 1,
             session_duration_minutes: pkg.session_duration_minutes || 60,
             simulator_hours: pkg.simulator_hours || 0,
+            category_hours: pkg.category_hours || 0,
             redirect_url: pkg.redirect_url || '',
             is_active: pkg.is_active,
             is_tpi_assessment: pkg.is_tpi_assessment || false,
@@ -342,6 +344,24 @@ function PackageManagement() {
                                             Number of simulator hours included in this package (for simulator bookings)
                                         </p>
                                     </div>
+                                    {/* Category asset hours — only relevant for dynamic (non-legacy) categories */}
+                                    {formData.service_category && serviceCategories.find(c => c.id === Number(formData.service_category) && !c.legacy_booking_type) && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-2">
+                                            Category Asset Hours Included
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.5"
+                                            value={formData.category_hours}
+                                            onChange={(e) => setFormData({...formData, category_hours: parseFloat(e.target.value) || 0})}
+                                        />
+                                        <p className="mt-1 text-xs text-text-secondary">
+                                            Hours usable for asset-only bookings in this category (e.g. table time). Set &gt; 0 to make this a combo package.
+                                        </p>
+                                    </div>
+                                    )}
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
                                             Redirect URL (Optional)

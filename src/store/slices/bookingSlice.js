@@ -306,11 +306,12 @@ export const getSimulatorCredits = createAsyncThunk(
 
 export const getAvailableSimulatorHours = createAsyncThunk(
     'booking/getAvailableSimulatorHours',
-    async ({ use_organization = false, user_id } = {}, { rejectWithValue }) => {
+    async ({ use_organization = false, user_id, category_id } = {}, { rejectWithValue }) => {
         try {
             const params = new URLSearchParams();
             if (use_organization) params.append('use_organization', 'true');
             if (user_id) params.append('user_id', user_id);
+            if (category_id) params.append('category_id', category_id);
             const queryString = params.toString();
             const url = queryString
                 ? `${endpoints.bookings.availableSimulatorHours}?${queryString}`

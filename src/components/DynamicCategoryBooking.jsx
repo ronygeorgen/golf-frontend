@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { getAvailableSimulatorHours } from '../store/slices/bookingSlice';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment-timezone';
 import apiClient from '../api/axios';
@@ -23,6 +24,8 @@ import SquarePaymentModal from './SquarePaymentModal';
 
 function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     const { user: reduxUser, locationTimezone } = useAppSelector((s) => s.auth);
+    const { totalAvailableHours, availableHoursLoading } = useAppSelector((s) => s.booking);
+    const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { popup, openPopup, closePopup } = usePopup();
 
@@ -76,6 +79,9 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
 
     // ── Toast (mirrors CoachingBooking) ─────────────────────────────────── //
     const [toast, setToast] = useState({ show: false, message: '' });
+
+    // ── Payment method (asset-only bookings) ─────────────────────────────── //
+    const [usePrepaidHours, setUsePrepaidHours] = useState(null); // null=not chosen, true=prepaid, false=pay
 
     // ── Booking state ────────────────────────────────────────────────────── //
     const [bookingLoading, setBookingLoading] = useState(false);
@@ -305,9 +311,23 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         }
     }, [category?.id, date, selectedPackageId, selectedCoachId, selectedAssetId, assetDuration, isAssetOnly, hasSessions, openPopup]);
 
+    // Refresh available prepaid hours each time the payment step is entered
+    useEffect(() => {
+        if (currentStep === 'payment' && selectedSlot && isAssetOnly) {
+            const params = { use_organization: true };
+            if (client?.id) params.user_id = client.id;
+            if (category?.id) params.category_id = category.id;
+            dispatch(getAvailableSimulatorHours(params));
+        }
+    }, [currentStep, selectedSlot, isAssetOnly, dispatch, client, category?.id]);
+
     // ── Back navigation (mirrors CoachingBooking) ────────────────────────── //
     const handleBack = () => {
-        if (currentStep === 'summary') {
+        if (currentStep === 'payment') {
+            // payment step only exists for asset-only priced bookings
+            setUsePrepaidHours(null);
+            setCurrentStep('slots');
+        } else if (currentStep === 'summary') {
             setSelectedSlot(null);
             setCurrentStep('slots');
         } else if (currentStep === 'slots') {
@@ -324,7 +344,14 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     const handleSlotSelect = (slot) => {
         if (isSlotDisabled(slot)) return;
         setSelectedSlot(slot);
-        setCurrentStep('summary');
+        // Asset-only priced bookings get a payment-method step before summary
+        const assetPrice = selectedAsset?.price_per_hour ? parseFloat(selectedAsset.price_per_hour) : 0;
+        if (isAssetOnly && assetPrice > 0) {
+            setUsePrepaidHours(null);
+            setCurrentStep('payment');
+        } else {
+            setCurrentStep('summary');
+        }
     };
 
     // ── Submit booking ───────────────────────────────────────────────────── //
@@ -338,6 +365,9 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             const computedEndTime = isAssetOnly
                 ? new Date(new Date(selectedSlot.start_time).getTime() + duration * 60000).toISOString()
                 : selectedSlot.end_time;
+            const assetTotalPrice = selectedAsset?.price_per_hour
+                ? (parseFloat(selectedAsset.price_per_hour) * (duration / 60)).toFixed(2)
+                : '0.00';
             const payload = {
                 booking_type: 'coaching',
                 coaching_package: isAssetOnly ? null : (selectedPkg?.id || null),
@@ -345,12 +375,11 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                 start_time: selectedSlot.start_time,
                 end_time: computedEndTime,
                 total_price: isAssetOnly
-                    ? (selectedAsset?.price_per_hour
-                        ? (parseFloat(selectedAsset.price_per_hour) * (duration / 60)).toFixed(2)
-                        : '0.00')
+                    ? (usePrepaidHours ? '0.00' : assetTotalPrice)
                     : (selectedPkg?.price || 0),
                 service_category: category.id,
                 ...(selectedAssetId && { category_asset: parseInt(selectedAssetId) }),
+                ...(isAssetOnly && usePrepaidHours !== null && { use_prepaid_hours: usePrepaidHours }),
             };
             if (target?.id && isAdminOrStaff) {
                 payload.client = target.id;
@@ -376,6 +405,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             setSelectedCoachId('');
             setSlots([]);
             setSelectedSlot(null);
+            setUsePrepaidHours(null);
             if (onBookingSuccess) setTimeout(onBookingSuccess, 2000);
         } catch (err) {
             const detail = err?.response?.data;
@@ -779,6 +809,132 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                             <p>No available time slots found. Please try a different date or package.</p>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── Payment Step (asset-only, priced bookings) ────────────────── */}
+            {currentStep === 'payment' && selectedSlot && isAssetOnly && (
+                <div className="bg-surface rounded-card shadow-card p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-bold text-text-primary">Payment Method</h2>
+                        <Button onClick={handleBack} variant="secondary" className="flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Back
+                        </Button>
+                    </div>
+
+                    {/* Payment choice */}
+                    <div className="bg-status-personal-bg border border-status-personal-text/20 rounded-card p-4 mb-4">
+                        <p className="text-status-personal-text font-semibold mb-2">Payment Method</p>
+                        {availableHoursLoading ? (
+                            <p className="text-sm text-text-secondary mb-3">Loading available hours…</p>
+                        ) : totalAvailableHours > 0 ? (
+                            <p className="text-sm text-status-personal-text/80 mb-3">
+                                You have {totalAvailableHours.toFixed(2)} pre-paid hour{totalAvailableHours !== 1 ? 's' : ''} available
+                            </p>
+                        ) : (
+                            <p className="text-sm text-text-secondary mb-3">
+                                No pre-paid hours available. You can pay for this session directly.
+                            </p>
+                        )}
+                        <div className="space-y-2">
+                            {totalAvailableHours > 0 && (
+                                <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="assetPaymentMethod"
+                                        className="h-4 w-4 text-status-personal-text"
+                                        checked={usePrepaidHours === true}
+                                        onChange={() => setUsePrepaidHours(true)}
+                                        disabled={availableHoursLoading}
+                                    />
+                                    <div className="flex-1">
+                                        <div className="font-medium text-text-primary">Use Pre-paid Hours</div>
+                                        <div className="text-xs text-text-secondary">
+                                            Use {(duration / 60).toFixed(2)} hour{duration / 60 !== 1 ? 's' : ''} from your {totalAvailableHours.toFixed(2)} available — no charge
+                                        </div>
+                                    </div>
+                                </label>
+                            )}
+                            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-background transition-colors">
+                                <input
+                                    type="radio"
+                                    name="assetPaymentMethod"
+                                    className="h-4 w-4 text-primary"
+                                    checked={usePrepaidHours === false}
+                                    onChange={() => setUsePrepaidHours(false)}
+                                />
+                                <div className="flex-1">
+                                    <div className="font-medium text-text-primary">Pay for Session</div>
+                                    <div className="text-xs text-text-secondary">
+                                        ${selectedAsset?.price_per_hour
+                                            ? (parseFloat(selectedAsset.price_per_hour) * (duration / 60)).toFixed(2)
+                                            : '0.00'} — redirected to payment gateway
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Booking summary */}
+                    <div className="bg-background rounded-card p-6 mb-4">
+                        <h4 className="text-lg font-bold text-text-primary mb-4">Booking Summary</h4>
+                        <div className="space-y-2">
+                            <p className="text-text-primary">
+                                <span className="font-medium">Category:</span> {category.customer_label || category.name}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Asset:</span> {selectedAsset?.name}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Date:</span> {formatLocalDate(selectedSlot.start_time, tz)}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Time:</span>{' '}
+                                {formatLocalTime(selectedSlot.start_time, tz)} – {formatLocalTime(
+                                    new Date(new Date(selectedSlot.start_time).getTime() + duration * 60000).toISOString(), tz
+                                )}
+                            </p>
+                            <p className="text-text-primary">
+                                <span className="font-medium">Duration:</span> {duration >= 60 ? `${Math.floor(duration / 60)}h${duration % 60 > 0 ? ` ${duration % 60}min` : ''}` : `${duration}min`}
+                            </p>
+                        </div>
+                        {usePrepaidHours === true && (
+                            <div className="mt-3 text-sm text-status-confirmed-text bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card p-3">
+                                This booking will use {(duration / 60).toFixed(2)} hour{duration / 60 !== 1 ? 's' : ''} from your pre-paid hours. No payment required.
+                            </div>
+                        )}
+                        {usePrepaidHours === false && (
+                            <div className="mt-3 text-sm text-text-secondary bg-background border border-border rounded-card p-3">
+                                <p className="font-semibold text-text-primary">You will be redirected to the payment gateway.</p>
+                            </div>
+                        )}
+                        {usePrepaidHours === null && (
+                            <div className="mt-3 text-sm text-warning bg-warning-bg border border-warning-text/20 rounded-card p-3">
+                                Please select a payment method above.
+                            </div>
+                        )}
+                    </div>
+
+                    <Button
+                        onClick={handleBooking}
+                        disabled={bookingLoading || usePrepaidHours === null}
+                        loading={bookingLoading}
+                        variant="primary"
+                        className="w-full py-3 flex items-center justify-center gap-2"
+                    >
+                        {bookingLoading ? (
+                            <>
+                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                <span>Processing…</span>
+                            </>
+                        ) : usePrepaidHours === true ? 'Confirm Booking (Use Pre-paid Hours)' : 'Proceed to Payment'}
+                    </Button>
                 </div>
             )}
 

@@ -40,6 +40,7 @@ const emptySession = {
     session_count: 5,
     session_duration_minutes: 60,
     simulator_hours: 0,
+    category_hours: 0,
     staff_members: [],
     redirect_url: '',
     is_active: true,
@@ -103,6 +104,7 @@ function buildPayload(form, cat) {
         session_count: parseInt(form.session_count, 10) || 1,
         session_duration_minutes: parseInt(form.session_duration_minutes, 10) || 60,
         simulator_hours: parseFloat(form.simulator_hours) || 0,
+        category_hours: parseFloat(form.category_hours) || 0,
         staff_members: form.staff_members || [],
         ...(cat?.legacy_booking_type === 'coaching' ? { is_tpi_assessment: form.is_tpi_assessment } : {}),
     };
@@ -364,6 +366,7 @@ export default function UnifiedPackagesPage() {
                 session_count: item.session_count || 5,
                 session_duration_minutes: item.session_duration_minutes || 60,
                 simulator_hours: item.simulator_hours ?? 0,
+                category_hours: item.category_hours ?? 0,
                 staff_members: staffIds,
                 redirect_url: item.redirect_url || '',
                 is_active: item.is_active !== undefined ? item.is_active : true,
@@ -518,7 +521,7 @@ export default function UnifiedPackagesPage() {
 
     const kindBadge = (item) => {
         if (item._kind === 'simulator') return <Badge status="personal">Simulator</Badge>;
-        if (item.simulator_hours > 0) return <Badge status="no_show">Combo</Badge>;
+        if ((item.simulator_hours > 0) || (item.category_hours > 0)) return <Badge status="no_show">Combo</Badge>;
         return <Badge status="confirmed">Coaching</Badge>;
     };
 
@@ -800,6 +803,24 @@ export default function UnifiedPackagesPage() {
                                                 value={formData.simulator_hours}
                                                 onChange={(e) =>
                                                     setFormData((p) => ({ ...p, simulator_hours: e.target.value }))
+                                                }
+                                            />
+                                        </FieldRow>
+                                    )}
+
+                                    {/* Category asset hours (combo — only for dynamic categories) */}
+                                    {selectedCategory && !selectedCategory.legacy_booking_type && (
+                                        <FieldRow
+                                            label="Category Asset Hours Included"
+                                            hint="Set > 0 to include asset-booking hours (e.g. table time). Users can redeem these for asset-only bookings in this category. Creates a Combo package."
+                                        >
+                                            <TextInput
+                                                type="number"
+                                                min="0"
+                                                step="0.5"
+                                                value={formData.category_hours}
+                                                onChange={(e) =>
+                                                    setFormData((p) => ({ ...p, category_hours: e.target.value }))
                                                 }
                                             />
                                         </FieldRow>
