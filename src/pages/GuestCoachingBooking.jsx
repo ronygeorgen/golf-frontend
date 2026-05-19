@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { checkCoachingAvailability, clearAvailability } from '../store/slices/bookingSlice';
 import PopupMessage from '../components/PopupMessage';
 import usePopup from '../hooks/usePopup';
@@ -11,9 +11,8 @@ import DateInput from '../components/ui/DateInput';
 import { BookingSlotsSkeleton, FormSkeleton } from '../components/skeletons/SkeletonLoader';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
-import logo from '../assets/hole9golf-logo.png';
+
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
-import { useAppSelector } from '../store/hooks';
 import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 
 function GuestCoachingBooking() {
@@ -22,6 +21,9 @@ function GuestCoachingBooking() {
     const [searchParams] = useSearchParams();
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
+    const { locationLogoUrl } = useAppSelector((state) => state.auth);
+    const [locations, setLocations] = useState([]);
+    const currentLogo = selectedLogoUrl;
 
     const phone = searchParams.get('phone');
     const [packages, setPackages] = useState([]);
@@ -114,6 +116,12 @@ function GuestCoachingBooking() {
             try {
                 setLoadingPackages(true);
 
+                // Fetch locations for logo lookup
+                const locRes = await apiClient.get(endpoints.auth.ghlLocations);
+                if (locRes.data?.locations) {
+                    setLocations(locRes.data.locations);
+                }
+
                 // Fetch guest packages by phone
                 const packagesResponse = await apiClient.get(endpoints.coaching.guestPackages, {
                     params: { phone }
@@ -122,10 +130,17 @@ function GuestCoachingBooking() {
                 if (packagesResponse.data) {
                     setPackages(packagesResponse.data.packages || []);
                     setPurchases(packagesResponse.data.purchases || []);
-                    setLocationId(packagesResponse.data.location_id);
+                    const locId = packagesResponse.data.location_id;
+                    setLocationId(locId);
+
+                    // Update logo based on locId
+                    if (locId && locRes.data?.locations) {
+                        const match = locRes.data.locations.find(l => l.location_id === locId);
+                        setSelectedLogoUrl(match?.logo_url || null);
+                    }
                 }
             } catch (error) {
-                console.error('Failed to fetch guest packages:', error);
+                console.error('Failed to fetch guest data:', error);
                 showError('Failed to load packages. Please try again.');
             } finally {
                 setLoadingPackages(false);
@@ -387,7 +402,7 @@ function GuestCoachingBooking() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
-                    <img src={logo} alt="Hole 9 Golf Logo" className="h-20 w-auto object-contain mx-auto mb-4" />
+                    {currentLogo && <img src={currentLogo} alt="Company Logo" className="h-20 w-auto object-contain mx-auto mb-4 max-w-[250px]" />}
                     <p className="text-text-secondary">Loading packages...</p>
                 </div>
             </div>
@@ -398,7 +413,7 @@ function GuestCoachingBooking() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center p-4">
                 <div className="bg-surface rounded-card shadow-card p-8 text-center max-w-md w-full">
-                    <img src={logo} alt="Hole 9 Golf Logo" className="h-20 w-auto object-contain mx-auto mb-4" />
+                    {currentLogo && <img src={currentLogo} alt="Company Logo" className="h-20 w-auto object-contain mx-auto mb-4 max-w-[250px]" />}
                     <h2 className="text-2xl font-bold text-text-primary mb-4">No Packages Available</h2>
                     <p className="text-text-secondary mb-6">
                         You don't have any active TPI Assessment packages with remaining sessions.
@@ -417,7 +432,7 @@ function GuestCoachingBooking() {
             <header className="bg-surface shadow-sm border-b border-border sticky top-0 z-50 w-full">
                 <div className="max-w-full px-4 sm:px-6 lg:px-8 mx-auto">
                     <div className="flex items-center justify-between h-14 w-full">
-                        <img src={logo} alt="Hole 9 Golf Logo" className="h-10 w-auto object-contain" />
+                        {currentLogo && <img src={currentLogo} alt="Company Logo" className="h-10 w-auto object-contain max-w-[150px]" />}
                         <button
                             onClick={() => navigate('/signin')}
                             className="px-4 py-2 rounded-button text-sm font-medium transition-colors bg-primary text-white hover:bg-primary-light"

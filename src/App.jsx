@@ -16,6 +16,9 @@ import StaffAvailability from './components/StaffAvailability';
 import SimulatorManagement from './components/SimulatorManagement';
 import SimulatorAvailability from './components/SimulatorAvailability';
 import PackageManagement from './components/PackageManagement';
+import CategoryManagement from './components/CategoryManagement';
+import CategoryAssetManagement from './components/CategoryAssetManagement';
+import UnifiedPackagesPage from './components/UnifiedPackagesPage';
 import SimulatorPackageManagement from './components/SimulatorPackageManagement';
 import UserManagement from './components/UserManagement';
 import CalendarView from './components/CalendarView';
@@ -27,6 +30,8 @@ import BannerManagement from './components/BannerManagement';
 import ClosedDaysManagement from './components/ClosedDaysManagement';
 import LiabilityWaiverManagement from './components/LiabilityWaiverManagement';
 import GHLLocationManagement from './components/GHLLocationManagement';
+import CouponManagement from './components/CouponManagement';
+import SquareConnectionManagement from './components/SquareConnectionManagement';
 import EventRegistrations from './pages/EventRegistrations';
 import Packages from './pages/Packages';
 import SpecialEvents from './pages/SpecialEvents';
@@ -233,14 +238,21 @@ function AppContent() {
                 <Route path="staff/:id/referrals" element={<StaffReferrals />} />
                 <Route path="simulators" element={<SimulatorManagement />} />
                 <Route path="simulators/:id/availability" element={<SimulatorAvailability />} />
-                <Route path="packages" element={<PackageManagement />} />
-                <Route path="simulator-packages" element={<SimulatorPackageManagement />} />
+                <Route path="categories" element={<CategoryManagement />} />
+                <Route path="categories/:categoryId/assets" element={<CategoryAssetManagement />} />
+                {/* Main packages hub — all categories in one place */}
+                <Route path="packages" element={<UnifiedPackagesPage />} />
+                {/* Legacy per-type routes kept for direct linking / backward compat */}
+                <Route path="packages-coaching" element={<PackageManagement />} />
+                <Route path="packages-simulator" element={<SimulatorPackageManagement />} />
                 <Route path="special-events" element={<SpecialEventsManagement />} />
                 <Route path="special-events/:eventId/registrations" element={<EventRegistrations />} />
                 <Route path="banners" element={<BannerManagement />} />
                 <Route path="closed-days" element={<ClosedDaysManagement />} />
                 <Route path="liability-waiver" element={<LiabilityWaiverManagement />} />
                 <Route path="ghl-locations" element={<GHLLocationManagement />} />
+                <Route path="coupons" element={<CouponManagement />} />
+                <Route path="square-connect" element={<SquareConnectionManagement />} />
                 <Route path="bookings" element={<BookingManagement />} />
                 <Route path="calendar" element={<CalendarView />} />
                 <Route path="overrides" element={<AdminOverrides />} />

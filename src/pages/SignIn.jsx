@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { requestOTP, verifyOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
-import logo from '../assets/hole9golf-logo.png';
+// import logo from '../assets/hole9golf-logo.png';
 import Button from '../components/ui/Button';
 import DOBPopup from '../components/DOBPopup';
 import LiabilityWaiverPopup from '../components/LiabilityWaiverPopup';
@@ -11,16 +11,17 @@ import Toast from '../components/ui/Toast';
 
 function SignIn() {
     const dispatch = useAppDispatch();
-    const { loading, error, otpSent, otpMessage, user } = useAppSelector((state) => state.auth);
+    const { loading, error, otpSent, otpMessage, user, locationLogoUrl } = useAppSelector((state) => state.auth);
+    // Logo is no longer shown on this page
     const location = useLocation();
-    
+
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState('phone');
     const [showDOBPopup, setShowDOBPopup] = useState(false);
     const [showWaiverPopup, setShowWaiverPopup] = useState(false);
     const [activeWaiver, setActiveWaiver] = useState(null);
-    
+
     const navigate = useNavigate();
     const { toast, showInfo, showSuccess, hideToast } = useToast();
 
@@ -29,14 +30,14 @@ function SignIn() {
         dispatch(clearError());
         dispatch(clearOTP());
         setStep('phone');
-        
+
         // Show toast message if redirected from guest landing page
         if (location.state?.message) {
             showInfo(location.state.message);
             // Clear the state to prevent showing the message again on refresh
             window.history.replaceState({}, document.title);
         }
-        
+
         // Check for purchase success message from URL params (after payment)
         const searchParams = new URLSearchParams(location.search);
         const purchaseSuccess = searchParams.get('purchase_success');
@@ -47,8 +48,8 @@ function SignIn() {
             searchParams.delete('purchase_success');
             searchParams.delete('message');
             const newSearch = searchParams.toString();
-            const newUrl = newSearch 
-                ? `${location.pathname}?${newSearch}` 
+            const newUrl = newSearch
+                ? `${location.pathname}?${newSearch}`
                 : location.pathname;
             window.history.replaceState({}, document.title, newUrl);
         }
@@ -71,19 +72,19 @@ function SignIn() {
             // Clear the popup flags on new login
             sessionStorage.removeItem('dobPopupShown');
             sessionStorage.removeItem('waiverPopupShown');
-            
+
             // Check for waiver first
             try {
                 const waiverResult = await dispatch(getActiveWaiver());
                 if (getActiveWaiver.fulfilled.match(waiverResult) && waiverResult.payload.waiver) {
                     const waiver = waiverResult.payload.waiver;
                     setActiveWaiver(waiver);
-                    
+
                     // Check if user has accepted
                     const acceptanceResult = await dispatch(checkWaiverAcceptance());
                     if (checkWaiverAcceptance.fulfilled.match(acceptanceResult)) {
                         const acceptance = acceptanceResult.payload;
-                        
+
                         // Show waiver popup if needed
                         if (acceptance.waiver_exists && acceptance.needs_acceptance) {
                             setShowWaiverPopup(true);
@@ -95,7 +96,7 @@ function SignIn() {
             } catch (error) {
                 console.error('Error checking waiver:', error);
             }
-            
+
             // Check if DOB is needed (only after waiver is handled)
             if (result.payload.needs_dob) {
                 setShowDOBPopup(true);
@@ -109,17 +110,11 @@ function SignIn() {
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
             <div className="bg-surface rounded-card shadow-card w-full max-w-md p-6 md:p-8">
-                <div className="flex justify-center mb-6">
-                    <img 
-                        src={logo} 
-                        alt="Hole 9 Golf Logo" 
-                        className="h-16 w-auto object-contain"
-                    />
-                </div>
+                {/* Logo removed - only shown after login */}
                 <h2 className="text-2xl md:text-3xl font-bold text-text-primary mb-6 text-center">
                     Sign In
                 </h2>
-                
+
                 {step === 'phone' && (
                     <form onSubmit={handlePhoneSubmit} className="space-y-4">
                         <div>
@@ -134,8 +129,8 @@ function SignIn() {
                                 required
                             />
                         </div>
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             disabled={loading}
                             variant="primary"
                             className="w-full py-3"
@@ -144,7 +139,7 @@ function SignIn() {
                         </Button>
                     </form>
                 )}
-                
+
                 {step === 'otp' && (
                     <form onSubmit={handleOtpSubmit} className="space-y-4">
                         <div>
@@ -161,8 +156,8 @@ function SignIn() {
                                 required
                             />
                         </div>
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             disabled={loading}
                             variant="primary"
                             className="w-full py-3"
@@ -171,8 +166,8 @@ function SignIn() {
                         </Button>
                         <p className="text-sm text-center text-text-secondary">
                             Didn't receive OTP?{' '}
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 className="text-primary hover:text-primary-light font-medium transition-colors"
                                 onClick={handlePhoneSubmit}
                             >
@@ -181,7 +176,7 @@ function SignIn() {
                         </p>
                     </form>
                 )}
-                
+
                 {otpMessage && (
                     <div className="mt-4 p-3 bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-card">
                         <p className="text-sm text-status-confirmed-text text-center">{otpMessage}</p>
@@ -194,7 +189,7 @@ function SignIn() {
                         </p>
                     </div>
                 )}
-                
+
                 <p className="mt-6 text-sm text-center text-text-secondary">
                     Don't have an account?{' '}
                     <Link to="/signup" className="text-primary hover:text-primary-light font-medium transition-colors">
@@ -202,7 +197,7 @@ function SignIn() {
                     </Link>
                 </p>
             </div>
-            
+
             <LiabilityWaiverPopup
                 isOpen={showWaiverPopup}
                 onClose={() => {
@@ -217,7 +212,7 @@ function SignIn() {
                 }}
                 waiver={activeWaiver}
             />
-            <DOBPopup 
+            <DOBPopup
                 isOpen={showDOBPopup}
                 onClose={() => {
                     setShowDOBPopup(false);
@@ -228,7 +223,7 @@ function SignIn() {
                     navigate('/'); // Navigate to root, LandingRedirect will handle role-based redirect
                 }}
             />
-            
+
             {toast && (
                 <div className="fixed top-4 right-4 z-50">
                     <Toast

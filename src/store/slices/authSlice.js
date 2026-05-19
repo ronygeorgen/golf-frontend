@@ -224,6 +224,8 @@ const getInitialState = () => {
         // Used by all components to display times in the correct local timezone.
         // DST transitions are handled automatically by date-fns-tz / Intl using IANA names.
         locationTimezone: localStorage.getItem('locationTimezone') || 'America/Halifax',
+        // Absolute URL for the current location's company logo (null = use default).
+        locationLogoUrl: localStorage.getItem('locationLogoUrl') || null,
         loading: false,
         error: null,
         otpSent: false,
@@ -251,6 +253,22 @@ const authSlice = createSlice({
             state.user = action.payload;
             if (action.payload) {
                 localStorage.setItem('user', JSON.stringify(action.payload));
+            }
+        },
+        // Superadmin can switch active location context from the nav bar
+        setSuperadminLocation: (state, action) => {
+            const { locationId, locationTimezone, locationLogoUrl } = action.payload;
+            state.locationId = locationId;
+            if (locationId) localStorage.setItem('locationId', locationId);
+            if (locationTimezone) {
+                state.locationTimezone = locationTimezone;
+                localStorage.setItem('locationTimezone', locationTimezone);
+            }
+            state.locationLogoUrl = locationLogoUrl || null;
+            if (locationLogoUrl) {
+                localStorage.setItem('locationLogoUrl', locationLogoUrl);
+            } else {
+                localStorage.removeItem('locationLogoUrl');
             }
         },
     },
@@ -322,6 +340,13 @@ const authSlice = createSlice({
                     state.locationTimezone = action.payload.location_timezone;
                     localStorage.setItem('locationTimezone', action.payload.location_timezone);
                 }
+                // Store location logo URL for dynamic branding
+                state.locationLogoUrl = action.payload.location_logo_url || null;
+                if (action.payload.location_logo_url) {
+                    localStorage.setItem('locationLogoUrl', action.payload.location_logo_url);
+                } else {
+                    localStorage.removeItem('locationLogoUrl');
+                }
                 // Clear DOB popup flag on login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -366,6 +391,13 @@ const authSlice = createSlice({
                 if (action.payload.location_timezone) {
                     state.locationTimezone = action.payload.location_timezone;
                     localStorage.setItem('locationTimezone', action.payload.location_timezone);
+                }
+                // Store location logo URL for dynamic branding
+                state.locationLogoUrl = action.payload.location_logo_url || null;
+                if (action.payload.location_logo_url) {
+                    localStorage.setItem('locationLogoUrl', action.payload.location_logo_url);
+                } else {
+                    localStorage.removeItem('locationLogoUrl');
                 }
                 // Clear DOB popup flag on new login
                 sessionStorage.removeItem('dobPopupShown');
@@ -458,6 +490,13 @@ const authSlice = createSlice({
                     state.locationTimezone = action.payload.location_timezone;
                     localStorage.setItem('locationTimezone', action.payload.location_timezone);
                 }
+                // Store location logo URL for dynamic branding
+                state.locationLogoUrl = action.payload.location_logo_url || null;
+                if (action.payload.location_logo_url) {
+                    localStorage.setItem('locationLogoUrl', action.payload.location_logo_url);
+                } else {
+                    localStorage.removeItem('locationLogoUrl');
+                }
                 // Clear DOB popup flag on auto-login
                 sessionStorage.removeItem('dobPopupShown');
             })
@@ -473,6 +512,7 @@ const authSlice = createSlice({
                 state.token = null;
                 state.locationId = null;
                 state.locationTimezone = 'America/Halifax'; // reset to default
+                state.locationLogoUrl = null;
                 state.error = null;
                 state.otpSent = false;
                 state.otpMessage = null;
@@ -480,6 +520,7 @@ const authSlice = createSlice({
                 state.waiverAcceptance = null;
                 localStorage.removeItem('locationId');
                 localStorage.removeItem('locationTimezone');
+                localStorage.removeItem('locationLogoUrl');
             });
 
         // Get Active Waiver
@@ -530,7 +571,7 @@ const authSlice = createSlice({
     },
 });
 
-export const { clearError, clearOTP, setUser } = authSlice.actions;
+export const { clearError, clearOTP, setUser, setSuperadminLocation } = authSlice.actions;
 export default authSlice.reducer;
 
 

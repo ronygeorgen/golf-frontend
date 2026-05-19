@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SimulatorBooking from '../components/SimulatorBooking';
 import CoachingBooking from '../components/CoachingBooking';
+import DynamicCategoryBooking from '../components/DynamicCategoryBooking';
 import Button from '../components/ui/Button';
 import useToast from '../hooks/useToast';
 import Toast from '../components/ui/Toast';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function Booking() {
     const location = useLocation();
@@ -14,7 +17,23 @@ function Booking() {
     // Get tab from URL params or default to 'simulator'
     const searchParams = new URLSearchParams(location.search);
     const tabFromUrl = searchParams.get('tab');
-    const [activeTab, setActiveTab] = useState(tabFromUrl || 'simulator');
+
+    // Accepts: 'simulator', 'coaching', or 'category-<id>' (Phase E)
+    const isValidTab = (t) =>
+        t === 'coaching' || t === 'simulator' || /^category-\d+$/.test(t || '');
+
+    const [activeTab, setActiveTab] = useState(isValidTab(tabFromUrl) ? tabFromUrl : 'simulator');
+
+    /** Phase A: categories from API (legacy_booking_type maps to existing booking stack) */
+    const [serviceCategories, setServiceCategories] = useState([]);
+    const [categoriesLoading, setCategoriesLoading] = useState(true);
+    const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+    // All active categories — legacy ones map to existing booking stacks,
+    // null legacy_booking_type uses the new DynamicCategoryBooking component (Phase E).
+    const bookableCategories = useMemo(() => serviceCategories || [], [serviceCategories]);
+
+    const useCategoryDropdown = !categoriesLoading && bookableCategories.length > 0;
 
     // Show toast message if redirected from guest registration
     useEffect(() => {
@@ -25,12 +44,89 @@ function Booking() {
         }
     }, [location.state, showSuccess]);
 
-    // Update activeTab when URL param changes
+    // Update activeTab when URL param changes (covers legacy tabs + Phase E category-X tabs)
     useEffect(() => {
-        if (tabFromUrl && (tabFromUrl === 'simulator' || tabFromUrl === 'coaching')) {
+        if (isValidTab(tabFromUrl)) {
             setActiveTab(tabFromUrl);
         }
-    }, [tabFromUrl]);
+    }, [tabFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Load service categories (location_id is appended by axios interceptor when set)
+    useEffect(() => {
+        let cancelled = false;
+        async function loadCategories() {
+            setCategoriesLoading(true);
+            try {
+                const { data } = await apiClient.get(endpoints.categories.active);
+                if (!cancelled && Array.isArray(data)) {
+                    setServiceCategories(data);
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    setServiceCategories([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setCategoriesLoading(false);
+                }
+            }
+        }
+        loadCategories();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // When categories arrive, align selection with ?tab= or current active tab
+    useEffect(() => {
+        if (!bookableCategories.length) {
+            setSelectedCategoryId(null);
+            return;
+        }
+        // Try to match the URL tab param to a category
+        const matchByTab = (tab) => {
+            if (!tab) return null;
+            // Legacy tabs: 'simulator' or 'coaching'
+            if (tab === 'simulator' || tab === 'coaching') {
+                return bookableCategories.find((c) => c.legacy_booking_type === tab) || null;
+            }
+            // Phase E tab: 'category-<id>'
+            const match = tab.match(/^category-(\d+)$/);
+            if (match) {
+                return bookableCategories.find((c) => c.id === Number(match[1])) || null;
+            }
+            return null;
+        };
+        const pick = matchByTab(tabFromUrl) || matchByTab(activeTab) || bookableCategories[0];
+        setSelectedCategoryId(pick.id);
+        if (pick.legacy_booking_type && pick.legacy_booking_type !== activeTab) {
+            setActiveTab(pick.legacy_booking_type);
+        }
+    }, [bookableCategories, tabFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleCategorySelectChange = (e) => {
+        const id = Number(e.target.value);
+        const cat = bookableCategories.find((c) => c.id === id);
+        if (!cat) return;
+        setSelectedCategoryId(id);
+        if (cat.legacy_booking_type) {
+            setActiveTab(cat.legacy_booking_type);
+            navigate(`/booking?tab=${cat.legacy_booking_type}`, { replace: true, state: { client } });
+        } else {
+            // Phase E: new category — use category id as the "tab" key
+            setActiveTab(`category-${id}`);
+            navigate(`/booking?tab=category-${id}`, { replace: true, state: { client } });
+        }
+    };
+
+    const handleLegacyTabClick = (tab) => {
+        setActiveTab(tab);
+        navigate(`/booking?tab=${tab}`, { replace: true, state: { client } });
+        if (useCategoryDropdown) {
+            const cat = bookableCategories.find((c) => c.legacy_booking_type === tab);
+            if (cat) setSelectedCategoryId(cat.id);
+        }
+    };
 
     // Check for client in location state (passed from MemberList)
     const client = location.state?.client;
@@ -72,40 +168,71 @@ function Booking() {
                     </ul>
                 </div>
 
-                <div className="bg-surface rounded-card shadow-card p-2 mb-6">
-                    <div className="flex gap-2">
-                        <button
-                            className={`flex-1 py-3 px-4 rounded-button font-semibold transition duration-200 ${activeTab === 'simulator'
-                                ? 'bg-primary/10 text-primary border border-primary'
-                                : 'bg-background text-text-secondary hover:bg-primary/5'
+                <div className="bg-surface rounded-card shadow-card p-4 mb-6">
+                    {categoriesLoading ? (
+                        <p className="text-sm text-text-secondary py-2 text-center">Loading session types…</p>
+                    ) : useCategoryDropdown ? (
+                        <div className="space-y-2">
+                            <label htmlFor="booking-category" className="block text-sm font-semibold text-text-primary">
+                                Type of session
+                            </label>
+                            <select
+                                id="booking-category"
+                                className="w-full rounded-button border border-border bg-background px-4 py-3 text-text-primary font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                value={selectedCategoryId ?? ''}
+                                onChange={handleCategorySelectChange}
+                                disabled={categoriesLoading}
+                            >
+                                {categoriesLoading && <option value="">Loading…</option>}
+                                {!categoriesLoading &&
+                                    bookableCategories.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.customer_label || c.name}
+                                        </option>
+                                    ))}
+                            </select>
+                            <p className="text-xs text-text-secondary">
+                                Categories are managed per location. New sports or fitness types configured by your admin
+                                will appear here automatically.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                className={`flex-1 py-3 px-4 rounded-button font-semibold transition duration-200 ${
+                                    activeTab === 'simulator'
+                                        ? 'bg-primary/10 text-primary border border-primary'
+                                        : 'bg-background text-text-secondary hover:bg-primary/5'
                                 }`}
-                            onClick={() => {
-                                setActiveTab('simulator');
-                                // Update URL without page reload
-                                navigate('/booking?tab=simulator', { replace: true, state: { client } });
-                            }}
-                        >
-                            Book Simulator
-                        </button>
-                        <button
-                            className={`flex-1 py-3 px-4 rounded-button font-semibold transition duration-200 ${activeTab === 'coaching'
-                                ? 'bg-primary/10 text-primary border border-primary'
-                                : 'bg-background text-text-secondary hover:bg-primary/5'
+                                onClick={() => handleLegacyTabClick('simulator')}
+                            >
+                                Book Simulator
+                            </button>
+                            <button
+                                type="button"
+                                className={`flex-1 py-3 px-4 rounded-button font-semibold transition duration-200 ${
+                                    activeTab === 'coaching'
+                                        ? 'bg-primary/10 text-primary border border-primary'
+                                        : 'bg-background text-text-secondary hover:bg-primary/5'
                                 }`}
-                            onClick={() => {
-                                setActiveTab('coaching');
-                                // Update URL without page reload
-                                navigate('/booking?tab=coaching', { replace: true, state: { client } });
-                            }}
-                        >
-                            Book Coaching
-                        </button>
-                    </div>
+                                onClick={() => handleLegacyTabClick('coaching')}
+                            >
+                                Book Coaching
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="booking-content">
                     {activeTab === 'simulator' && <SimulatorBooking client={client} />}
                     {activeTab === 'coaching' && <CoachingBooking client={client} />}
+                    {/* Phase E: non-legacy categories */}
+                    {activeTab && activeTab.startsWith('category-') && (() => {
+                        const catId = Number(activeTab.replace('category-', ''));
+                        const cat = bookableCategories.find((c) => c.id === catId);
+                        return cat ? <DynamicCategoryBooking category={cat} client={client} /> : null;
+                    })()}
                 </div>
             </div>
 

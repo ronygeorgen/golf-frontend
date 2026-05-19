@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { logout } from '../store/slices/authSlice';
+import { logout, setSuperadminLocation } from '../store/slices/authSlice';
 import { endpoints } from '../api/endpoints';
+import apiClient from '../api/axios';
 import {
     LayoutDashboard,
     Users,
-    Gamepad2,
     Package,
     Calendar,
     CalendarDays,
@@ -21,27 +21,50 @@ import {
     Clock,
     CalendarOff,
     MapPin,
-    Megaphone
+    Megaphone,
+    Ticket,
+    Layers,
+    Building2,
+    CreditCard,
 } from 'lucide-react';
-import logo from '../assets/hole9golf-logo.png';
+
 
 function AdminLayout() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [manageMenuOpen, setManageMenuOpen] = useState(false);
     const [bookingsMenuOpen, setBookingsMenuOpen] = useState(false);
+    const [locationSwitcherOpen, setLocationSwitcherOpen] = useState(false);
     const [isInIframe, setIsInIframe] = useState(false);
+    const [allLocations, setAllLocations] = useState([]);
     const dropdownRef = useRef(null);
     const manageMenuRef = useRef(null);
     const bookingsMenuRef = useRef(null);
+    const locationSwitcherRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
-    const { user } = useAppSelector((state) => state.auth);
+    const { user, locationLogoUrl, locationId } = useAppSelector((state) => state.auth);
+
+    // Role helpers — defined early so useEffects below can use them
+    const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
+    const isSuperadmin = user?.role === 'superadmin';
+
+    // Resolve logo: location-specific logo only (no fallback)
+    const currentLogo = locationLogoUrl;
 
     // Detect if page is loaded in an iframe
     useEffect(() => {
         setIsInIframe(window.self !== window.top);
     }, []);
+
+    // Fetch all locations for the superadmin location switcher
+    useEffect(() => {
+        if (isSuperadmin) {
+            apiClient.get(endpoints.ghl.admin.locations)
+                .then(res => { if (res.data?.locations) setAllLocations(res.data.locations); })
+                .catch(() => { });
+        }
+    }, [isSuperadmin]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -55,6 +78,9 @@ function AdminLayout() {
             if (bookingsMenuRef.current && !bookingsMenuRef.current.contains(event.target)) {
                 setBookingsMenuOpen(false);
             }
+            if (locationSwitcherRef.current && !locationSwitcherRef.current.contains(event.target)) {
+                setLocationSwitcherOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -63,25 +89,25 @@ function AdminLayout() {
         };
     }, []);
 
-    const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
-    const isSuperadmin = user?.role === 'superadmin';
 
     // Navigation structure with grouped items
+
     const navigationItems = {
         dashboard: { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
         manage: {
             label: 'Manage',
             icon: Settings,
             items: [
+                { path: '/admin/categories', label: 'Manage Categories', icon: Layers },
                 { path: '/admin/users', label: 'Manage Users', icon: UserCog },
                 { path: '/admin/staff', label: isSuperadmin ? 'Manage Admin' : 'Manage Staff', icon: Users },
-                { path: '/admin/simulators', label: 'Manage Simulators', icon: Gamepad2 },
-                { path: '/admin/packages', label: 'Manage Coaching/Combo Packages', icon: Package },
-                { path: '/admin/simulator-packages', label: 'Manage Simulator Only Packages', icon: Clock },
+                { path: '/admin/packages', label: 'Manage Packages', icon: Package },
                 { path: '/admin/special-events', label: 'Manage Special Events', icon: CalendarDays },
                 ...((isAdmin || isSuperadmin) ? [{ path: '/admin/banners', label: 'Manage Banners', icon: Megaphone }] : []),
                 { path: '/admin/closed-days', label: 'Manage Closed Days', icon: CalendarOff },
                 { path: '/admin/liability-waiver', label: 'Manage Liability Waiver', icon: ShieldCheck },
+                { path: '/admin/coupons', label: 'Manage Coupons', icon: Ticket },
+                { path: '/admin/square-connect', label: 'Square Connect', icon: CreditCard },
                 ...(isSuperadmin ? [{ path: '/admin/ghl-locations', label: 'Manage GHL Locations', icon: MapPin }] : []),
             ]
         },
@@ -119,6 +145,16 @@ function AdminLayout() {
         window.open(onboardURL, '_blank', 'noopener,noreferrer');
     };
 
+    // Superadmin: switch active location context
+    const handleSwitchLocation = (loc) => {
+        dispatch(setSuperadminLocation({
+            locationId: loc.location_id,
+            locationTimezone: loc.timezone || 'America/Halifax',
+            locationLogoUrl: loc.logo_url || null,
+        }));
+        setLocationSwitcherOpen(false);
+    };
+
     const getPageTitle = () => {
         const path = location.pathname;
 
@@ -134,6 +170,7 @@ function AdminLayout() {
         if (isActive(navigationItems.dashboard.path)) return 'Dashboard';
         if (isActive(navigationItems.overrides.path)) return 'Admin Overrides';
         if (isActive('/admin/ghl-locations')) return 'GHL Location Management';
+        if (isActive('/admin/square-connect')) return 'Square Connect';
 
         return 'Admin Dashboard';
     };
@@ -157,11 +194,13 @@ function AdminLayout() {
                                 onClick={() => navigate('/admin')}
                                 className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity"
                             >
-                                <img
-                                    src={logo}
-                                    alt="Hole 9 Golf Logo"
-                                    className="h-10 sm:h-8 md:h-10 w-auto object-contain"
-                                />
+                                {currentLogo && (
+                                    <img
+                                        src={currentLogo}
+                                        alt="Company Logo"
+                                        className="h-10 sm:h-8 md:h-10 w-auto object-contain max-w-[200px]"
+                                    />
+                                )}
                                 <h1 className="text-lg sm:text-xl font-bold text-primary hidden sm:block">
                                     Admin Panel
                                 </h1>
@@ -294,7 +333,53 @@ function AdminLayout() {
                         )}
 
                         {/* Right side - User Profile Dropdown */}
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2">
+                            {/* Superadmin Location Switcher */}
+                            {isSuperadmin && allLocations.length > 0 && (
+                                <div className="relative" ref={locationSwitcherRef}>
+                                    <button
+                                        onClick={() => setLocationSwitcherOpen(!locationSwitcherOpen)}
+                                        title="Switch active location"
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-button text-sm border border-border hover:bg-background transition-colors text-text-primary"
+                                    >
+                                        <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
+                                        <span className="hidden sm:inline max-w-[120px] truncate">
+                                            {allLocations.find(l => l.location_id === locationId)?.company_name
+                                                || locationId
+                                                || 'Switch Location'}
+                                        </span>
+                                        <ChevronDown className={`w-3 h-3 transition-transform ${locationSwitcherOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {locationSwitcherOpen && (
+                                        <div className="absolute right-0 top-full mt-1 min-w-56 max-w-xs bg-surface rounded-card shadow-card border border-border py-2 z-[60]">
+                                            <p className="px-4 py-1.5 text-xs font-semibold text-text-secondary uppercase tracking-wider border-b border-border mb-1">
+                                                Switch Location
+                                            </p>
+                                            {allLocations.map(loc => (
+                                                <button
+                                                    key={loc.location_id}
+                                                    onClick={() => handleSwitchLocation(loc)}
+                                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${loc.location_id === locationId
+                                                        ? 'bg-primary/10 text-primary font-semibold'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                >
+                                                    {loc.logo_url ? (
+                                                        <img src={loc.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0 rounded" />
+                                                    ) : (
+                                                        <Building2 className="w-4 h-4 flex-shrink-0 text-text-secondary" />
+                                                    )}
+                                                    <span className="truncate">{loc.company_name || loc.location_id}</span>
+                                                    {loc.location_id === locationId && (
+                                                        <span className="ml-auto text-xs text-primary">Active</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             {isAdmin && (
                                 <div className="relative" ref={dropdownRef}>
                                     <button

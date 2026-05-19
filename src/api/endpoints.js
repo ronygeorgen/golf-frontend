@@ -19,7 +19,7 @@ export const endpoints = {
         checkWaiverAcceptance: '/auth/liability-waiver/check/',
         acceptWaiver: '/auth/liability-waiver/accept/',
     },
-    
+
     // Admin endpoints
     admin: {
         dashboard: {
@@ -33,6 +33,7 @@ export const endpoints = {
             dayAvailability: (id) => `/admin/staff/${id}/day-availability/`,
             blockedDates: (id) => `/admin/staff/${id}/blocked-dates/`,
             referrals: (id) => `/admin/staff/${id}/referrals/`,
+            categories: (id) => `/admin/staff/${id}/categories/`,
         },
         simulators: {
             list: '/admin/simulators/',
@@ -70,7 +71,7 @@ export const endpoints = {
             upcoming: '/admin/bookings/upcoming/',
             calendarEvents: '/admin/bookings/calendar_events/',
             stats: '/admin/bookings/stats/',
-            
+
         },
         overrides: {
             coachingSessions: '/admin/overrides/coaching-sessions/',
@@ -109,7 +110,29 @@ export const endpoints = {
             acceptances: (id) => `/admin/liability-waiver/${id}/acceptances/`,
         },
     },
-    
+
+    // Service categories
+    categories: {
+        // Public (Phase A)
+        active: '/categories/active/',
+        // Phase E: slot availability for non-legacy categories
+        slots: (id) => `/categories/${id}/slots/`,
+        // Admin CRUD (Phase B)
+        admin: {
+            list: '/admin/categories/',
+            detail: (id) => `/admin/categories/${id}/`,
+            toggleActive: (id) => `/admin/categories/${id}/toggle_active/`,
+        },
+        // Category Assets
+        assets: {
+            list: (categoryId) => `/admin/category-assets/?category_id=${categoryId}`,
+            create: '/admin/category-assets/',
+            detail: (id) => `/admin/category-assets/${id}/`,
+            toggleActive: (id) => `/admin/category-assets/${id}/toggle_active/`,
+            availability: (id) => `/admin/category-assets/${id}/availability/`,
+        },
+    },
+
     // Booking endpoints
     bookings: {
         list: '/bookings/',
@@ -131,7 +154,7 @@ export const endpoints = {
         staffDailySchedule: '/bookings/staff-daily-schedule/',
         guestCreate: '/bookings/guest-create/',
     },
-    
+
     // Simulator endpoints (public)
     simulators: {
         list: '/simulators/simulators/',
@@ -139,7 +162,7 @@ export const endpoints = {
         durationPrices: '/simulators/duration-prices/',
         credits: '/simulators/credits/',
     },
-    
+
     // Coaching endpoints (public)
     coaching: {
         packages: '/coaching/packages/',
@@ -181,9 +204,11 @@ export const endpoints = {
             locations: '/ghlpage/admin/locations/',
             updateCompanyName: (locationId) => `/ghlpage/admin/locations/${locationId}/company-name/`,
             setCompanyName: '/ghlpage/admin/locations/set-company-name/',
+            uploadLogo: (locationId) => `/ghlpage/admin/locations/${locationId}/logo/`,
+            deleteLogo: (locationId) => `/ghlpage/admin/locations/${locationId}/logo/delete/`,
         },
     },
-    
+
     // Special Events endpoints
     specialEvents: {
         list: '/special-events/events/',
@@ -213,5 +238,20 @@ export const endpoints = {
         staffSales: '/dashboard/staff-sales/',
         tpiConversion: '/dashboard/tpi-conversion/',
         kpiStats: '/dashboard/kpi-stats/',
+    },
+
+    // Square Payment endpoints
+    square: {
+        config: '/square/config/',
+        initiatePayment: '/square/initiate-payment/',
+        webhook: '/square/webhook/',
+    },
+
+    // Coupon endpoints
+    coupons: {
+        list: '/coupons/',
+        detail: (id) => `/coupons/${id}/`,
+        validate: '/coupons/validate/',
+        usages: '/coupons/usages/',
     },
 };

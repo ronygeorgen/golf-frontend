@@ -10,6 +10,8 @@ import {
     getTransfersPending,
     getMyOrganizationPurchases,
 } from '../store/slices/coachingSlice';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 import PackagePurchaseModal from '../components/PackagePurchaseModal';
 import OrganizationMemberManagement from '../components/OrganizationMemberManagement';
 import PackageUsageDetails from '../components/PackageUsageDetails';
@@ -46,7 +48,8 @@ function Packages() {
 
     // Get view mode from URL params, default to 'view-packages'
     const viewMode = searchParams.get('view') === 'purchases' ? 'manage-purchases' : 'view-packages';
-    const [packageFilter, setPackageFilter] = useState('all'); // 'all', 'coaching', 'simulator', 'combo'
+    const [packageFilter, setPackageFilter] = useState('all'); // 'all', 'coaching', 'simulator', 'combo', or 'cat-<id>'
+    const [serviceCategories, setServiceCategories] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalType, setModalType] = useState('normal');
     const [selectedPackageId, setSelectedPackageId] = useState(null);
@@ -58,6 +61,32 @@ function Packages() {
     const [restrictionsModalOpen, setRestrictionsModalOpen] = useState(false);
     const [selectedPackageForRestrictions, setSelectedPackageForRestrictions] = useState(null);
     const previewLimit = 5;
+
+    // Load service categories for dynamic filter tabs
+    useEffect(() => {
+        apiClient.get(endpoints.categories.active).then(({ data }) => {
+            if (Array.isArray(data)) setServiceCategories(data);
+        }).catch(() => {});
+    }, []);
+
+    // Auto-open purchase modal when ?buy=<packageId> is in the URL
+    // (e.g. deep-linked from the booking page when user doesn't own a package)
+    useEffect(() => {
+        const buyId = searchParams.get('buy');
+        if (!buyId) return;
+        const allPkgs = [...(packages || []), ...(simulatorPackages || [])];
+        if (allPkgs.length === 0) return; // wait for packages to load
+        const targetPkg = allPkgs.find((p) => String(p.id) === String(buyId));
+        if (targetPkg) {
+            const isSimulator = simulatorPackages?.some((p) => String(p.id) === String(buyId));
+            setSelectedPackageId(targetPkg.id);
+            setSelectedPackageCategory(isSimulator ? 'simulator' : (targetPkg.category || 'coaching'));
+            setModalType('normal');
+            setModalOpen(true);
+            // Remove the ?buy param so reloads don't re-open the modal
+            setSearchParams((prev) => { prev.delete('buy'); return prev; });
+        }
+    }, [searchParams, packages, simulatorPackages]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Initial load - fetch all data on mount
     useEffect(() => {
@@ -222,16 +251,34 @@ function Packages() {
         setSelectedPurchaseForDetails(null);
     };
 
+    // IDs of non-legacy (new-sport) service categories — used to exclude them from the
+    // "Coaching" / "Combo" legacy filter tabs so they only appear under their own tab.
+    const nonLegacyCatIds = new Set(
+        serviceCategories.filter(c => !c.legacy_booking_type).map(c => c.id)
+    );
+
     // Filter packages based on selected filter
     const getFilteredPackages = () => {
         if (packageFilter === 'all') {
             return packages;
         } else if (packageFilter === 'coaching') {
-            // Coaching packages (no simulator hours)
-            return packages.filter(pkg => !pkg.simulator_hours || parseFloat(pkg.simulator_hours) === 0);
+            // Legacy coaching: session-based, NOT belonging to a new-sport category
+            return packages.filter(pkg => {
+                const catId = pkg.service_category_id ?? pkg.service_category;
+                if (catId && nonLegacyCatIds.has(catId)) return false;
+                return !pkg.simulator_hours || parseFloat(pkg.simulator_hours) === 0;
+            });
         } else if (packageFilter === 'combo') {
-            // Combo packages (have simulator hours)
-            return packages.filter(pkg => pkg.simulator_hours && parseFloat(pkg.simulator_hours) > 0);
+            // Combo: coaching + simulator hours, NOT belonging to a new-sport category
+            return packages.filter(pkg => {
+                const catId = pkg.service_category_id ?? pkg.service_category;
+                if (catId && nonLegacyCatIds.has(catId)) return false;
+                return pkg.simulator_hours && parseFloat(pkg.simulator_hours) > 0;
+            });
+        } else if (packageFilter.startsWith('cat-')) {
+            // Phase E: filter by service_category_id
+            const catId = Number(packageFilter.replace('cat-', ''));
+            return packages.filter(pkg => pkg.service_category_id === catId || pkg.service_category === catId);
         }
         return [];
     };
@@ -239,6 +286,13 @@ function Packages() {
     const getFilteredSimulatorPackages = () => {
         if (packageFilter === 'all' || packageFilter === 'simulator') {
             return simulatorPackages || [];
+        }
+        // Phase E: a non-legacy service category might also have simulator packages
+        if (packageFilter.startsWith('cat-')) {
+            const catId = Number(packageFilter.replace('cat-', ''));
+            return (simulatorPackages || []).filter(
+                pkg => pkg.service_category_id === catId || pkg.service_category === catId,
+            );
         }
         return [];
     };
@@ -268,9 +322,13 @@ function Packages() {
                                 <span className="text-sm font-medium text-text-secondary mr-2">Filter:</span>
                                 {[
                                     { id: 'all', label: 'All Packages' },
-                                    { id: 'coaching', label: 'Coaching Packages' },
-                                    { id: 'simulator', label: 'Simulator Only Packages' },
-                                    { id: 'combo', label: 'Combo Packages' },
+                                    { id: 'coaching', label: 'Coaching' },
+                                    { id: 'simulator', label: 'Simulator Only' },
+                                    { id: 'combo', label: 'Combo' },
+                                    // Phase E: one button per non-legacy service category
+                                    ...serviceCategories
+                                        .filter(c => !c.legacy_booking_type)
+                                        .map(c => ({ id: `cat-${c.id}`, label: c.customer_label || c.name })),
                                 ].map((filter) => (
                                     <button
                                         key={filter.id}
