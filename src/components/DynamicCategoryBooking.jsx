@@ -92,6 +92,14 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     const [previousPackageId, setPreviousPackageId] = useState('');
     const [previousCoachId, setPreviousCoachId] = useState('');
 
+    // Specific-time search
+    const [specificTimeEnabled, setSpecificTimeEnabled] = useState(false);
+    const [specificTime, setSpecificTime] = useState('');
+    const [searchingNextDate, setSearchingNextDate] = useState(false);
+    const [nextAvailableResult, setNextAvailableResult] = useState(null);
+    const [noTimeInWindow, setNoTimeInWindow] = useState(false);
+    const [preferredTimeMatch, setPreferredTimeMatch] = useState(null);
+
     // ── Derived ─────────────────────────────────────────────────────────── //
 
     /** Packages the user can actually use: active purchases with sessions left,
@@ -251,8 +259,10 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
     );
 
     // ── Check availability ───────────────────────────────────────────────── //
-    const checkAvailability = useCallback(async () => {
-        if (!date) {
+    const checkAvailability = useCallback(async (overrideDate) => {
+        const effectiveDate = overrideDate || date;
+
+        if (!effectiveDate) {
             openPopup({ type: 'warning', title: 'Select a date', message: 'Please choose a date before checking availability.' });
             return;
         }
@@ -269,8 +279,13 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             }
         }
 
+        // Reset specific-time scan results
+        setNextAvailableResult(null);
+        setNoTimeInWindow(false);
+        setPreferredTimeMatch(null);
+
         // Store for back-navigation
-        setPreviousDate(date);
+        setPreviousDate(effectiveDate);
         setPreviousPackageId(selectedPackageId);
         setPreviousCoachId(selectedCoachId);
 
@@ -281,7 +296,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         setLoadingSlots(true);
 
         try {
-            const params = { date };
+            const params = { date: effectiveDate };
             if (selectedAssetId) params.asset_id = selectedAssetId;
             if (!isAssetOnly) {
                 if (selectedPackageId) params.package_id = selectedPackageId;
@@ -292,14 +307,62 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
             }
             const { data } = await apiClient.get(endpoints.categories.slots(category.id), { params });
             const fetched = data?.available_slots || [];
-            setSlots(fetched);
 
             if (fetched.length === 0) {
                 const msg = data?.message || 'No available time slots found for the selected date. Please try a different date.';
                 setToast({ show: true, message: msg });
                 setTimeout(() => setToast({ show: false, message: '' }), 5000);
                 setCurrentStep('form');
+                return;
+            }
+
+            // Specific-time filter
+            if (specificTimeEnabled && specificTime) {
+                const match = fetched.find(slot =>
+                    moment.tz(slot.start_time, tz).format('HH:mm') === specificTime
+                );
+                if (match) {
+                    setPreferredTimeMatch(match);
+                    setSlots(fetched);
+                    setCurrentStep('slots');
+                } else {
+                    setSlots([]);
+                    setSearchingNextDate(true);
+                    // Scan forward
+                    let current = moment.tz(effectiveDate, tz).add(1, 'day');
+                    const maxMoment = moment.tz(maxDateString, tz);
+                    let found = null;
+                    while (!found && current.isSameOrBefore(maxMoment, 'day')) {
+                        const scanDateStr = current.format('YYYY-MM-DD');
+                        try {
+                            const scanParams = { date: scanDateStr };
+                            if (selectedAssetId) scanParams.asset_id = selectedAssetId;
+                            if (!isAssetOnly) {
+                                if (selectedPackageId) scanParams.package_id = selectedPackageId;
+                                if (selectedCoachId) scanParams.coach_id = selectedCoachId;
+                            } else {
+                                scanParams.duration = assetDuration;
+                            }
+                            const resp = await apiClient.get(endpoints.categories.slots(category.id), { params: scanParams });
+                            const scanSlots = resp.data?.available_slots || [];
+                            const scanMatch = scanSlots.find(sl =>
+                                moment.tz(sl.start_time, tz).format('HH:mm') === specificTime
+                            );
+                            if (scanMatch) {
+                                found = { date: scanDateStr, slot: scanMatch, formattedDate: current.format('dddd, MMMM D') };
+                            }
+                        } catch (_) { /* skip */ }
+                        current = current.add(1, 'day');
+                    }
+                    setSearchingNextDate(false);
+                    if (found) {
+                        setNextAvailableResult(found);
+                    } else {
+                        setNoTimeInWindow(true);
+                    }
+                }
             } else {
+                setSlots(fetched);
                 setCurrentStep('slots');
             }
         } catch (err) {
@@ -309,7 +372,7 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
         } finally {
             setLoadingSlots(false);
         }
-    }, [category?.id, date, selectedPackageId, selectedCoachId, selectedAssetId, assetDuration, isAssetOnly, hasSessions, openPopup]);
+    }, [category?.id, date, selectedPackageId, selectedCoachId, selectedAssetId, assetDuration, isAssetOnly, hasSessions, openPopup, specificTimeEnabled, specificTime, tz, maxDateString]);
 
     // Refresh available prepaid hours each time the payment step is entered
     useEffect(() => {
@@ -678,13 +741,67 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                                 </div>
                                             )}
 
+                                            {/* ── Find by specific time toggle ── */}
+                                            <div className="flex items-center justify-between py-3 px-4 bg-background rounded-button border border-border">
+                                                <div>
+                                                    <span className="text-sm font-medium text-text-primary">Find by specific time</span>
+                                                    <p className="text-xs text-text-secondary mt-0.5">Scan forward to find the next date with a slot at your preferred time</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSpecificTimeEnabled(!specificTimeEnabled); setSpecificTime(''); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+
+                                            {specificTimeEnabled && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-text-primary mb-2">Preferred Start Time</label>
+                                                    <input
+                                                        type="time"
+                                                        value={specificTime}
+                                                        onChange={(e) => { setSpecificTime(e.target.value); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                        className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {searchingNextDate && (
+                                                <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-button">
+                                                    <svg className="animate-spin h-4 w-4 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                                                    <span className="text-sm text-primary font-medium">Searching for next available {specificTime} slot…</span>
+                                                </div>
+                                            )}
+
+                                            {nextAvailableResult && !searchingNextDate && (
+                                                <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-button flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-amber-800">⏰ No {specificTime} slot on selected date</p>
+                                                        <p className="text-xs text-amber-700 mt-0.5">Next available: <span className="font-bold">{nextAvailableResult.formattedDate}</span></p>
+                                                    </div>
+                                                    <Button variant="primary" className="text-xs px-4 py-2 whitespace-nowrap"
+                                                        onClick={() => { setDate(nextAvailableResult.date); setNextAvailableResult(null); checkAvailability(nextAvailableResult.date); }}>
+                                                        Use {nextAvailableResult.formattedDate}
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {noTimeInWindow && !searchingNextDate && (
+                                                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-button">
+                                                    <p className="text-sm font-semibold text-red-700">❌ No availability for {specificTime} in the next 30 days</p>
+                                                    <p className="text-xs text-red-600 mt-1">Try a different time or check back later.</p>
+                                                </div>
+                                            )}
+
                                             <Button
-                                                onClick={checkAvailability}
-                                                disabled={loadingSlots || (!!selectedPackageId && !hasSessions)}
+                                                onClick={() => checkAvailability()}
+                                                disabled={loadingSlots || (!!selectedPackageId && !hasSessions) || searchingNextDate}
                                                 variant="primary"
                                                 className="w-full py-3"
                                             >
-                                                {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
+                                                {loadingSlots ? 'Checking Availability…' : searchingNextDate ? 'Scanning…' : 'Check Availability'}
                                             </Button>
                                         </>
                                     )}
@@ -710,13 +827,67 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                             <option value={180}>3 hours</option>
                                         </select>
                                     </div>
+                                    {/* ── Find by specific time toggle (Asset-Only) ── */}
+                                    <div className="flex items-center justify-between py-3 px-4 bg-background rounded-button border border-border">
+                                        <div>
+                                            <span className="text-sm font-medium text-text-primary">Find by specific time</span>
+                                            <p className="text-xs text-text-secondary mt-0.5">Scan forward to find the next date with a slot at your preferred time</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSpecificTimeEnabled(!specificTimeEnabled); setSpecificTime(''); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {specificTimeEnabled && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">Preferred Start Time</label>
+                                            <input
+                                                type="time"
+                                                value={specificTime}
+                                                onChange={(e) => { setSpecificTime(e.target.value); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {searchingNextDate && (
+                                        <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-button">
+                                            <svg className="animate-spin h-4 w-4 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                                            <span className="text-sm text-primary font-medium">Searching for next available {specificTime} slot…</span>
+                                        </div>
+                                    )}
+
+                                    {nextAvailableResult && !searchingNextDate && (
+                                        <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-button flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-amber-800">⏰ No {specificTime} slot on selected date</p>
+                                                <p className="text-xs text-amber-700 mt-0.5">Next available: <span className="font-bold">{nextAvailableResult.formattedDate}</span></p>
+                                            </div>
+                                            <Button variant="primary" className="text-xs px-4 py-2 whitespace-nowrap"
+                                                onClick={() => { setDate(nextAvailableResult.date); setNextAvailableResult(null); checkAvailability(nextAvailableResult.date); }}>
+                                                Use {nextAvailableResult.formattedDate}
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {noTimeInWindow && !searchingNextDate && (
+                                        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-button">
+                                            <p className="text-sm font-semibold text-red-700">❌ No availability for {specificTime} in the next 30 days</p>
+                                            <p className="text-xs text-red-600 mt-1">Try a different time or check back later.</p>
+                                        </div>
+                                    )}
+
                                     <Button
-                                        onClick={checkAvailability}
-                                        disabled={loadingSlots || !date}
+                                        onClick={() => checkAvailability()}
+                                        disabled={loadingSlots || !date || searchingNextDate}
                                         variant="primary"
                                         className="w-full py-3"
                                     >
-                                        {loadingSlots ? 'Checking Availability…' : 'Check Availability'}
+                                        {loadingSlots ? 'Checking Availability…' : searchingNextDate ? 'Scanning…' : 'Check Availability'}
                                     </Button>
                                 </>
                             )}
@@ -742,6 +913,11 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                         <p className="text-sm text-text-secondary py-8 text-center">Loading slots…</p>
                     ) : slots.length > 0 ? (
                         <>
+                            {preferredTimeMatch && (
+                                <div className="px-4 py-3 bg-green-50 border border-green-300 rounded-button mb-4 flex items-center gap-2">
+                                    <span className="text-green-700 text-sm font-medium">⭐ Your {specificTime} slot is available — highlighted below</span>
+                                </div>
+                            )}
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
                                 <h3 className="text-lg font-bold text-text-primary">Select a Time Slot</h3>
                                 <div className="text-sm text-text-secondary flex flex-wrap items-center gap-2">
@@ -773,6 +949,8 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                         selectedSlot &&
                                         new Date(selectedSlot.start_time).getTime() ===
                                         new Date(slot.start_time).getTime();
+                                    const isPreferredMatch = !disabled && preferredTimeMatch &&
+                                        new Date(preferredTimeMatch.start_time).getTime() === new Date(slot.start_time).getTime();
 
                                     return (
                                         <div
@@ -781,10 +959,15 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                                 ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
                                                 : isSelected
                                                     ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
-                                                    : 'border-border hover:border-primary hover:bg-background cursor-pointer'
+                                                    : isPreferredMatch
+                                                        ? 'border-primary ring-2 ring-primary/40 bg-primary/5 cursor-pointer'
+                                                        : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                                 }`}
                                             onClick={() => !disabled && handleSlotSelect(slot)}
                                         >
+                                            {isPreferredMatch && (
+                                                <span className="absolute -top-2 -right-2 bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow z-10">⭐ Your time</span>
+                                            )}
                                             <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                 {formatLocalTime(slot.start_time, tz)}
                                             </div>

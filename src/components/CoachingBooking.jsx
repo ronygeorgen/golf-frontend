@@ -18,6 +18,8 @@ import { BookingSlotsSkeleton, FormSkeleton } from './skeletons/SkeletonLoader';
 import { formatLocalTime, formatLocalDate, localToUTCIso, getTodayInTimezone } from '../utils/timezoneUtils';
 import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 import StaffDailySchedule from './StaffDailySchedule';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function CoachingBooking({ client, onBookingSuccess }) {
     const { user: reduxUser, locationTimezone } = useAppSelector((state) => state.auth);
@@ -49,6 +51,13 @@ function CoachingBooking({ client, onBookingSuccess }) {
     const [showStaffSchedule, setShowStaffSchedule] = useState(false);
     const [isManualMode, setIsManualMode] = useState(false);
     const [manualTime, setManualTime] = useState('');
+    // Specific-time search
+    const [specificTimeEnabled, setSpecificTimeEnabled] = useState(false);
+    const [specificTime, setSpecificTime] = useState('');
+    const [searchingNextDate, setSearchingNextDate] = useState(false);
+    const [nextAvailableResult, setNextAvailableResult] = useState(null);
+    const [noTimeInWindow, setNoTimeInWindow] = useState(false);
+    const [preferredTimeMatch, setPreferredTimeMatch] = useState(null);
 
     // Step management: 'form' -> 'slots' -> 'summary'
     const [currentStep, setCurrentStep] = useState('form');
@@ -360,6 +369,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
 
     // Track if the availability check was triggered automatically (for validation) or manually
     const isAutoCheck = useRef(false);
+    const preventAutoMoveRef = useRef(false);
     const [hasChecked, setHasChecked] = useState(false);
 
     // Track closed day status
@@ -447,7 +457,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
     useEffect(() => {
         if (availability.coaching && availability.coaching.length > 0) {
             // Ensure we move to slots even if there's a special event message, as we now handle granular conflicts
-            if (currentStep === 'form' && !isAutoCheck.current) {
+            if (currentStep === 'form' && !isAutoCheck.current && !preventAutoMoveRef.current) {
                 setCurrentStep('slots');
             }
         } else if (availability.coaching && availability.coaching.length === 0 && currentStep === 'slots') {
@@ -468,53 +478,42 @@ function CoachingBooking({ client, onBookingSuccess }) {
         navigate('/packages');
     };
 
-    const checkAvailability = async () => {
-        if (!date) {
-            openPopup({
-                type: 'warning',
-                title: 'Select a date',
-                message: 'Please choose a date before checking availability.',
-            });
+    const checkAvailability = async (overrideDate) => {
+        const effectiveDate = overrideDate || date;
+
+        if (!effectiveDate) {
+            openPopup({ type: 'warning', title: 'Select a date', message: 'Please choose a date before checking availability.' });
             return;
         }
-
         if (!selectedPackage) {
-            openPopup({
-                type: 'warning',
-                title: 'Select a package',
-                message: 'Please choose a coaching package before checking availability.',
-            });
+            openPopup({ type: 'warning', title: 'Select a package', message: 'Please choose a coaching package before checking availability.' });
             return;
         }
-
         if (!hasSessions) {
-            openPopup({
-                type: 'warning',
-                title: 'No sessions remaining',
-                message: 'You are out of sessions for this package. Please purchase another package to continue.',
-            });
+            openPopup({ type: 'warning', title: 'No sessions remaining', message: 'You are out of sessions for this package. Please purchase another package to continue.' });
             return;
         }
 
-        // Store current values for back navigation
-        setPreviousDate(date);
+        // Reset specific-time scan results
+        setNextAvailableResult(null);
+        setNoTimeInWindow(false);
+        setPreferredTimeMatch(null);
+        preventAutoMoveRef.current = false;
+
+        setPreviousDate(effectiveDate);
         setPreviousPackage(selectedPackage);
         setPreviousCoach(selectedCoach);
 
-        // Clear selected slot and reset availability before checking
         setSelectedSlot(null);
-        dispatch(clearAvailability()); // Clear previous availability slots
-        setToast({ show: false, message: '' }); // Clear any existing toast
-
+        dispatch(clearAvailability());
+        setToast({ show: false, message: '' });
         setLoading(true);
-        // Mark as manual check
         isAutoCheck.current = false;
 
-        // Fetch special events first
-        await dispatch(checkSpecialEventsOnDate(date));
+        await dispatch(checkSpecialEventsOnDate(effectiveDate));
 
         const result = await dispatch(checkCoachingAvailability({
-            date,
+            date: effectiveDate,
             packageId: selectedPackage,
             coachId: selectedCoach,
             duration: duration,
@@ -526,16 +525,58 @@ function CoachingBooking({ client, onBookingSuccess }) {
         if (checkCoachingAvailability.fulfilled.match(result)) {
             const payload = result.payload || {};
             const slots = payload.slots || [];
-            // Block if no slots OR if there is a specific special event message
+
             if (slots.length === 0 || payload.specialEventMessage) {
                 setToast({
                     show: true,
                     message: payload.specialEventMessage || payload.message || 'No available time slots found for the selected date and package. Please try a different date or package.'
                 });
-                setTimeout(() => {
-                    setToast({ show: false, message: '' });
-                }, 5000);
+                setTimeout(() => setToast({ show: false, message: '' }), 5000);
                 setCurrentStep('form');
+                return;
+            }
+
+            // Specific-time filter
+            if (specificTimeEnabled && specificTime) {
+                const match = slots.find(slot =>
+                    moment.tz(slot.start_time, tz).format('HH:mm') === specificTime
+                );
+                if (match) {
+                    setPreferredTimeMatch(match); // highlight slot in grid
+                    // preventAutoMoveRef stays false → useEffect auto-moves to slots
+                } else {
+                    preventAutoMoveRef.current = true;  // block auto-move
+                    dispatch(clearAvailability());       // clear unrelated slots
+                    setSearchingNextDate(true);
+                    // Scan forward via direct apiClient — not Redux, zero flicker
+                    let current = moment.tz(effectiveDate, tz).add(1, 'day');
+                    const maxMoment = moment.tz(maxDateString, tz);
+                    let found = null;
+                    while (!found && current.isSameOrBefore(maxMoment, 'day')) {
+                        const scanDateStr = current.format('YYYY-MM-DD');
+                        try {
+                            const resp = await apiClient.get(endpoints.bookings.checkCoachingAvailability, {
+                                params: {
+                                    date: scanDateStr,
+                                    package_id: selectedPackage,
+                                    ...(selectedCoach ? { coach_id: selectedCoach } : {}),
+                                    duration,
+                                },
+                            });
+                            const scanSlots = resp.data.slots || [];
+                            const scanMatch = scanSlots.find(sl =>
+                                moment.tz(sl.start_time, tz).format('HH:mm') === specificTime
+                            );
+                            if (scanMatch) {
+                                found = { date: scanDateStr, slot: scanMatch, formattedDate: current.format('dddd, MMMM D') };
+                            }
+                        } catch (_) { /* skip */ }
+                        current = current.add(1, 'day');
+                    }
+                    setSearchingNextDate(false);
+                    if (found) setNextAvailableResult(found);
+                    else setNoTimeInWindow(true);
+                }
             }
         }
     };
@@ -1085,13 +1126,67 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                         </div>
                                     )}
 
+                                    {/* ── Find by specific time toggle ── */}
+                                    <div className="flex items-center justify-between py-3 px-4 bg-background rounded-button border border-border">
+                                        <div>
+                                            <span className="text-sm font-medium text-text-primary">Find by specific time</span>
+                                            <p className="text-xs text-text-secondary mt-0.5">Scan forward to find the next date with a slot at your preferred time</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSpecificTimeEnabled(!specificTimeEnabled); setSpecificTime(''); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {specificTimeEnabled && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-2">Preferred Start Time</label>
+                                            <input
+                                                type="time"
+                                                value={specificTime}
+                                                onChange={(e) => { setSpecificTime(e.target.value); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {searchingNextDate && (
+                                        <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-button">
+                                            <svg className="animate-spin h-4 w-4 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                                            <span className="text-sm text-primary font-medium">Searching for next available {specificTime} slot…</span>
+                                        </div>
+                                    )}
+
+                                    {nextAvailableResult && !searchingNextDate && (
+                                        <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-button flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-amber-800">⏰ No {specificTime} slot on selected date</p>
+                                                <p className="text-xs text-amber-700 mt-0.5">Next available: <span className="font-bold">{nextAvailableResult.formattedDate}</span></p>
+                                            </div>
+                                            <Button variant="primary" className="text-xs px-4 py-2 whitespace-nowrap"
+                                                onClick={() => { setDate(nextAvailableResult.date); setNextAvailableResult(null); preventAutoMoveRef.current = false; checkAvailability(nextAvailableResult.date); }}>
+                                                Use {nextAvailableResult.formattedDate}
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {noTimeInWindow && !searchingNextDate && (
+                                        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-button">
+                                            <p className="text-sm font-semibold text-red-700">❌ No availability for {specificTime} in the next 30 days</p>
+                                            <p className="text-xs text-red-600 mt-1">Try a different time or check back later.</p>
+                                        </div>
+                                    )}
+
                                     <Button
-                                        onClick={checkAvailability}
-                                        disabled={loading || bookingLoading || (selectedPackage && !hasSessions) || isDateBlocked || isClosedDay || checkingClosedDay}
+                                        onClick={() => checkAvailability()}
+                                        disabled={loading || bookingLoading || (selectedPackage && !hasSessions) || isDateBlocked || isClosedDay || checkingClosedDay || searchingNextDate}
                                         variant="primary"
                                         className="w-full py-3"
                                     >
-                                        {loading || bookingLoading ? 'Checking Availability...' : 'Check Availability'}
+                                        {loading || bookingLoading ? 'Checking Availability...' : searchingNextDate ? 'Scanning…' : 'Check Availability'}
                                     </Button>
 
                                     {isAdminOrStaff && (
@@ -1165,6 +1260,11 @@ function CoachingBooking({ client, onBookingSuccess }) {
                             <BookingSlotsSkeleton count={8} />
                         ) : availability.coaching && availability.coaching.length > 0 ? (
                             <>
+                                {preferredTimeMatch && (
+                                    <div className="px-4 py-3 bg-green-50 border border-green-300 rounded-button mb-4 flex items-center gap-2">
+                                        <span className="text-green-700 text-sm font-medium">⭐ Your {specificTime} slot is available — highlighted below</span>
+                                    </div>
+                                )}
                                 {availability.specialEventMessage && (
                                     <div className="bg-danger/10 border border-danger/30 rounded-card p-4 mb-4">
                                         <p className="text-danger font-semibold">{availability.specialEventMessage}</p>
@@ -1207,8 +1307,9 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                         const isDurationConflict = conflict?.isDurationConflict;
                                         const eventStartTime = conflict?.eventStartTime;
                                         const suggestedDuration = disabled && !specialEvent ? getSuggestedDuration(slot) : null;
-                                        // Check if this slot is selected (compare by start_time since that's unique)
                                         const isSelected = selectedSlot && new Date(selectedSlot.start_time).getTime() === new Date(slot.start_time).getTime();
+                                        const isPreferredMatch = !disabled && preferredTimeMatch &&
+                                            new Date(preferredTimeMatch.start_time).getTime() === new Date(slot.start_time).getTime();
 
                                         return (
                                             <div
@@ -1217,10 +1318,15 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                                     ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
                                                     : isSelected
                                                         ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
-                                                        : 'border-border hover:border-primary hover:bg-background cursor-pointer'
+                                                        : isPreferredMatch
+                                                            ? 'border-primary ring-2 ring-primary/40 bg-primary/5 cursor-pointer'
+                                                            : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                                     }`}
                                                 onClick={() => !disabled && handleSlotSelect(slot)}
                                             >
+                                                {isPreferredMatch && (
+                                                    <span className="absolute -top-2 -right-2 bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow z-10">⭐ Your time</span>
+                                                )}
                                                 <div className={`text-lg font-semibold ${disabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                                     {formatLocalTime(slot.start_time, tz)}
                                                 </div>
