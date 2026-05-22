@@ -148,6 +148,7 @@ export const endpoints = {
         calendarEvents: '/bookings/calendar_events/',
         stats: '/bookings/stats/',
         checkSimulatorAvailability: '/bookings/check_simulator_availability/',
+        findNextAvailableSlot: '/bookings/find_next_available_slot/',
         checkCoachingAvailability: '/bookings/check_coaching_availability/',
         coachingSessionsByCoach: '/bookings/coaching_sessions_by_coach/',
         availableSimulatorHours: '/bookings/available-simulator-hours/',
