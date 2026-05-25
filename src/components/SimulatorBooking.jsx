@@ -11,6 +11,8 @@ import DateInput from './ui/DateInput';
 import { formatLocalTime, formatLocalDate, getTodayInTimezone } from '../utils/timezoneUtils';
 import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 import SquarePaymentModal from './SquarePaymentModal';
+import apiClient from '../api/axios';
+import { endpoints } from '../api/endpoints';
 
 function SimulatorBooking({ client, onBookingSuccess }) {
     const dispatch = useAppDispatch();
@@ -42,6 +44,18 @@ function SimulatorBooking({ client, onBookingSuccess }) {
         tempId: null,
         amount: null,
     });
+
+    // ---- Specific-time feature ------------------------------------------------
+    // When enabled the user enters a preferred start time. If that time isn't
+    // available on the selected date the component silently scans forward (up to
+    // 30 days) and surfaces the next date where the slot is free.
+    const [specificTimeEnabled, setSpecificTimeEnabled] = useState(false);
+    const [specificTime, setSpecificTime] = useState('');
+    const [searchingNextDate, setSearchingNextDate] = useState(false);
+    const [nextAvailableResult, setNextAvailableResult] = useState(null); // { date, slot, formattedDate }
+    const [noTimeInWindow, setNoTimeInWindow] = useState(false);
+    const [preferredTimeMatch, setPreferredTimeMatch] = useState(null); // start_time of matched slot
+    // ---------------------------------------------------------------------------
 
     // Step management: 'form' -> 'slots' -> 'payment'
     const [currentStep, setCurrentStep] = useState('form');
@@ -216,10 +230,13 @@ function SimulatorBooking({ client, onBookingSuccess }) {
 
     // Track if availability check was explicitly triggered by user (not auto-fetch for max simulators)
     const explicitAvailabilityCheckRef = useRef(false);
+    // Prevent auto-move to slots step when specific-time search found no match on selected date
+    const preventAutoMoveRef = useRef(false);
 
     // Move to slots step when slots are fetched (only if explicitly checked by user)
+    // preventAutoMoveRef blocks this when specific-time scan found no match on the selected date
     useEffect(() => {
-        if (availability.simulator && availability.simulator.length > 0 && currentStep === 'form' && explicitAvailabilityCheckRef.current) {
+        if (availability.simulator && availability.simulator.length > 0 && currentStep === 'form' && explicitAvailabilityCheckRef.current && !preventAutoMoveRef.current) {
             // Ensure we don't move to slots if there's a special event message
             if (!availability.specialEventMessage) {
                 setCurrentStep('slots');
@@ -250,8 +267,12 @@ function SimulatorBooking({ client, onBookingSuccess }) {
         }
     }, [currentStep, selectedSlot, dispatch, client]);
 
-    const checkAvailability = async () => {
-        if (!date) {
+    // checkAvailability accepts an optional explicitDate so the "Use this date" banner
+    // can trigger a check for the found date without waiting for the date state to update.
+    const checkAvailability = async (explicitDate) => {
+        const effectiveDate = (typeof explicitDate === 'string' ? explicitDate : null) || date;
+
+        if (!effectiveDate) {
             openPopup({
                 type: 'warning',
                 title: 'Select a date',
@@ -260,23 +281,39 @@ function SimulatorBooking({ client, onBookingSuccess }) {
             return;
         }
 
+        // Validate specific time input when toggle is on
+        if (specificTimeEnabled && !specificTime) {
+            openPopup({
+                type: 'warning',
+                title: 'Enter a time',
+                message: 'Please enter a preferred start time, or turn off the "Find by specific time" toggle.',
+            });
+            return;
+        }
+
         // Store current values for back navigation
-        setPreviousDate(date);
+        setPreviousDate(effectiveDate);
         setPreviousDuration(duration);
 
         // Clear selected slot and reset availability before checking
         setSelectedSlot(null);
-        dispatch(clearAvailability()); // Clear previous availability slots
+        dispatch(clearAvailability());
+
+        // Reset specific-time banners
+        setNextAvailableResult(null);
+        setNoTimeInWindow(false);
+        setPreferredTimeMatch(null);
+        preventAutoMoveRef.current = false;
 
         // Mark that this is an explicit availability check by user
         explicitAvailabilityCheckRef.current = true;
 
         setLoading(true);
         // Fetch special events first
-        await dispatch(checkSpecialEventsOnDate(date));
+        await dispatch(checkSpecialEventsOnDate(effectiveDate));
 
         const count = simulatorCount && simulatorCount >= 1 ? simulatorCount : 1;
-        const result = await dispatch(checkSimulatorAvailability({ date, duration, simulator_count: count }));
+        const result = await dispatch(checkSimulatorAvailability({ date: effectiveDate, duration, simulator_count: count }));
         setLoading(false);
 
         // Check if the API returned a message or error
@@ -302,6 +339,37 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                 simulator_count: payload.simulator_count,
                 payload_keys: Object.keys(payload)
             });
+
+            // ---- Specific-time logic ------------------------------------------
+            if (specificTimeEnabled && specificTime) {
+                const matchedSlot = slots.find(slot =>
+                    moment.tz(slot.start_time, tz).format('HH:mm') === specificTime
+                );
+
+                if (matchedSlot) {
+                    // ✅ Preferred time found on the selected date — highlight it
+                    setPreferredTimeMatch(matchedSlot.start_time);
+                    // Auto-move to slots step is handled by the existing useEffect
+                } else {
+                    // ❌ No matching slot on selected date — scan forward silently
+                    preventAutoMoveRef.current = true;        // block auto-move to slots
+                    explicitAvailabilityCheckRef.current = false;
+                    dispatch(clearAvailability());            // don't show unrelated slots
+
+                    setSearchingNextDate(true);
+                    // Single backend call — no Redux loop, no slot flickering
+                    const found = await findNextAvailableDateForTime(effectiveDate, duration, count);
+                    setSearchingNextDate(false);
+
+                    if (found) {
+                        setNextAvailableResult(found);
+                    } else {
+                        setNoTimeInWindow(true);
+                    }
+                    return; // Skip normal error messages
+                }
+            }
+            // -------------------------------------------------------------------
 
             // Show message from API if available (e.g., "No simulators available for this day")
             // Priority: message > error > specialEventMessage > default message
@@ -423,6 +491,35 @@ function SimulatorBooking({ client, onBookingSuccess }) {
             return `${hours} hour${hours > 1 ? 's' : ''}`;
         }
         return `${maxSuggested} minutes`;
+    };
+
+    /**
+     * Asks the backend to scan forward from fromDate+1 (up to 30 days) and
+     * return the first date/slot that matches specificTime.
+     * One HTTP call — no Redux loop, no interim slot renders.
+     */
+    const findNextAvailableDateForTime = async (fromDate, durationArg, countArg) => {
+        try {
+            const response = await apiClient.get(endpoints.bookings.findNextAvailableSlot, {
+                params: {
+                    date:            fromDate,      // backend scans from fromDate+1 onwards
+                    duration:        durationArg,
+                    simulator_count: countArg,
+                    preferred_time:  specificTime,  // HH:MM in center local time
+                },
+            });
+            if (response.data.found) {
+                return {
+                    date:          response.data.date,
+                    slot:          response.data.slot,
+                    formattedDate: response.data.formatted_date,
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('find_next_available_slot error:', error);
+            return null;
+        }
     };
 
     const handleSlotSelect = (slot) => {
@@ -803,13 +900,121 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                             )}
                         </div>
 
+                        {/* ---- Find by specific time ---- */}
+                        <div className="rounded-card border border-border p-4 bg-background space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-text-primary">Find by specific time</p>
+                                    <p className="text-xs text-text-secondary mt-0.5">
+                                        If unavailable, we'll find the next open date
+                                    </p>
+                                </div>
+                                {/* Toggle switch */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={specificTimeEnabled}
+                                    onClick={() => {
+                                        setSpecificTimeEnabled(prev => !prev);
+                                        setNextAvailableResult(null);
+                                        setNoTimeInWindow(false);
+                                        setPreferredTimeMatch(null);
+                                        setSpecificTime('');
+                                    }}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                        specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'
+                                    }`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                        specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
+                                </button>
+                            </div>
+
+                            {specificTimeEnabled && (
+                                <div>
+                                    <label className="block text-sm font-medium text-text-primary mb-1.5">
+                                        Preferred Start Time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={specificTime}
+                                        onChange={(e) => {
+                                            setSpecificTime(e.target.value);
+                                            setNextAvailableResult(null);
+                                            setNoTimeInWindow(false);
+                                            setPreferredTimeMatch(null);
+                                        }}
+                                        className="w-full px-3 py-2 border border-border rounded-button bg-surface text-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Searching spinner */}
+                            {specificTimeEnabled && searchingNextDate && (
+                                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                    <svg className="animate-spin h-4 w-4 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                    Searching for next available date at {specificTime}…
+                                </div>
+                            )}
+
+                            {/* Banner: next date found */}
+                            {specificTimeEnabled && nextAvailableResult && !searchingNextDate && (
+                                <div className="rounded-button border border-amber-400/40 bg-amber-50/10 p-3 space-y-2">
+                                    <p className="text-sm font-medium text-amber-700">
+                                        ⚠️ No slot at {specificTime} on {moment(date, 'YYYY-MM-DD').format('MMMM D')}.
+                                    </p>
+                                    <p className="text-sm text-amber-600">
+                                        Next available: <span className="font-semibold">{nextAvailableResult.formattedDate}</span> at {specificTime}
+                                    </p>
+                                    <div className="flex gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const foundDate = nextAvailableResult.date;
+                                                setDate(foundDate);
+                                                setNextAvailableResult(null);
+                                                await checkAvailability(foundDate);
+                                            }}
+                                            className="px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-button hover:bg-primary-light transition-colors"
+                                        >
+                                            Use {nextAvailableResult.formattedDate}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNextAvailableResult(null)}
+                                            className="px-3 py-1.5 border border-border text-text-secondary text-xs font-medium rounded-button hover:bg-surface transition-colors"
+                                        >
+                                            Dismiss
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Banner: no availability in 30-day window */}
+                            {specificTimeEnabled && noTimeInWindow && !searchingNextDate && (
+                                <div className="rounded-button border border-danger/30 bg-red-50/10 p-3">
+                                    <p className="text-sm font-medium text-danger">
+                                        ❌ No availability at {specificTime} in the next 30 days.
+                                    </p>
+                                    <p className="text-xs text-text-secondary mt-1">
+                                        Try a different time or turn off the time filter.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        {/* ---- / Find by specific time ---- */}
+
                         <Button
                             onClick={checkAvailability}
-                            disabled={loading || fetchingMaxSimulators || !!availability.specialEventMessage || isClosedDay || checkingClosedDay}
+                            disabled={loading || searchingNextDate || fetchingMaxSimulators || !!availability.specialEventMessage || isClosedDay || checkingClosedDay}
                             variant="primary"
                             className="w-full py-3"
                         >
-                            {loading ? 'Checking Availability...' : 'Check Availability'}
+                            {loading ? 'Checking Availability...' : searchingNextDate ? 'Searching…' : 'Check Availability'}
                         </Button>
                     </div>
                 </div>
@@ -858,6 +1063,9 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                             const specialEvent = conflict?.event;
                             const isDurationConflict = conflict?.isDurationConflict;
                             const eventStartTime = conflict?.eventStartTime;
+                            // ⭐ Highlight the slot that matches the user's preferred time
+                            const isPreferredTime = specificTimeEnabled && preferredTimeMatch &&
+                                new Date(slot.start_time).getTime() === new Date(preferredTimeMatch).getTime();
 
                             return (
                                 <div
@@ -866,10 +1074,19 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                         ? 'border-danger/30 bg-red-50 cursor-not-allowed opacity-60'
                                         : isSelected
                                             ? 'border-primary bg-primary-light/20 shadow-card-hover cursor-pointer'
-                                            : 'border-border hover:border-primary hover:bg-background cursor-pointer'
+                                            : isPreferredTime
+                                                ? 'border-primary/70 bg-primary/5 ring-2 ring-primary/20 cursor-pointer'
+                                                : 'border-border hover:border-primary hover:bg-background cursor-pointer'
                                         }`}
                                     onClick={() => handleSlotSelect(slot)}
                                 >
+                                    {isPreferredTime && !isDisabled && (
+                                        <div className="absolute -top-2.5 right-2">
+                                            <span className="px-2 py-0.5 bg-primary text-white text-xs font-bold rounded-full shadow-sm">
+                                                ⭐ Your time
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className={`text-lg font-semibold ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
                                         {new Date(slot.start_time).toLocaleTimeString('en-US', {
                                             hour: '2-digit',
@@ -951,8 +1168,46 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                     </div>
                 </div>
             )}
+            {/* Empty-state: reached slots step but no slots available */}
+            {currentStep === 'slots' && (!availability.simulator || availability.simulator.length === 0) && (
+                <div className="bg-surface rounded-card shadow-card p-8 flex flex-col items-center text-center gap-5">
+                    {/* Illustration */}
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-primary/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+
+                    <div>
+                        <h2 className="text-xl font-bold text-text-primary mb-2">No Available Slots</h2>
+                        <p className="text-text-secondary text-sm max-w-xs">
+                            There are no open time slots for{' '}
+                            <span className="font-semibold text-text-primary">
+                                {date ? moment(date, 'YYYY-MM-DD').format('MMMM D, YYYY') : 'the selected date'}
+                            </span>
+                            {' '}with the chosen duration and simulator count.
+                        </p>
+                        <p className="text-text-secondary/70 text-xs mt-2">
+                            Try a different date, a shorter duration, or fewer simulators.
+                        </p>
+                    </div>
+
+                    <Button
+                        onClick={handleBack}
+                        variant="primary"
+                        className="flex items-center gap-2 px-6"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Go Back &amp; Change Date
+                    </Button>
+                </div>
+            )}
 
             {/* Payment Step */}
+
             {currentStep === 'payment' && selectedSlot && (
                 <div className="bg-surface rounded-card shadow-card p-6">
                     <div className="flex items-center justify-between mb-4">
