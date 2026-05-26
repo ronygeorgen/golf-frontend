@@ -262,8 +262,14 @@ function MemberList() {
 
                 // Square: open the payment modal
                 // Find the package price from the fetched packages list
-                const pkgList = packageType === 'simulator' ? simulatorPackages : packages;
-                const pkgData = pkgList.find(p => p.id === packageId);
+                // Note: `packages` is a tab-keyed object { coaching: [...], simulator: [...] }
+                // so we must resolve the correct array before calling .find()
+                const pkgArray = packageType === 'simulator'
+                    ? simulatorPackages
+                    : (Array.isArray(packages)
+                        ? packages
+                        : (packages[activePackageTab] || packages['coaching'] || []));
+                const pkgData = pkgArray.find(p => p.id === packageId);
                 setSquarePayment({
                     isOpen: true,
                     tempId: response.data.temp_id,
