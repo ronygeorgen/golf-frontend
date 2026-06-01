@@ -440,16 +440,7 @@ export default function SquarePaymentModal({
                                 </svg>
                                 <p className="text-xs text-amber-800 leading-relaxed">
                                     <span className="font-semibold">All sales are final.</span>{' '}
-                                    Please see our{' '}
-                                    <a
-                                        href="https://www.holegolf.ca/terms"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline font-medium hover:text-amber-900 transition-colors"
-                                    >
-                                        terms &amp; conditions
-                                    </a>
-                                    {' '}on our website for our full refund policy.
+                                    Please see our terms &amp; conditions on our website for our full refund policy.
                                 </p>
                             </div>
 
