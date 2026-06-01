@@ -9,11 +9,16 @@
  *   isOpen         {boolean}  - Whether the modal is visible.
  *   onClose        {fn}       - Called when the user closes/cancels.
  *   onSuccess      {fn}       - Called with the backend response on success.
- *   amount         {number}   - Amount to charge (in dollars / local currency, e.g. 45.00).
+ *   amount         {number}   - Base amount before tax (in dollars / local currency, e.g. 35.00).
  *   currency       {string}   - ISO 4217 code (default: 'CAD').
  *   tempId         {string}   - The temp_id UUID for this pending booking/purchase.
  *   paymentType    {string}   - 'simulator' | 'package' | 'event'.
  *   description    {string}   - Human-friendly label shown in the modal (e.g. "Simulator Booking - 2 hrs").
+ *
+ * Tax note:
+ *   Nova Scotia HST (14%, effective April 1 2025) is added by the backend on top of the
+ *   post-coupon base price.  This modal displays the tax breakdown for transparency.
+ *   The `amount` prop must always be the PRE-TAX base price.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import apiClient from '../api/axios';
@@ -83,7 +88,13 @@ export default function SquarePaymentModal({
     const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount_amount, final_amount, ... }
     const [couponError, setCouponError] = useState('');
 
-    const finalChargeAmount = appliedCoupon ? appliedCoupon.final_amount : amount;
+    // ---- Tax calculation (Nova Scotia HST 14%, effective Apr 1 2025) ------
+    // Tax is always applied to the post-coupon base by the backend.
+    // We compute it here only for display purposes.
+    const TAX_RATE = 0.14;
+    const discountedBase = appliedCoupon ? appliedCoupon.final_amount : Number(amount);
+    const taxAmount = Math.round(discountedBase * TAX_RATE * 100) / 100;
+    const finalChargeAmount = Math.round((discountedBase + taxAmount) * 100) / 100;
 
     // ---- Step 1: Fetch Square config from backend -----------------------
     useEffect(() => {
@@ -278,11 +289,13 @@ export default function SquarePaymentModal({
                 <div className="p-6 space-y-5">
                     {/* Price Breakdown */}
                     <div className="bg-background rounded-button border border-border divide-y divide-border overflow-hidden">
+                        {/* Base price row */}
                         <div className="px-4 py-3 flex items-center justify-between">
                             <span className="text-text-secondary text-sm">Base Price</span>
                             <span className="text-text-primary font-medium">${Number(amount).toFixed(2)}</span>
                         </div>
 
+                        {/* Coupon discount row */}
                         {appliedCoupon && (
                             <div className="px-4 py-3 flex items-center justify-between bg-green-50/10">
                                 <span className="text-green-600 text-sm flex items-center gap-1.5 font-medium">
@@ -295,6 +308,18 @@ export default function SquarePaymentModal({
                             </div>
                         )}
 
+                        {/* HST tax row */}
+                        <div className="px-4 py-3 flex items-center justify-between">
+                            <span className="text-text-secondary text-sm flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                                </svg>
+                                HST (14%) — Nova Scotia
+                            </span>
+                            <span className="text-text-primary font-medium">+${taxAmount.toFixed(2)}</span>
+                        </div>
+
+                        {/* Total row */}
                         <div className="px-4 py-3 flex items-center justify-between bg-surface/40">
                             <span className="text-text-primary text-sm font-bold">Total to Pay</span>
                             <span className="text-text-primary text-2xl font-bold flex items-baseline gap-1.5">
