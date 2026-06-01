@@ -433,6 +433,26 @@ export default function SquarePaymentModal({
                                 <span>Your payment is encrypted and secured by Square.</span>
                             </div>
 
+                            {/* Refund policy notice */}
+                            <div className="flex items-start gap-2 bg-amber-50/60 border border-amber-200/70 rounded-button px-3 py-2.5">
+                                <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p className="text-xs text-amber-800 leading-relaxed">
+                                    <span className="font-semibold">All sales are final.</span>{' '}
+                                    Please see our{' '}
+                                    <a
+                                        href="https://www.holegolf.ca/terms"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline font-medium hover:text-amber-900 transition-colors"
+                                    >
+                                        terms &amp; conditions
+                                    </a>
+                                    {' '}on our website for our full refund policy.
+                                </p>
+                            </div>
+
                             {/* Actions */}
                             <div className="flex gap-3 pt-1">
                                 <button
