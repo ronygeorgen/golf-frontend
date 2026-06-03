@@ -286,7 +286,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
             openPopup({
                 type: 'warning',
                 title: 'Enter a time',
-                message: 'Please enter a preferred start time, or turn off the "Find by specific time" toggle.',
+                message: 'Please enter a preferred start time, or turn off the "Find next available" toggle.',
             });
             return;
         }
@@ -900,11 +900,11 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                             )}
                         </div>
 
-                        {/* ---- Find by specific time ---- */}
+                        {/* ---- Find next available ---- */}
                         <div className="rounded-card border border-border p-4 bg-background space-y-3">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-text-primary">Find by specific time</p>
+                                    <p className="text-sm font-medium text-text-primary">Find next available</p>
                                     <p className="text-xs text-text-secondary mt-0.5">
                                         If unavailable, we'll find the next open date
                                     </p>
@@ -915,11 +915,18 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                     role="switch"
                                     aria-checked={specificTimeEnabled}
                                     onClick={() => {
+                                        const enabling = !specificTimeEnabled;
                                         setSpecificTimeEnabled(prev => !prev);
                                         setNextAvailableResult(null);
                                         setNoTimeInWindow(false);
                                         setPreferredTimeMatch(null);
                                         setSpecificTime('');
+                                        // Turning the toggle ON → clear stale slots so the
+                                        // user must click Check Availability fresh.
+                                        if (enabling) {
+                                            dispatch(clearAvailability());
+                                            preventAutoMoveRef.current = false;
+                                        }
                                     }}
                                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
                                         specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'
@@ -944,6 +951,10 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                             setNextAvailableResult(null);
                                             setNoTimeInWindow(false);
                                             setPreferredTimeMatch(null);
+                                            // Clear stale slots so Check Availability always
+                                            // runs fresh with the updated preferred time.
+                                            dispatch(clearAvailability());
+                                            preventAutoMoveRef.current = false;
                                         }}
                                         className="w-full px-3 py-2 border border-border rounded-button bg-surface text-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
                                     />
@@ -1006,7 +1017,7 @@ function SimulatorBooking({ client, onBookingSuccess }) {
                                 </div>
                             )}
                         </div>
-                        {/* ---- / Find by specific time ---- */}
+                        {/* ---- / Find next available ---- */}
 
                         <Button
                             onClick={checkAvailability}

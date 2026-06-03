@@ -741,15 +741,27 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                                 </div>
                                             )}
 
-                                            {/* ── Find by specific time toggle ── */}
+                                            {/* ── Find next available toggle ── */}
                                             <div className="flex items-center justify-between py-3 px-4 bg-background rounded-button border border-border">
                                                 <div>
-                                                    <span className="text-sm font-medium text-text-primary">Find by specific time</span>
+                                                    <span className="text-sm font-medium text-text-primary">Find next available</span>
                                                     <p className="text-xs text-text-secondary mt-0.5">Scan forward to find the next date with a slot at your preferred time</p>
                                                 </div>
                                                 <button
                                                     type="button"
-                                                    onClick={() => { setSpecificTimeEnabled(!specificTimeEnabled); setSpecificTime(''); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                    onClick={() => {
+                                                        const enabling = !specificTimeEnabled;
+                                                        setSpecificTimeEnabled(enabling);
+                                                        setSpecificTime('');
+                                                        setNextAvailableResult(null);
+                                                        setNoTimeInWindow(false);
+                                                        setPreferredTimeMatch(null);
+                                                        // Turning ON → clear stale slots so user must re-check
+                                                        if (enabling) {
+                                                            setSlots([]);
+                                                            setCurrentStep('form');
+                                                        }
+                                                    }}
                                                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
                                                 >
                                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -762,7 +774,15 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                                     <input
                                                         type="time"
                                                         value={specificTime}
-                                                        onChange={(e) => { setSpecificTime(e.target.value); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                        onChange={(e) => {
+                                                            setSpecificTime(e.target.value);
+                                                            setNextAvailableResult(null);
+                                                            setNoTimeInWindow(false);
+                                                            setPreferredTimeMatch(null);
+                                                            // Clear stale slots so Check Availability runs fresh
+                                                            setSlots([]);
+                                                            setCurrentStep('form');
+                                                        }}
                                                         className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                                                     />
                                                 </div>
@@ -827,15 +847,27 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                             <option value={180}>3 hours</option>
                                         </select>
                                     </div>
-                                    {/* ── Find by specific time toggle (Asset-Only) ── */}
+                                    {/* ── Find next available toggle (Asset-Only) ── */}
                                     <div className="flex items-center justify-between py-3 px-4 bg-background rounded-button border border-border">
                                         <div>
-                                            <span className="text-sm font-medium text-text-primary">Find by specific time</span>
+                                            <span className="text-sm font-medium text-text-primary">Find next available</span>
                                             <p className="text-xs text-text-secondary mt-0.5">Scan forward to find the next date with a slot at your preferred time</p>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => { setSpecificTimeEnabled(!specificTimeEnabled); setSpecificTime(''); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                            onClick={() => {
+                                                const enabling = !specificTimeEnabled;
+                                                setSpecificTimeEnabled(enabling);
+                                                setSpecificTime('');
+                                                setNextAvailableResult(null);
+                                                setNoTimeInWindow(false);
+                                                setPreferredTimeMatch(null);
+                                                // Turning ON → clear stale slots so user must re-check
+                                                if (enabling) {
+                                                    setSlots([]);
+                                                    setCurrentStep('form');
+                                                }
+                                            }}
                                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
                                         >
                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -848,7 +880,15 @@ function DynamicCategoryBooking({ category, client, onBookingSuccess }) {
                                             <input
                                                 type="time"
                                                 value={specificTime}
-                                                onChange={(e) => { setSpecificTime(e.target.value); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                onChange={(e) => {
+                                                    setSpecificTime(e.target.value);
+                                                    setNextAvailableResult(null);
+                                                    setNoTimeInWindow(false);
+                                                    setPreferredTimeMatch(null);
+                                                    // Clear stale slots so Check Availability runs fresh
+                                                    setSlots([]);
+                                                    setCurrentStep('form');
+                                                }}
                                                 className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                                             />
                                         </div>

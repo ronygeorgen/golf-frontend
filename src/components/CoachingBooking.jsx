@@ -432,7 +432,9 @@ function CoachingBooking({ client, onBookingSuccess }) {
         // Clear previous availability to prevent stale state from blocking the UI
         dispatch(clearAvailability());
 
-        if (!date || !selectedPackage || !hasSessions || isClosedDay) return;
+        // Skip silent auto-check when "Find next available" is on — the user
+        // must click Check Availability manually so the specific-time filter runs.
+        if (!date || !selectedPackage || !hasSessions || isClosedDay || specificTimeEnabled) return;
 
         const timer = setTimeout(async () => {
             isAutoCheck.current = true;
@@ -451,7 +453,7 @@ function CoachingBooking({ client, onBookingSuccess }) {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [date, selectedPackage, selectedCoach, duration, dispatch, hasSessions, isClosedDay, client?.id]);
+    }, [date, selectedPackage, selectedCoach, duration, dispatch, hasSessions, isClosedDay, client?.id, specificTimeEnabled]);
 
     // Move to slots step when slots are fetched - ONLY for manual checks
     useEffect(() => {
@@ -1126,15 +1128,28 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                         </div>
                                     )}
 
-                                    {/* ── Find by specific time toggle ── */}
+                                    {/* ── Find next available toggle ── */}
                                     <div className="flex items-center justify-between py-3 px-4 bg-background rounded-button border border-border">
                                         <div>
-                                            <span className="text-sm font-medium text-text-primary">Find by specific time</span>
+                                            <span className="text-sm font-medium text-text-primary">Find next available</span>
                                             <p className="text-xs text-text-secondary mt-0.5">Scan forward to find the next date with a slot at your preferred time</p>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => { setSpecificTimeEnabled(!specificTimeEnabled); setSpecificTime(''); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                            onClick={() => {
+                                                const enabling = !specificTimeEnabled;
+                                                setSpecificTimeEnabled(enabling);
+                                                setSpecificTime('');
+                                                setNextAvailableResult(null);
+                                                setNoTimeInWindow(false);
+                                                setPreferredTimeMatch(null);
+                                                // Turning the toggle ON → clear stale availability so
+                                                // the user must click Check Availability fresh.
+                                                if (enabling) {
+                                                    dispatch(clearAvailability());
+                                                    preventAutoMoveRef.current = false;
+                                                }
+                                            }}
                                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${specificTimeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
                                         >
                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${specificTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -1147,7 +1162,16 @@ function CoachingBooking({ client, onBookingSuccess }) {
                                             <input
                                                 type="time"
                                                 value={specificTime}
-                                                onChange={(e) => { setSpecificTime(e.target.value); setNextAvailableResult(null); setNoTimeInWindow(false); setPreferredTimeMatch(null); }}
+                                                onChange={(e) => {
+                                                    setSpecificTime(e.target.value);
+                                                    setNextAvailableResult(null);
+                                                    setNoTimeInWindow(false);
+                                                    setPreferredTimeMatch(null);
+                                                    // Clear stale slots so Check Availability button
+                                                    // always triggers a fresh search with the new time.
+                                                    dispatch(clearAvailability());
+                                                    preventAutoMoveRef.current = false;
+                                                }}
                                                 className="w-full px-4 py-2 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                                             />
                                         </div>
