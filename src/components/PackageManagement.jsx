@@ -38,6 +38,10 @@ function PackageManagement() {
         is_active: true,
         is_tpi_assessment: false,
         service_category: '',
+        is_membership: false,
+        monthly_sessions: 0,
+        monthly_simulator_hours: 0,
+        monthly_category_hours: 0,
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -149,6 +153,10 @@ function PackageManagement() {
             is_active: pkg.is_active,
             is_tpi_assessment: pkg.is_tpi_assessment || false,
             service_category: pkg.service_category_id ?? pkg.service_category ?? '',
+            is_membership: pkg.is_membership || false,
+            monthly_sessions: pkg.monthly_sessions || 0,
+            monthly_simulator_hours: pkg.monthly_simulator_hours || 0,
+            monthly_category_hours: pkg.monthly_category_hours || 0,
         });
         setShowForm(true);
     };
@@ -302,65 +310,148 @@ function PackageManagement() {
                                             required
                                         />
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                                Sessions Included
+                                    <div className="flex items-center p-3 border border-primary/20 bg-primary/5 rounded-lg mb-4">
+                                        <input
+                                            type="checkbox"
+                                            id="is_membership"
+                                            checked={formData.is_membership}
+                                            onChange={(e) => setFormData({...formData, is_membership: e.target.checked})}
+                                            className="w-5 h-5 text-primary border-border rounded focus:ring-primary"
+                                        />
+                                        <div className="ml-3">
+                                            <label htmlFor="is_membership" className="text-sm font-bold text-primary cursor-pointer">
+                                                Make this a Monthly Membership
                                             </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={formData.session_count}
-                                                onChange={(e) => setFormData({...formData, session_count: parseInt(e.target.value, 10) || 1})}
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                                Session Duration (minutes)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="15"
-                                                step="15"
-                                                value={formData.session_duration_minutes}
-                                                onChange={(e) => setFormData({...formData, session_duration_minutes: parseInt(e.target.value, 10) || 60})}
-                                                required
-                                            />
+                                            <p className="text-xs text-text-secondary mt-0.5">
+                                                Clients will be billed monthly via Square. Sessions/hours reset each billing cycle.
+                                            </p>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-2">
-                                            Simulator Hours Included
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.5"
-                                            value={formData.simulator_hours}
-                                            onChange={(e) => setFormData({...formData, simulator_hours: parseFloat(e.target.value) || 0})}
-                                        />
-                                        <p className="mt-1 text-xs text-text-secondary">
-                                            Number of simulator hours included in this package (for simulator bookings)
-                                        </p>
-                                    </div>
-                                    {/* Category asset hours — only relevant for dynamic (non-legacy) categories */}
-                                    {formData.service_category && serviceCategories.find(c => c.id === Number(formData.service_category) && !c.legacy_booking_type) && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-text-primary mb-2">
-                                            Category Asset Hours Included
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.5"
-                                            value={formData.category_hours}
-                                            onChange={(e) => setFormData({...formData, category_hours: parseFloat(e.target.value) || 0})}
-                                        />
-                                        <p className="mt-1 text-xs text-text-secondary">
-                                            Hours usable for asset-only bookings in this category (e.g. table time). Set &gt; 0 to make this a combo package.
-                                        </p>
-                                    </div>
+
+                                    {formData.is_membership ? (
+                                        <>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-primary mb-2">
+                                                        Monthly Sessions Included
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={formData.monthly_sessions}
+                                                        onChange={(e) => setFormData({...formData, monthly_sessions: parseInt(e.target.value, 10) || 0})}
+                                                        required
+                                                        className="border-primary"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-text-primary mb-2">
+                                                        Session Duration (minutes)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="15"
+                                                        step="15"
+                                                        value={formData.session_duration_minutes}
+                                                        onChange={(e) => setFormData({...formData, session_duration_minutes: parseInt(e.target.value, 10) || 60})}
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-primary mb-2">
+                                                        Monthly Simulator Hours
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.5"
+                                                        value={formData.monthly_simulator_hours}
+                                                        onChange={(e) => setFormData({...formData, monthly_simulator_hours: parseFloat(e.target.value) || 0})}
+                                                        className="border-primary"
+                                                    />
+                                                </div>
+                                                {formData.service_category && serviceCategories.find(c => c.id === Number(formData.service_category) && !c.legacy_booking_type) && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-primary mb-2">
+                                                        Monthly Category Hours
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.5"
+                                                        value={formData.monthly_category_hours}
+                                                        onChange={(e) => setFormData({...formData, monthly_category_hours: parseFloat(e.target.value) || 0})}
+                                                        className="border-primary"
+                                                    />
+                                                </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-text-primary mb-2">
+                                                        Initial Sessions Included
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={formData.session_count}
+                                                        onChange={(e) => setFormData({...formData, session_count: parseInt(e.target.value, 10) || 1})}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-text-primary mb-2">
+                                                        Session Duration (minutes)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="15"
+                                                        step="15"
+                                                        value={formData.session_duration_minutes}
+                                                        onChange={(e) => setFormData({...formData, session_duration_minutes: parseInt(e.target.value, 10) || 60})}
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                                    Initial Simulator Hours Included
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.5"
+                                                    value={formData.simulator_hours}
+                                                    onChange={(e) => setFormData({...formData, simulator_hours: parseFloat(e.target.value) || 0})}
+                                                />
+                                                <p className="mt-1 text-xs text-text-secondary">
+                                                    Number of simulator hours included in this package (for simulator bookings)
+                                                </p>
+                                            </div>
+                                            {/* Category asset hours — only relevant for dynamic (non-legacy) categories */}
+                                            {formData.service_category && serviceCategories.find(c => c.id === Number(formData.service_category) && !c.legacy_booking_type) && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                                    Initial Category Asset Hours Included
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.5"
+                                                    value={formData.category_hours}
+                                                    onChange={(e) => setFormData({...formData, category_hours: parseFloat(e.target.value) || 0})}
+                                                />
+                                                <p className="mt-1 text-xs text-text-secondary">
+                                                    Hours usable for asset-only bookings in this category (e.g. table time). Set &gt; 0 to make this a combo package.
+                                                </p>
+                                            </div>
+                                            )}
+                                        </>
                                     )}
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -469,6 +560,9 @@ function PackageManagement() {
                                                 Description
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Membership
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Price
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -513,17 +607,30 @@ function PackageManagement() {
                                                         {pkg.description || <span className="text-text-secondary italic">No description</span>}
                                                     </button>
                                                 </td>
+                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                    {pkg.is_membership && (
+                                                        <Badge status="info">Membership</Badge>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-accent">
                                                     ${pkg.price}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
-                                                    {pkg.session_count}
+                                                    {pkg.is_membership ? (
+                                                        <span className="text-primary font-medium">{pkg.monthly_sessions}/mo</span>
+                                                    ) : (
+                                                        pkg.session_count
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
                                                     {pkg.session_duration_minutes} min
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
-                                                    {pkg.simulator_hours || 0} hrs
+                                                    {pkg.is_membership ? (
+                                                        <span className="text-primary font-medium">{pkg.monthly_simulator_hours || 0}/mo</span>
+                                                    ) : (
+                                                        <span>{pkg.simulator_hours || 0} hrs</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-text-primary max-w-xs truncate">
                                                     {pkg.redirect_url ? (
