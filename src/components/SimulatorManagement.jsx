@@ -16,6 +16,7 @@ import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import { formatLocalDateTime, getTodayInTimezone } from '../utils/timezoneUtils';
 
 function SimulatorManagement() {
     const dispatch = useAppDispatch();
@@ -23,6 +24,7 @@ function SimulatorManagement() {
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { list: simulators, loading } = useAppSelector((state) => state.admin.simulators);
+    const { locationTimezone } = useAppSelector((state) => state.auth);
     const modalRef = useRef(null);
 
     const [showForm, setShowForm] = useState(false);
@@ -43,9 +45,12 @@ function SimulatorManagement() {
         simulator: null,
         allowCoachingBay: false,
         deactivateAfter: true,
+        isSpecificDate: false,
+        specificDate: '',
         result: null,
         error: null,
         loading: false,
+        loadingType: null,
     });
 
     const openReassignModal = (simulator) => {
@@ -54,9 +59,12 @@ function SimulatorManagement() {
             simulator,
             allowCoachingBay: false,
             deactivateAfter: Boolean(simulator.is_active),
+            isSpecificDate: false,
+            specificDate: getTodayInTimezone(locationTimezone),
             result: null,
             error: null,
             loading: false,
+            loadingType: null,
         });
     };
 
@@ -66,25 +74,32 @@ function SimulatorManagement() {
             simulator: null,
             allowCoachingBay: false,
             deactivateAfter: true,
+            isSpecificDate: false,
+            specificDate: '',
             result: null,
             error: null,
             loading: false,
+            loadingType: null,
         });
     };
 
-    const runReassignRequest = async (dryRun) => {
+    const runReassignRequest = async (dryRun, forceIsSpecificDate = undefined) => {
         const sim = reassignModal.simulator;
         if (!sim) return;
-        setReassignModal((prev) => ({ ...prev, loading: true, error: null }));
+        setReassignModal((prev) => ({ ...prev, loading: true, loadingType: dryRun ? 'preview' : 'apply', error: null }));
+        
+        const isSpecificDate = forceIsSpecificDate !== undefined ? forceIsSpecificDate : reassignModal.isSpecificDate;
+        
         const body = {
             dry_run: dryRun,
             allow_coaching_bay: reassignModal.allowCoachingBay,
             deactivate: dryRun ? false : reassignModal.deactivateAfter && Boolean(sim.is_active),
+            specific_date: isSpecificDate ? reassignModal.specificDate : null,
         };
         const result = await dispatch(
             deactivateSimulatorAndReassign({ id: sim.id, body })
         );
-        setReassignModal((prev) => ({ ...prev, loading: false }));
+        setReassignModal((prev) => ({ ...prev, loading: false, loadingType: null }));
         if (deactivateSimulatorAndReassign.rejected.match(result)) {
             const p = result.payload || {};
             const msg =
@@ -671,7 +686,11 @@ function SimulatorManagement() {
                                 : 'Reassign upcoming bookings'}
                         </h2>
                         <p className="text-sm text-text-secondary mb-4">
-                            Confirmed bookings from <strong>now</strong> onward on{' '}
+                            Confirmed bookings {reassignModal.isSpecificDate ? (
+                                <>on <strong>{reassignModal.specificDate}</strong></>
+                            ) : (
+                                <>from <strong>now</strong> onward</>
+                            )} on{' '}
                             <strong>Bay {reassignModal.simulator.bay_number}</strong> are moved to
                             another active bay at the <strong>same</strong> start and end time when a
                             slot is free. Simulator and coaching sessions on this bay are included.
@@ -707,6 +726,59 @@ function SimulatorManagement() {
                                     Deactivate this bay after applying moves
                                 </label>
                             )}
+                            <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer mt-2">
+                                <input
+                                    type="checkbox"
+                                    checked={reassignModal.isSpecificDate}
+                                    onChange={(e) =>
+                                        setReassignModal((prev) => ({
+                                            ...prev,
+                                            isSpecificDate: e.target.checked,
+                                        }))
+                                    }
+                                    className="w-4 h-4 rounded border-border"
+                                />
+                                Only move bookings for a specific date
+                            </label>
+                            {reassignModal.isSpecificDate && (
+                                <div className="ml-6 mt-2 flex items-center gap-3">
+                                    <input
+                                        type="date"
+                                        value={reassignModal.specificDate}
+                                        onChange={(e) =>
+                                            setReassignModal((prev) => ({
+                                                ...prev,
+                                                specificDate: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full max-w-[200px]"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        disabled={reassignModal.loading}
+                                        onClick={() => runReassignRequest(true)}
+                                        className="py-2 px-4 text-sm whitespace-nowrap"
+                                    >
+                                        {reassignModal.loading && reassignModal.loadingType === 'preview' ? 'Searching...' : 'Search Date'}
+                                    </Button>
+                                    <button
+                                        type="button"
+                                        disabled={reassignModal.loading}
+                                        onClick={() => {
+                                            setReassignModal(prev => ({
+                                                ...prev,
+                                                isSpecificDate: false,
+                                                specificDate: getTodayInTimezone(locationTimezone)
+                                            }));
+                                            runReassignRequest(true, false);
+                                        }}
+                                        className="text-sm text-primary hover:text-primary-light transition-colors whitespace-nowrap disabled:opacity-50"
+                                    >
+                                        Clear / View All
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         {reassignModal.error && (
                             <p className="text-sm text-danger mb-3">{reassignModal.error}</p>
@@ -723,11 +795,12 @@ function SimulatorManagement() {
                                         <p className="font-medium text-status-confirmed-text mb-1">
                                             Would move / moved ({reassignModal.result.moved.length})
                                         </p>
-                                        <ul className="list-disc pl-5 text-text-primary max-h-32 overflow-y-auto">
+                                        <ul className="list-disc pl-5 text-text-primary max-h-48 overflow-y-auto">
                                             {reassignModal.result.moved.map((m) => (
-                                                <li key={m.booking_id}>
-                                                    #{m.booking_id} {m.client_label} — Bay{' '}
-                                                    {m.from_bay_number} → Bay {m.to_bay_number}
+                                                <li key={m.booking_id} className="mb-2">
+                                                    #{m.booking_id} {m.client_label} <br/>
+                                                    <span className="text-text-secondary text-xs">{formatLocalDateTime(m.start_time, locationTimezone)} to {formatLocalDateTime(m.end_time, locationTimezone)}</span><br/>
+                                                    Bay {m.from_bay_number} → Bay {m.to_bay_number}
                                                 </li>
                                             ))}
                                         </ul>
@@ -738,10 +811,12 @@ function SimulatorManagement() {
                                         <p className="font-medium text-danger mb-1">
                                             Cannot move ({reassignModal.result.failed.length})
                                         </p>
-                                        <ul className="list-disc pl-5 text-text-primary max-h-32 overflow-y-auto">
+                                        <ul className="list-disc pl-5 text-text-primary max-h-48 overflow-y-auto">
                                             {reassignModal.result.failed.map((f) => (
-                                                <li key={f.booking_id}>
-                                                    #{f.booking_id} {f.client_label} — {f.reason}
+                                                <li key={f.booking_id} className="mb-2">
+                                                    #{f.booking_id} {f.client_label} <br/>
+                                                    <span className="text-text-secondary text-xs">{formatLocalDateTime(f.start_time, locationTimezone)} to {formatLocalDateTime(f.end_time, locationTimezone)}</span><br/>
+                                                    {f.reason}
                                                 </li>
                                             ))}
                                         </ul>
@@ -762,7 +837,7 @@ function SimulatorManagement() {
                                 disabled={reassignModal.loading}
                                 onClick={() => runReassignRequest(true)}
                             >
-                                {reassignModal.loading ? '…' : 'Preview'}
+                                {reassignModal.loading && reassignModal.loadingType === 'preview' ? '…' : 'Preview'}
                             </Button>
                             <Button
                                 type="button"
@@ -770,7 +845,7 @@ function SimulatorManagement() {
                                 disabled={reassignModal.loading}
                                 onClick={() => runReassignRequest(false)}
                             >
-                                {reassignModal.loading ? 'Applying…' : 'Apply'}
+                                {reassignModal.loading && reassignModal.loadingType === 'apply' ? 'Applying…' : 'Apply'}
                             </Button>
                             <Button type="button" variant="secondary" onClick={closeReassignModal}>
                                 Close
