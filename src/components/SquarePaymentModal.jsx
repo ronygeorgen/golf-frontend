@@ -23,39 +23,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
-
-// ---- Inject Square Web Payments SDK script once -------------------------
-let sdkScriptLoaded = false;
-let sdkScriptLoading = false;
-let sdkScriptCallbacks = [];
-
-function loadSquareSDK(environment) {
-    return new Promise((resolve, reject) => {
-        if (sdkScriptLoaded) { resolve(); return; }
-        sdkScriptCallbacks.push({ resolve, reject });
-        if (sdkScriptLoading) return;
-        sdkScriptLoading = true;
-
-        const src = environment === 'production'
-            ? 'https://web.squarecdn.com/v1/square.js'
-            : 'https://sandbox.web.squarecdn.com/v1/square.js';
-
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => {
-            sdkScriptLoaded = true;
-            sdkScriptLoading = false;
-            sdkScriptCallbacks.forEach(cb => cb.resolve());
-            sdkScriptCallbacks = [];
-        };
-        script.onerror = (e) => {
-            sdkScriptLoading = false;
-            sdkScriptCallbacks.forEach(cb => cb.reject(e));
-            sdkScriptCallbacks = [];
-        };
-        document.head.appendChild(script);
-    });
-}
+import { loadSquareSdk } from '../utils/squareSdk';
 
 // -------------------------------------------------------------------------
 
@@ -112,7 +80,7 @@ export default function SquarePaymentModal({
     // ---- Step 2: Load the Square SDK script ----------------------------
     useEffect(() => {
         if (!isOpen || !configLoaded || !squareConfig) return;
-        loadSquareSDK(squareConfig.environment)
+        loadSquareSdk(squareConfig.environment)
             .then(() => setSdkReady(true))
             .catch(() => setErrorMsg('Could not load payment SDK. Please check your connection.'));
     }, [isOpen, configLoaded, squareConfig]);

@@ -501,13 +501,27 @@ function Packages() {
                                                 {/* Action Buttons */}
                                                 <div className="space-y-2 mt-auto">
                                                     {pkg.is_membership ? (
-                                                        <Button
-                                                            onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
-                                                            variant="primary"
-                                                            className="w-full py-2 text-sm"
-                                                        >
-                                                            Subscribe
-                                                        </Button>
+                                                        memberships?.some(m => m.package_id === pkg.id && m.status === 'active') ? (
+                                                            <Button
+                                                                onClick={() => {
+                                                                    const activeMembership = memberships.find(m => m.package_id === pkg.id && m.status === 'active');
+                                                                    setSelectedMembership(activeMembership);
+                                                                    setMembershipManageOpen(true);
+                                                                }}
+                                                                variant="secondary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Manage Membership
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
+                                                                variant="primary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Subscribe
+                                                            </Button>
+                                                        )
                                                     ) : pkg.session_count >= 10 ? (
                                                         <>
                                                             <Button
@@ -644,13 +658,27 @@ function Packages() {
                                                 {/* Action Buttons */}
                                                 <div className="grid gap-2 mt-auto">
                                                     {pkg.is_membership ? (
-                                                        <Button
-                                                            onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
-                                                            variant="primary"
-                                                            className="w-full py-2 text-sm"
-                                                        >
-                                                            Subscribe
-                                                        </Button>
+                                                        memberships?.some(m => m.package_id === pkg.id && m.status === 'active') ? (
+                                                            <Button
+                                                                onClick={() => {
+                                                                    const activeMembership = memberships.find(m => m.package_id === pkg.id && m.status === 'active');
+                                                                    setSelectedMembership(activeMembership);
+                                                                    setMembershipManageOpen(true);
+                                                                }}
+                                                                variant="secondary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Manage Membership
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
+                                                                variant="primary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Subscribe
+                                                            </Button>
+                                                        )
                                                     ) : (
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <Button

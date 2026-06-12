@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { subscribeMembership, getMyMemberships } from '../store/slices/membershipSlice';
 import { endpoints } from '../api/endpoints';
 import apiClient from '../api/axios';
+import { loadSquareSdk } from '../utils/squareSdk';
 
 /**
  * Modal for subscribing to a membership package.
@@ -16,56 +17,70 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
     const [squareCard, setSquareCard] = useState(null);
     const [sqAppId, setSqAppId] = useState('');
     const [sqLocationId, setSqLocationId] = useState('');
+    const [sqEnvironment, setSqEnvironment] = useState('sandbox');
     const [paymentError, setPaymentError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const cardContainerRef = useRef(null);
     const paymentsRef = useRef(null);
 
-    // Fetch Square config
+    // Fetch Square config (application_id, location_id, environment)
     useEffect(() => {
         if (!isOpen || !locationId) return;
         apiClient.get(`${endpoints.square.config}?location_id=${locationId}`)
             .then(({ data }) => {
                 setSqAppId(data.application_id || data.app_id || '');
                 setSqLocationId(data.location_id || '');
+                setSqEnvironment(data.environment || 'sandbox');
             })
             .catch(() => {});
     }, [isOpen, locationId]);
 
-    // Load Square Web SDK when moving to payment step
+    // Load the correct Square Web Payments SDK (sandbox vs production)
     useEffect(() => {
         if (step !== 'payment' || !sqAppId || !sqLocationId) return;
-        let card;
-        const initSquare = async () => {
-            if (!window.Square) {
-                const script = document.createElement('script');
-                script.src = 'https://web.squarecdn.com/v1/square.js';
-                script.onload = () => setSquareLoaded(true);
-                document.head.appendChild(script);
-            } else {
-                setSquareLoaded(true);
-            }
-        };
-        initSquare();
-    }, [step, sqAppId, sqLocationId]);
+
+        loadSquareSdk(sqEnvironment)
+            .then(() => setSquareLoaded(true))
+            .catch(() => setPaymentError('Could not load payment SDK. Please check your connection.'));
+    }, [step, sqAppId, sqLocationId, sqEnvironment]);
 
     useEffect(() => {
         if (!squareLoaded || !sqAppId || !sqLocationId || step !== 'payment') return;
+        if (!cardContainerRef.current) return;
+
         let card;
         const attachCard = async () => {
             try {
+                if (!window.Square) throw new Error('Square SDK not available.');
                 const payments = window.Square.payments(sqAppId, sqLocationId);
                 paymentsRef.current = payments;
-                card = await payments.card();
+                card = await payments.card({
+                    style: {
+                        '.input-container': { borderColor: '#374151', borderRadius: '8px' },
+                        '.input-container.is-focus': { borderColor: '#4F7942' },
+                        '.input-container.is-error': { borderColor: '#ef4444' },
+                        '.message-text': { color: '#6b7280' },
+                        '.message-icon': { color: '#6b7280' },
+                        input: {
+                            backgroundColor: '#1f2937',
+                            color: '#f9fafb',
+                            fontFamily: 'sans-serif',
+                            fontSize: '15px',
+                        },
+                        'input::placeholder': { color: '#6b7280' },
+                    },
+                });
                 await card.attach(cardContainerRef.current);
                 setSquareCard(card);
             } catch (e) {
+                console.error('Square card mount error:', e);
                 setPaymentError('Failed to load payment form. Please refresh and try again.');
             }
         };
         attachCard();
         return () => { if (card) { card.destroy?.().catch(() => {}); } };
     }, [squareLoaded, sqAppId, sqLocationId, step]);
+
 
     const handleSubscribe = async () => {
         if (!squareCard) return;

@@ -65,16 +65,16 @@ function MembershipManageModal({ isOpen, onClose, subscription }) {
 
                 <div className="p-6 space-y-4">
                     {cancelSuccess && (
-                        <div className="bg-status-confirmed-bg border border-status-confirmed-text/30 rounded-xl p-3">
-                            <p className="text-sm text-status-confirmed-text font-medium">
+                        <div className="bg-statusConfirmedBg border border-statusConfirmedText/30 rounded-xl p-3">
+                            <p className="text-sm text-statusConfirmedText font-medium">
                                 ✅ Subscription canceled. Your hours remain active until {periodEnd}.
                             </p>
                         </div>
                     )}
 
                     {cancelError && (
-                        <div className="bg-status-cancelled-bg border border-status-cancelled-text/30 rounded-xl p-3">
-                            <p className="text-sm text-status-cancelled-text">{cancelError}</p>
+                        <div className="bg-statusCancelledBg border border-statusCancelledText/30 rounded-xl p-3">
+                            <p className="text-sm text-statusCancelledText">{cancelError}</p>
                         </div>
                     )}
 
@@ -114,12 +114,12 @@ function MembershipManageModal({ isOpen, onClose, subscription }) {
                             {!confirmCancel ? (
                                 <button
                                     onClick={() => setConfirmCancel(true)}
-                                    className="w-full py-2.5 border border-status-cancelled-text text-status-cancelled-text rounded-button text-sm font-medium hover:bg-status-cancelled-bg transition-all"
+                                    className="w-full py-2.5 border border-statusCancelledText text-statusCancelledText rounded-button text-sm font-medium hover:bg-statusCancelledBg transition-all"
                                 >
                                     Cancel Membership
                                 </button>
                             ) : (
-                                <div className="bg-status-cancelled-bg border border-status-cancelled-text/30 rounded-xl p-4 space-y-3">
+                                <div className="bg-statusCancelledBg border border-statusCancelledText/30 rounded-xl p-4 space-y-3">
                                     <p className="text-sm text-text-primary font-medium">Are you sure you want to cancel?</p>
                                     <p className="text-xs text-text-secondary">Your hours will remain active until {periodEnd}. No refunds are issued.</p>
                                     <div className="flex gap-2">
@@ -133,7 +133,7 @@ function MembershipManageModal({ isOpen, onClose, subscription }) {
                                         <button
                                             onClick={handleCancel}
                                             disabled={canceling}
-                                            className="flex-1 py-2 bg-status-cancelled-text text-white rounded-button text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50"
+                                            className="flex-1 py-2 bg-statusCancelledText text-white rounded-button text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50"
                                         >
                                             {canceling ? 'Canceling...' : 'Yes, Cancel'}
                                         </button>
