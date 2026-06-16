@@ -235,7 +235,7 @@ export default function SquarePaymentModal({
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-surface rounded-card shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-surface rounded-card shadow-2xl w-full max-w-md flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in duration-200">
                 {/* Header */}
                 <div className="bg-primary px-6 py-5 flex items-center justify-between">
                     <div>
@@ -254,7 +254,7 @@ export default function SquarePaymentModal({
                     </button>
                 </div>
 
-                <div className="p-6 space-y-5">
+                <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
                     {/* Price Breakdown */}
                     <div className="bg-background rounded-button border border-border divide-y divide-border overflow-hidden">
                         {/* Base price row */}
