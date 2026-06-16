@@ -246,6 +246,11 @@ export const endpoints = {
         config: '/square/config/',
         initiatePayment: '/square/initiate-payment/',
         webhook: '/square/webhook/',
+        memberships: {
+            subscribe: '/square/memberships/subscribe/',
+            cancel: (id) => `/square/memberships/${id}/cancel/`,
+            my: '/square/memberships/my/',
+        },
     },
 
     // Coupon endpoints

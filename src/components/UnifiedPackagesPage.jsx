@@ -45,6 +45,10 @@ const emptySession = {
     redirect_url: '',
     is_active: true,
     is_tpi_assessment: false,
+    is_membership: false,
+    monthly_sessions: 0,
+    monthly_simulator_hours: 0,
+    monthly_category_hours: 0,
 };
 
 const emptyHours = {
@@ -57,6 +61,8 @@ const emptyHours = {
     time_restrictions: [],
     redirect_url: '',
     is_active: true,
+    is_membership: false,
+    monthly_hours: 0,
 };
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -88,6 +94,7 @@ function buildPayload(form, cat) {
         redirect_url: form.redirect_url || '',
         is_active: form.is_active,
         service_category: form.service_category || null,
+        is_membership: form.is_membership || false,
     };
 
     if (isHoursBased(cat)) {
@@ -96,6 +103,7 @@ function buildPayload(form, cat) {
             hours: parseFloat(form.hours) || 0,
             validity_days: form.validity_days ? parseInt(form.validity_days, 10) : null,
             time_restrictions: form.time_restrictions || [],
+            monthly_hours: parseFloat(form.monthly_hours) || 0,
         };
     }
 
@@ -106,6 +114,9 @@ function buildPayload(form, cat) {
         simulator_hours: parseFloat(form.simulator_hours) || 0,
         category_hours: parseFloat(form.category_hours) || 0,
         staff_members: form.staff_members || [],
+        monthly_sessions: parseInt(form.monthly_sessions, 10) || 0,
+        monthly_simulator_hours: parseFloat(form.monthly_simulator_hours) || 0,
+        monthly_category_hours: parseFloat(form.monthly_category_hours) || 0,
         ...(cat?.legacy_booking_type === 'coaching' ? { is_tpi_assessment: form.is_tpi_assessment } : {}),
     };
 }
@@ -352,6 +363,8 @@ export default function UnifiedPackagesPage() {
                 time_restrictions: timeRestrictions,
                 redirect_url: item.redirect_url || '',
                 is_active: item.is_active !== undefined ? item.is_active : true,
+                is_membership: item.is_membership || false,
+                monthly_hours: item.monthly_hours ?? 0,
             });
         } else {
             const staffIds = (item.staff_members_details || item.staff_members || []).map((s) =>
@@ -371,6 +384,10 @@ export default function UnifiedPackagesPage() {
                 redirect_url: item.redirect_url || '',
                 is_active: item.is_active !== undefined ? item.is_active : true,
                 is_tpi_assessment: item.is_tpi_assessment || false,
+                is_membership: item.is_membership || false,
+                monthly_sessions: item.monthly_sessions ?? 0,
+                monthly_simulator_hours: item.monthly_simulator_hours ?? 0,
+                monthly_category_hours: item.monthly_category_hours ?? 0,
             });
         }
         setModalOpen(true);
@@ -604,8 +621,13 @@ export default function UnifiedPackagesPage() {
                                     const key = `${item._kind}-${item.id}`;
                                     return (
                                         <tr key={key} className="hover:bg-background/50 transition-colors">
-                                            <td className="px-4 py-3 font-medium text-text-primary max-w-[200px] truncate">
-                                                {item.title}
+                                            <td className="px-4 py-3 font-medium text-text-primary max-w-[200px] truncate flex items-center gap-2">
+                                                <span className="truncate">{item.title}</span>
+                                                {item.is_membership && (
+                                                    <Badge status="info" className="py-0 px-1.5 text-[10px] flex-shrink-0">
+                                                        Membership
+                                                    </Badge>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-text-secondary text-xs">
                                                 {item.service_category_name || '—'}
@@ -613,9 +635,25 @@ export default function UnifiedPackagesPage() {
                                             <td className="px-4 py-3">{kindBadge(item)}</td>
                                             <td className="px-4 py-3 text-text-secondary">${item.price}</td>
                                             <td className="px-4 py-3 text-text-secondary text-xs whitespace-nowrap">
-                                                {item._kind === 'simulator'
-                                                    ? `${item.hours} hrs`
-                                                    : `${item.session_count} sessions × ${item.session_duration_minutes} min`}
+                                                {item._kind === 'simulator' ? (
+                                                    `${item.is_membership ? item.monthly_hours : item.hours} hrs${item.is_membership ? '/mo' : ''}`
+                                                ) : (
+                                                    <div className="space-y-0.5">
+                                                        <div>
+                                                            {item.is_membership ? item.monthly_sessions : item.session_count} sessions{item.is_membership ? '/mo' : ''} × {item.session_duration_minutes} min
+                                                        </div>
+                                                        {((item.is_membership && parseFloat(item.monthly_simulator_hours) > 0) || (!item.is_membership && parseFloat(item.simulator_hours) > 0)) && (
+                                                            <div className="text-accent font-medium">
+                                                                + {item.is_membership ? item.monthly_simulator_hours : item.simulator_hours} sim hrs{item.is_membership ? '/mo' : ''}
+                                                            </div>
+                                                        )}
+                                                        {((item.is_membership && parseFloat(item.monthly_category_hours) > 0) || (!item.is_membership && parseFloat(item.category_hours) > 0)) && (
+                                                            <div className="text-warning font-medium">
+                                                                + {item.is_membership ? item.monthly_category_hours : item.category_hours} cat hrs{item.is_membership ? '/mo' : ''}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <Badge status={item.is_active ? 'confirmed' : 'cancelled'}>
@@ -761,18 +799,37 @@ export default function UnifiedPackagesPage() {
                                 />
                             </FieldRow>
 
+                            {/* ── Membership Toggle ── */}
+                            <div className="flex items-center p-3 border border-primary/20 bg-primary/5 rounded-button mb-4">
+                                <input
+                                    type="checkbox"
+                                    id="is_membership"
+                                    checked={formData.is_membership}
+                                    onChange={(e) => setFormData((p) => ({ ...p, is_membership: e.target.checked }))}
+                                    className="w-5 h-5 text-primary border-border rounded focus:ring-primary"
+                                />
+                                <div className="ml-3">
+                                    <label htmlFor="is_membership" className="text-sm font-bold text-primary cursor-pointer">
+                                        Make this a Monthly Membership
+                                    </label>
+                                    <p className="text-xs text-text-secondary mt-0.5">
+                                        Clients will be billed monthly via Square. Sessions/hours reset each billing cycle.
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* ══ SESSION-BASED FIELDS ══════════════════════════════════════════════ */}
                             {!isHoursBased(selectedCategory) && selectedCategory && (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <FieldRow label="Sessions Included *">
+                                        <FieldRow label={formData.is_membership ? "Monthly Sessions Included *" : "Initial Sessions Included *"}>
                                             <TextInput
                                                 type="number"
-                                                min="1"
+                                                min={formData.is_membership ? "0" : "1"}
                                                 required
-                                                value={formData.session_count}
+                                                value={formData.is_membership ? formData.monthly_sessions : formData.session_count}
                                                 onChange={(e) =>
-                                                    setFormData((p) => ({ ...p, session_count: e.target.value }))
+                                                    setFormData((p) => (formData.is_membership ? { ...p, monthly_sessions: e.target.value } : { ...p, session_count: e.target.value }))
                                                 }
                                             />
                                         </FieldRow>
@@ -793,16 +850,16 @@ export default function UnifiedPackagesPage() {
                                     {/* Simulator hours (combo — only for legacy coaching) */}
                                     {selectedCategory?.legacy_booking_type === 'coaching' && (
                                         <FieldRow
-                                            label="Simulator Hours Included"
+                                            label={formData.is_membership ? "Monthly Simulator Hours Included" : "Initial Simulator Hours Included"}
                                             hint="Set > 0 to create a Combo package that also includes simulator hours."
                                         >
                                             <TextInput
                                                 type="number"
                                                 min="0"
                                                 step="0.5"
-                                                value={formData.simulator_hours}
+                                                value={formData.is_membership ? formData.monthly_simulator_hours : formData.simulator_hours}
                                                 onChange={(e) =>
-                                                    setFormData((p) => ({ ...p, simulator_hours: e.target.value }))
+                                                    setFormData((p) => (formData.is_membership ? { ...p, monthly_simulator_hours: e.target.value } : { ...p, simulator_hours: e.target.value }))
                                                 }
                                             />
                                         </FieldRow>
@@ -811,16 +868,16 @@ export default function UnifiedPackagesPage() {
                                     {/* Category asset hours (combo — only for dynamic categories) */}
                                     {selectedCategory && !selectedCategory.legacy_booking_type && (
                                         <FieldRow
-                                            label="Category Asset Hours Included"
+                                            label={formData.is_membership ? "Monthly Category Asset Hours Included" : "Initial Category Asset Hours Included"}
                                             hint="Set > 0 to include asset-booking hours (e.g. table time). Users can redeem these for asset-only bookings in this category. Creates a Combo package."
                                         >
                                             <TextInput
                                                 type="number"
                                                 min="0"
                                                 step="0.5"
-                                                value={formData.category_hours}
+                                                value={formData.is_membership ? formData.monthly_category_hours : formData.category_hours}
                                                 onChange={(e) =>
-                                                    setFormData((p) => ({ ...p, category_hours: e.target.value }))
+                                                    setFormData((p) => (formData.is_membership ? { ...p, monthly_category_hours: e.target.value } : { ...p, category_hours: e.target.value }))
                                                 }
                                             />
                                         </FieldRow>
@@ -879,18 +936,19 @@ export default function UnifiedPackagesPage() {
                             {isHoursBased(selectedCategory) && (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <FieldRow label="Total Hours *">
+                                        <FieldRow label={formData.is_membership ? "Monthly Hours *" : "Total Hours *"}>
                                             <TextInput
                                                 type="number"
                                                 min="0.5"
                                                 step="0.5"
                                                 required
-                                                value={formData.hours}
+                                                value={formData.is_membership ? formData.monthly_hours : formData.hours}
                                                 onChange={(e) =>
-                                                    setFormData((p) => ({ ...p, hours: e.target.value }))
+                                                    setFormData((p) => (formData.is_membership ? { ...p, monthly_hours: e.target.value } : { ...p, hours: e.target.value }))
                                                 }
                                             />
                                         </FieldRow>
+                                        {!formData.is_membership && (
                                         <FieldRow label="Validity (days)" hint="Leave blank for no expiry">
                                             <TextInput
                                                 type="number"
@@ -902,6 +960,7 @@ export default function UnifiedPackagesPage() {
                                                 placeholder="e.g. 365"
                                             />
                                         </FieldRow>
+                                        )}
                                     </div>
 
                                     {/* Time restrictions */}

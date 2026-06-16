@@ -33,6 +33,8 @@ function SimulatorPackageManagement() {
         validity_days: '',
         time_restrictions: [],
         service_category: '',
+        is_membership: false,
+        monthly_hours: '',
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -89,7 +91,8 @@ function SimulatorPackageManagement() {
             price: parseFloat(formData.price),
             hours: parseFloat(formData.hours),
             validity_days: formData.validity_days ? parseInt(formData.validity_days) : null,
-            time_restrictions: formData.time_restrictions || []
+            time_restrictions: formData.time_restrictions || [],
+            monthly_hours: formData.is_membership ? parseFloat(formData.monthly_hours) : null,
         };
 
         setSubmitLoading(true);
@@ -167,6 +170,8 @@ function SimulatorPackageManagement() {
             validity_days: pkg.validity_days || '',
             time_restrictions: time_restrictions,
             service_category: pkg.service_category_id ?? pkg.service_category ?? '',
+            is_membership: pkg.is_membership || false,
+            monthly_hours: pkg.monthly_hours !== null && pkg.monthly_hours !== undefined ? parseFloat(pkg.monthly_hours) : '',
         });
         setShowForm(true);
     };
@@ -254,6 +259,9 @@ function SimulatorPackageManagement() {
                                                 Price
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Type
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Hours
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -289,8 +297,21 @@ function SimulatorPackageManagement() {
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-accent">
                                                     ${pkg.price}
                                                 </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                                    {pkg.is_membership ? (
+                                                        <span className="inline-flex items-center gap-1 text-primary bg-primary/10 px-2 py-1 rounded text-xs font-bold uppercase">
+                                                            <span className="text-[10px]">🔁</span> Membership
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-text-secondary">Standard</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary">
-                                                    {pkg.hours} hrs
+                                                    {pkg.is_membership ? (
+                                                        <span>{pkg.monthly_hours} hrs<span className="text-xs text-text-secondary">/mo</span></span>
+                                                    ) : (
+                                                        `${pkg.hours} hrs`
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-text-primary max-w-xs truncate">
                                                     {pkg.redirect_url ? (
@@ -436,10 +457,13 @@ function SimulatorPackageManagement() {
                                                 required
                                                 className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                             />
+                                            {formData.is_membership && (
+                                                <p className="text-xs text-primary mt-1">This will be billed monthly via Square.</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-text-primary mb-1">
-                                                Hours *
+                                                Initial Total Hours *
                                             </label>
                                             <input
                                                 type="number"
@@ -450,8 +474,51 @@ function SimulatorPackageManagement() {
                                                 required
                                                 className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary"
                                             />
+                                            {formData.is_membership && (
+                                                <p className="text-xs text-text-secondary mt-1">First month's hours.</p>
+                                            )}
                                         </div>
                                     </div>
+                                    
+                                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-4">
+                                        <div className="flex items-start">
+                                            <div className="flex items-center h-5">
+                                                <input
+                                                    type="checkbox"
+                                                    id="is_membership"
+                                                    checked={formData.is_membership}
+                                                    onChange={(e) => setFormData({...formData, is_membership: e.target.checked})}
+                                                    className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                                                />
+                                            </div>
+                                            <div className="ml-3 text-sm">
+                                                <label htmlFor="is_membership" className="font-bold text-primary">
+                                                    Make this a Recurring Membership
+                                                </label>
+                                                <p className="text-text-secondary">Clients will be subscribed in Square and billed monthly. Hours reset each billing cycle.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {formData.is_membership && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-text-primary mb-1">
+                                                    Monthly Reset Hours *
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    step="0.5"
+                                                    min="0.5"
+                                                    value={formData.monthly_hours}
+                                                    onChange={(e) => setFormData({...formData, monthly_hours: e.target.value})}
+                                                    required={formData.is_membership}
+                                                    className="w-full px-3 py-2 border border-primary/30 rounded-button bg-background text-text-primary focus:border-primary"
+                                                    placeholder="e.g. 10"
+                                                />
+                                                <p className="text-xs text-text-secondary mt-1">Hours will reset to this amount each time the membership renews. Unused hours do not carry over.</p>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-1">
                                             Redirect URL (Optional)

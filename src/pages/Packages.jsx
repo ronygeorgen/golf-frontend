@@ -10,6 +10,7 @@ import {
     getTransfersPending,
     getMyOrganizationPurchases,
 } from '../store/slices/coachingSlice';
+import { getMyMemberships } from '../store/slices/membershipSlice';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import PackagePurchaseModal from '../components/PackagePurchaseModal';
@@ -18,6 +19,8 @@ import PackageUsageDetails from '../components/PackageUsageDetails';
 import SessionTransfer from '../components/SessionTransfer';
 import GiftClaim from '../components/GiftClaim';
 import TransferClaim from '../components/TransferClaim';
+import MembershipSubscribeModal from '../components/MembershipSubscribeModal';
+import MembershipManageModal from '../components/MembershipManageModal';
 import { Skeleton } from '../components/skeletons/SkeletonLoader';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -60,6 +63,10 @@ function Packages() {
     const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState(null);
     const [restrictionsModalOpen, setRestrictionsModalOpen] = useState(false);
     const [selectedPackageForRestrictions, setSelectedPackageForRestrictions] = useState(null);
+    const [membershipSubscribeOpen, setMembershipSubscribeOpen] = useState(false);
+    const [membershipManageOpen, setMembershipManageOpen] = useState(false);
+    const [selectedMembership, setSelectedMembership] = useState(null);
+    const { subscriptions: memberships } = useAppSelector((state) => state.memberships);
     const previewLimit = 5;
 
     // Load service categories for dynamic filter tabs
@@ -103,6 +110,7 @@ function Packages() {
         dispatch(getMyOrganizationPurchases({ page: 1 }));
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
+        dispatch(getMyMemberships());
     }, [dispatch]);
 
     // Refetch data when view mode changes - watch searchParams directly to ensure it triggers on URL changes
@@ -120,6 +128,7 @@ function Packages() {
             dispatch(getMyOrganizationPurchases({ page: 1 }));
             dispatch(getGiftsPending());
             dispatch(getTransfersPending());
+            dispatch(getMyMemberships());
         } else if (currentView === 'view-packages') {
             // When switching to packages view, refresh package listings
             console.log('📞 ViewMode effect (view-packages) - Calling getActiveCoachingPackages and getActiveSimulatorPackages');
@@ -155,6 +164,7 @@ function Packages() {
                 console.log('🔄 Page became visible - Refreshing purchase data');
                 dispatch(getMyPackagePurchases({ page: 1 }));
                 dispatch(getMySimulatorPurchases({ page: 1 }));
+                dispatch(getMyMemberships());
             }
         };
 
@@ -209,13 +219,29 @@ function Packages() {
 
     const handleOpenModal = (pkgId, type, packageCategory = null) => {
         setSelectedPackageId(pkgId);
-        setModalType(type);
-        setSelectedPackageCategory(packageCategory); // Store the category of the clicked package
-        setModalOpen(true);
+        setSelectedPackageCategory(packageCategory);
+        
+        // Find the correct package using the category to avoid ID conflicts
+        let pkg;
+        if (packageCategory === 'simulator') {
+            pkg = (simulatorPackages || []).find(p => p.id === pkgId) || packages.find(p => p.id === pkgId);
+        } else if (packageCategory === 'coaching' || packageCategory === 'combo') {
+            pkg = packages.find(p => p.id === pkgId) || (simulatorPackages || []).find(p => p.id === pkgId);
+        } else {
+            pkg = (simulatorPackages || []).find(p => p.id === pkgId) || packages.find(p => p.id === pkgId);
+        }
+
+        if (pkg?.is_membership && type === 'normal') {
+            setMembershipSubscribeOpen(true);
+        } else {
+            setModalType(type);
+            setModalOpen(true);
+        }
     };
 
     const handleCloseModal = () => {
         setModalOpen(false);
+        setMembershipSubscribeOpen(false);
         setSelectedPackageId(null);
         setSelectedPackageCategory(null);
     };
@@ -228,6 +254,7 @@ function Packages() {
         dispatch(getMyOrganizationPurchases({ page: 1 }));
         dispatch(getGiftsPending());
         dispatch(getTransfersPending());
+        dispatch(getMyMemberships());
     };
 
     const handleManageMembers = (purchase) => {
@@ -261,6 +288,8 @@ function Packages() {
     const getFilteredPackages = () => {
         if (packageFilter === 'all') {
             return packages;
+        } else if (packageFilter === 'memberships') {
+            return packages.filter(pkg => pkg.is_membership);
         } else if (packageFilter === 'coaching') {
             // Legacy coaching: session-based, NOT belonging to a new-sport category
             return packages.filter(pkg => {
@@ -286,6 +315,8 @@ function Packages() {
     const getFilteredSimulatorPackages = () => {
         if (packageFilter === 'all' || packageFilter === 'simulator') {
             return simulatorPackages || [];
+        } else if (packageFilter === 'memberships') {
+            return (simulatorPackages || []).filter(pkg => pkg.is_membership);
         }
         // Phase E: a non-legacy service category might also have simulator packages
         if (packageFilter.startsWith('cat-')) {
@@ -322,6 +353,7 @@ function Packages() {
                                 <span className="text-sm font-medium text-text-secondary mr-2">Filter:</span>
                                 {[
                                     { id: 'all', label: 'All Packages' },
+                                    { id: 'memberships', label: 'Memberships' },
                                     { id: 'coaching', label: 'Coaching' },
                                     { id: 'simulator', label: 'Simulator Only' },
                                     { id: 'combo', label: 'Combo' },
@@ -403,24 +435,43 @@ function Packages() {
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
                                                         <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
-                                                        <p className="text-xs text-text-secondary mt-0.5">One-time</p>
+                                                        <p className="text-xs text-text-secondary mt-0.5">
+                                                            {pkg.is_membership ? 'Per Month' : 'One-time'}
+                                                        </p>
                                                     </div>
                                                 </div>
 
                                                 {/* Package Stats */}
+                                                {pkg.is_membership && (
+                                                    <div className="mb-2">
+                                                        <Badge status="info" className="w-fit text-xs">Membership</Badge>
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center gap-3 pt-2 border-t border-border/50 flex-wrap">
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-status-confirmed-text"></div>
-                                                        <span className="text-xs font-medium text-text-primary">{pkg.session_count} Sessions</span>
+                                                        <span className="text-xs font-medium text-text-primary">
+                                                            {pkg.is_membership ? `${pkg.monthly_sessions} Sessions/mo` : `${pkg.session_count} Sessions`}
+                                                        </span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
                                                         <span className="text-xs font-medium text-text-primary">Duration {pkg.session_duration_minutes} min</span>
                                                     </div>
-                                                    {pkg.simulator_hours > 0 && (
+                                                    {((!pkg.is_membership && pkg.simulator_hours > 0) || (pkg.is_membership && pkg.monthly_simulator_hours > 0)) && (
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
-                                                            <span className="text-xs font-medium text-text-primary">{pkg.simulator_hours} Simulator hrs</span>
+                                                            <span className="text-xs font-medium text-text-primary">
+                                                                {pkg.is_membership ? `${pkg.monthly_simulator_hours} Simulator hrs/mo` : `${pkg.simulator_hours} Simulator hrs`}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {((!pkg.is_membership && pkg.category_hours > 0) || (pkg.is_membership && pkg.monthly_category_hours > 0)) && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-warning"></div>
+                                                            <span className="text-xs font-medium text-text-primary">
+                                                                {pkg.is_membership ? `${pkg.monthly_category_hours} Category hrs/mo` : `${pkg.category_hours} Category hrs`}
+                                                            </span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -432,16 +483,46 @@ function Packages() {
                                                 {/* Package Info */}
                                                 <div className="bg-status-confirmed-bg border border-status-confirmed-text/20 rounded-lg p-2.5 mb-3">
                                                     <p className="text-xs text-status-confirmed-text font-semibold">
-                                                        You will get <span className="text-base font-bold">{pkg.session_count}</span> coaching session{pkg.session_count !== 1 ? 's' : ''}
-                                                        {pkg.simulator_hours > 0 && (
+                                                        {pkg.is_membership ? (
+                                                            <>You will get <span className="text-base font-bold">{pkg.monthly_sessions}</span> coaching session{pkg.monthly_sessions !== 1 ? 's' : ''}</>
+                                                        ) : (
+                                                            <>You will get <span className="text-base font-bold">{pkg.session_count}</span> coaching session{pkg.session_count !== 1 ? 's' : ''}</>
+                                                        )}
+                                                        {pkg.simulator_hours > 0 && !pkg.is_membership && (
                                                             <> and <span className="text-base font-bold">{pkg.simulator_hours}</span> simulator hour{pkg.simulator_hours !== 1 ? 's' : ''}</>
                                                         )}
+                                                        {pkg.monthly_simulator_hours > 0 && pkg.is_membership && (
+                                                            <> and <span className="text-base font-bold">{pkg.monthly_simulator_hours}</span> simulator hour{pkg.monthly_simulator_hours !== 1 ? 's' : ''}</>
+                                                        )}
+                                                        {pkg.is_membership && " per month"}
                                                     </p>
                                                 </div>
 
                                                 {/* Action Buttons */}
                                                 <div className="space-y-2 mt-auto">
-                                                    {pkg.session_count >= 10 ? (
+                                                    {pkg.is_membership ? (
+                                                        memberships?.some(m => m.package_id === pkg.id && m.status === 'active') ? (
+                                                            <Button
+                                                                onClick={() => {
+                                                                    const activeMembership = memberships.find(m => m.package_id === pkg.id && m.status === 'active');
+                                                                    setSelectedMembership(activeMembership);
+                                                                    setMembershipManageOpen(true);
+                                                                }}
+                                                                variant="secondary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Manage Membership
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
+                                                                variant="primary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Subscribe
+                                                            </Button>
+                                                        )
+                                                    ) : pkg.session_count >= 10 ? (
                                                         <>
                                                             <Button
                                                                 onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
@@ -508,15 +589,20 @@ function Packages() {
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
                                                         <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
-                                                        <p className="text-xs text-text-secondary mt-0.5">One-time</p>
+                                                        <p className="text-xs text-text-secondary mt-0.5">{pkg.is_membership ? 'Per Month' : 'One-time'}</p>
                                                     </div>
                                                 </div>
 
                                                 {/* Package Stats */}
+                                                {pkg.is_membership && (
+                                                    <div className="mb-2">
+                                                        <Badge status="info" className="w-fit text-xs">Membership</Badge>
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center gap-3 pt-2 border-t border-border/50 flex-wrap">
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-accent"></div>
-                                                        <span className="text-xs font-medium text-text-primary">{pkg.hours} Simulator Hours</span>
+                                                        <span className="text-xs font-medium text-text-primary">{pkg.is_membership ? pkg.monthly_hours : pkg.hours} Simulator Hours</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -525,7 +611,9 @@ function Packages() {
                                             <div className="p-4 flex-1 flex flex-col">
                                                 <div className="mb-3">
                                                     <p className="text-xs text-text-secondary">
-                                                        Simulator-only package. Hours can be used for simulator bookings only.
+                                                        {pkg.is_membership 
+                                                            ? `Simulator membership. You get ${pkg.monthly_hours} simulator hours every month.` 
+                                                            : 'Simulator-only package. Hours can be used for simulator bookings only.'}
                                                     </p>
                                                 </div>
 
@@ -568,21 +656,47 @@ function Packages() {
                                                 )}
 
                                                 {/* Action Buttons */}
-                                                <div className="grid grid-cols-2 gap-2 mt-auto">
-                                                    <Button
-                                                        onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
-                                                        variant="primary"
-                                                        className="w-full py-2 text-sm"
-                                                    >
-                                                        Buy for Myself
-                                                    </Button>
-                                                    <Button
-                                                        onClick={() => handleOpenModal(pkg.id, 'gift', pkg.category)}
-                                                        variant="accent"
-                                                        className="w-full py-2 text-sm"
-                                                    >
-                                                        Gift Package
-                                                    </Button>
+                                                <div className="grid gap-2 mt-auto">
+                                                    {pkg.is_membership ? (
+                                                        memberships?.some(m => m.package_id === pkg.id && m.status === 'active') ? (
+                                                            <Button
+                                                                onClick={() => {
+                                                                    const activeMembership = memberships.find(m => m.package_id === pkg.id && m.status === 'active');
+                                                                    setSelectedMembership(activeMembership);
+                                                                    setMembershipManageOpen(true);
+                                                                }}
+                                                                variant="secondary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Manage Membership
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
+                                                                variant="primary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Subscribe
+                                                            </Button>
+                                                        )
+                                                    ) : (
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <Button
+                                                                onClick={() => handleOpenModal(pkg.id, 'normal', pkg.category)}
+                                                                variant="primary"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Buy for Myself
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => handleOpenModal(pkg.id, 'gift', pkg.category)}
+                                                                variant="accent"
+                                                                className="w-full py-2 text-sm"
+                                                            >
+                                                                Gift Package
+                                                            </Button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -607,6 +721,58 @@ function Packages() {
                         </div>
                     </div>
 
+                    {memberships && memberships.length > 0 && (
+                        <div className="bg-surface rounded-card shadow-card p-6 mb-8 border-l-4 border-primary">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                                    <span className="text-primary">🔁</span> My Memberships
+                                </h2>
+                            </div>
+                            <div className="grid gap-4">
+                                {memberships.map((membership) => (
+                                    <div key={membership.id} className="rounded-card p-4 bg-background border border-border shadow-card">
+                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="text-lg font-semibold text-text-primary">{membership.package_details?.title}</h3>
+                                                    <Badge status={membership.status === 'active' ? 'confirmed' : 'cancelled'}>
+                                                        {membership.status.charAt(0).toUpperCase() + membership.status.slice(1)}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-sm text-text-secondary">
+                                                    Hours reset every month.
+                                                </p>
+                                                {membership.status === 'active' && membership.current_period_end && (
+                                                    <p className="text-sm font-medium text-primary mt-2">
+                                                        Next billing & hours reset: {new Date(membership.current_period_end).toLocaleDateString()}
+                                                    </p>
+                                                )}
+                                                {membership.status === 'canceled' && membership.current_period_end && (
+                                                    <p className="text-sm font-medium text-danger mt-2">
+                                                        Access ends on: {new Date(membership.current_period_end).toLocaleDateString()}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2">
+                                                {membership.status === 'active' && (
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() => {
+                                                            setSelectedMembership(membership);
+                                                            setMembershipManageOpen(true);
+                                                        }}
+                                                    >
+                                                        Manage Membership
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-surface rounded-card shadow-card p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold text-text-primary">My Package Purchases</h2>
@@ -630,6 +796,7 @@ function Packages() {
                                         console.log('🔄 Refresh button clicked - Refreshing purchase data');
                                         dispatch(getMyPackagePurchases({ page: 1 }));
                                         dispatch(getMySimulatorPurchases({ page: 1 }));
+                                        dispatch(getMyMemberships());
                                     }}
                                     className="text-sm text-primary hover:text-primary-light font-semibold transition-colors"
                                 >
@@ -869,6 +1036,20 @@ function Packages() {
                 defaultType={modalType}
                 lockType={true}
                 titleText={modalType === 'gift' ? 'Gift Entire Package' : modalType === 'organization' ? 'Purchase for Group' : 'Buy Package for Yourself'}
+            />
+            
+            <MembershipSubscribeModal
+                isOpen={membershipSubscribeOpen}
+                onClose={handleCloseModal}
+                package={selectedPackage}
+                locationId={authState?.locationId}
+                onSuccess={handlePurchaseSuccess}
+            />
+            
+            <MembershipManageModal
+                isOpen={membershipManageOpen}
+                onClose={() => { setMembershipManageOpen(false); setSelectedMembership(null); }}
+                subscription={selectedMembership}
             />
 
             <OrganizationMemberManagement

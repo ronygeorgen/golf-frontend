@@ -4,6 +4,7 @@ import adminReducer from './slices/adminSlice';
 import bookingReducer from './slices/bookingSlice';
 import simulatorReducer from './slices/simulatorSlice';
 import coachingReducer from './slices/coachingSlice';
+import membershipReducer from './slices/membershipSlice';
 
 export const store = configureStore({
     reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
         booking: bookingReducer,
         simulator: simulatorReducer,
         coaching: coachingReducer,
+        memberships: membershipReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
