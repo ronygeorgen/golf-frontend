@@ -4,7 +4,7 @@ import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
-import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle, Phone, Mail, Building2 } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
@@ -87,6 +87,11 @@ function GHLLocationManagement() {
     const [timezoneSearch, setTimezoneSearch] = useState('');
     const [submitLoading, setSubmitLoading] = useState(false);
 
+    // Invoice contact fields
+    const [contactPhone, setContactPhone] = useState('');
+    const [supportEmail, setSupportEmail] = useState('');
+    const [businessId, setBusinessId] = useState('');
+
     // Logo upload state
     const [logoPreview, setLogoPreview] = useState(null);      // data URL for preview
     const [logoBlob, setLogoBlob] = useState(null);             // resized Blob ready to upload
@@ -137,6 +142,9 @@ function GHLLocationManagement() {
         setCompanyName(location.company_name || '');
         setTimezone(location.timezone || 'America/Halifax');
         setTimezoneSearch('');
+        setContactPhone(location.contact_phone || '');
+        setSupportEmail(location.support_email || '');
+        setBusinessId(location.business_id || '');
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -152,13 +160,13 @@ function GHLLocationManagement() {
         try {
             const response = await apiClient.put(
                 endpoints.ghl.admin.updateCompanyName(editingLocation.location_id),
-                { company_name: companyName, timezone }
+                { company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId }
             );
 
             if (response.data) {
                 setLocations(locations.map(loc =>
                     loc.location_id === editingLocation.location_id
-                        ? { ...loc, company_name: companyName, timezone }
+                        ? { ...loc, company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId }
                         : loc
                 ));
 
@@ -195,6 +203,9 @@ function GHLLocationManagement() {
         setCompanyName('');
         setTimezone('America/Halifax');
         setTimezoneSearch('');
+        setContactPhone('');
+        setSupportEmail('');
+        setBusinessId('');
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -415,6 +426,62 @@ function GHLLocationManagement() {
                                         )}
                                     </div>
 
+                                    {/* ── Invoice Contact Details ── */}
+                                    <div className="border border-border rounded-button p-4 space-y-4">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Mail className="w-4 h-4 text-primary" />
+                                            <span className="text-sm font-semibold text-text-primary">Invoice Contact Details</span>
+                                        </div>
+                                        <p className="text-xs text-text-secondary -mt-1">
+                                            These details appear on every payment invoice sent to customers.
+                                        </p>
+
+                                        {/* Contact Phone */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1.5">
+                                                <Phone className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                                                Contact Phone
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                value={contactPhone}
+                                                onChange={(e) => setContactPhone(e.target.value)}
+                                                placeholder="e.g. +1 902-555-0100"
+                                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                            />
+                                        </div>
+
+                                        {/* Support Email */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1.5">
+                                                <Mail className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                                                Support Email
+                                            </label>
+                                            <input
+                                                type="email"
+                                                value={supportEmail}
+                                                onChange={(e) => setSupportEmail(e.target.value)}
+                                                placeholder="e.g. support@mygolfcenter.com"
+                                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                            />
+                                        </div>
+
+                                        {/* Business ID */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-text-primary mb-1.5">
+                                                <Building2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />
+                                                Business ID
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={businessId}
+                                                onChange={(e) => setBusinessId(e.target.value)}
+                                                placeholder="e.g. GST/HST registration number"
+                                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                            />
+                                        </div>
+                                    </div>
+
                                     {/* ── Company Logo Section ── */}
                                     <div className="border border-border rounded-button p-4 space-y-3">
                                         <div className="flex items-center gap-2">
@@ -563,6 +630,15 @@ function GHLLocationManagement() {
                                                 Timezone
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Contact Phone
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Support Email
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Business ID
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Status
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -593,10 +669,29 @@ function GHLLocationManagement() {
                                                 <td className="px-4 py-4 text-sm text-text-secondary">
                                                     <span className="inline-flex items-center gap-1">
                                                         <Globe className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                                                        <span className="truncate max-w-[200px]" title={getTimezoneLabel(location.timezone)}>
+                                                        <span className="truncate max-w-[160px]" title={getTimezoneLabel(location.timezone)}>
                                                             {location.timezone || 'America/Halifax'}
                                                         </span>
                                                     </span>
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-secondary">
+                                                    {location.contact_phone ? (
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Phone className="w-3 h-3 text-primary flex-shrink-0" />
+                                                            {location.contact_phone}
+                                                        </span>
+                                                    ) : <span className="italic text-xs">Not set</span>}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-secondary">
+                                                    {location.support_email ? (
+                                                        <a href={`mailto:${location.support_email}`}
+                                                           className="text-primary hover:underline truncate max-w-[160px] block">
+                                                            {location.support_email}
+                                                        </a>
+                                                    ) : <span className="italic text-xs">Not set</span>}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-secondary font-mono">
+                                                    {location.business_id || <span className="italic text-xs not-italic">Not set</span>}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
                                                     {location.status || 'N/A'}
