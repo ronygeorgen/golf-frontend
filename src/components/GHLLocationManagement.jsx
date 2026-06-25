@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppSelector } from '../store/hooks';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
@@ -85,6 +85,8 @@ function GHLLocationManagement() {
     const [companyName, setCompanyName] = useState('');
     const [timezone, setTimezone] = useState('America/Halifax');
     const [timezoneSearch, setTimezoneSearch] = useState('');
+    const [timezoneOpen, setTimezoneOpen] = useState(false);
+    const timezoneDropdownRef = useRef(null);
     const [submitLoading, setSubmitLoading] = useState(false);
 
     // Invoice contact fields
@@ -100,15 +102,36 @@ function GHLLocationManagement() {
     const [logoUploading, setLogoUploading] = useState(false);
     const [logoDeleting, setLogoDeleting] = useState(false);
 
+    // Refund policy
+    const [refundPolicy, setRefundPolicy] = useState('');
+    // View-only modal
+    const [viewPolicyLocation, setViewPolicyLocation] = useState(null);
+
     const isSuperadmin = user?.role === 'superadmin';
 
     // Filtered timezone list based on search
-    const filteredTimezones = timezoneSearch.trim()
-        ? COMMON_TIMEZONES.filter(tz =>
-            tz.label.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
-            tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
-        )
-        : COMMON_TIMEZONES;
+    const filteredTimezones = useMemo(() =>
+        timezoneSearch.trim()
+            ? COMMON_TIMEZONES.filter(tz =>
+                tz.label.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
+                tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
+            )
+            : COMMON_TIMEZONES,
+        [timezoneSearch]
+    );
+
+    // Close timezone dropdown on outside click
+    useEffect(() => {
+        if (!timezoneOpen) return;
+        const handleOutside = (e) => {
+            if (timezoneDropdownRef.current && !timezoneDropdownRef.current.contains(e.target)) {
+                setTimezoneOpen(false);
+                setTimezoneSearch('');
+            }
+        };
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [timezoneOpen]);
 
     useEffect(() => {
         if (isSuperadmin) {
@@ -145,6 +168,7 @@ function GHLLocationManagement() {
         setContactPhone(location.contact_phone || '');
         setSupportEmail(location.support_email || '');
         setBusinessId(location.business_id || '');
+        setRefundPolicy(location.refund_policy || '');
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -160,13 +184,13 @@ function GHLLocationManagement() {
         try {
             const response = await apiClient.put(
                 endpoints.ghl.admin.updateCompanyName(editingLocation.location_id),
-                { company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId }
+                { company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId, refund_policy: refundPolicy }
             );
 
             if (response.data) {
                 setLocations(locations.map(loc =>
                     loc.location_id === editingLocation.location_id
-                        ? { ...loc, company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId }
+                        ? { ...loc, company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId, refund_policy: refundPolicy }
                         : loc
                 ));
 
@@ -206,6 +230,7 @@ function GHLLocationManagement() {
         setContactPhone('');
         setSupportEmail('');
         setBusinessId('');
+        setRefundPolicy('');
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -338,6 +363,50 @@ function GHLLocationManagement() {
 
     return (
         <>
+            {/* ── View Refund Policy Modal ─────────────────────────────────────────── */}
+            {viewPolicyLocation && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center p-4 z-50"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)' }}
+                    onClick={() => setViewPolicyLocation(null)}
+                >
+                    <div
+                        className="bg-surface rounded-card shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-5 border-b border-border">
+                            <h3 className="text-lg font-bold text-text-primary">Refund &amp; Cancellation Policy</h3>
+                            <button
+                                onClick={() => setViewPolicyLocation(null)}
+                                className="text-text-secondary hover:text-text-primary transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-5 overflow-y-auto flex-1">
+                            <p className="text-xs text-text-secondary mb-3 font-medium uppercase tracking-wide">
+                                {viewPolicyLocation.company_name || viewPolicyLocation.location_id}
+                            </p>
+                            {viewPolicyLocation.refund_policy ? (
+                                <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+                                    {viewPolicyLocation.refund_policy}
+                                </p>
+                            ) : (
+                                <p className="text-sm text-text-secondary italic">No refund policy set.</p>
+                            )}
+                        </div>
+                        <div className="p-5 border-t border-border">
+                            <button
+                                onClick={() => setViewPolicyLocation(null)}
+                                className="w-full py-2 rounded-button bg-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div>
                 {/* Edit Form Modal */}
                 {showForm && editingLocation && (
@@ -388,7 +457,7 @@ function GHLLocationManagement() {
                                         />
                                     </div>
 
-                                    {/* Timezone Selector */}
+                                    {/* Timezone Selector — custom dropdown */}
                                     <div>
                                         <label className="block text-sm font-medium text-text-primary mb-1">
                                             <Globe className="inline w-4 h-4 mr-1 -mt-0.5" />
@@ -397,33 +466,75 @@ function GHLLocationManagement() {
                                         <p className="text-xs text-text-secondary mb-2">
                                             All bookings and availability for this center will use this timezone. DST is handled automatically.
                                         </p>
-                                        <input
-                                            type="text"
-                                            value={timezoneSearch}
-                                            onChange={(e) => setTimezoneSearch(e.target.value)}
-                                            placeholder="Search timezone..."
-                                            className="w-full px-3 py-2 border border-border rounded-button bg-background text-text-primary text-sm mb-1 focus:ring-2 focus:ring-primary focus:border-primary"
-                                        />
-                                        <select
-                                            value={timezone}
-                                            onChange={(e) => {
-                                                setTimezone(e.target.value);
-                                                setTimezoneSearch('');
-                                            }}
-                                            className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
-                                            size={5}
-                                        >
-                                            {filteredTimezones.map(tz => (
-                                                <option key={tz.value} value={tz.value}>
-                                                    {tz.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {timezone && (
-                                            <p className="text-xs text-primary mt-1">
-                                                Selected: <strong>{timezone}</strong>
-                                            </p>
-                                        )}
+                                        <div className="relative" ref={timezoneDropdownRef}>
+                                            {/* Trigger */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTimezoneOpen(prev => !prev);
+                                                    setTimezoneSearch('');
+                                                }}
+                                                className="w-full flex items-center justify-between px-4 py-3 border border-border rounded-button bg-background text-text-primary text-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
+                                            >
+                                                <span className="truncate text-left">
+                                                    {COMMON_TIMEZONES.find(tz => tz.value === timezone)?.label || timezone || 'Select timezone…'}
+                                                </span>
+                                                <svg
+                                                    className={`w-4 h-4 ml-2 flex-shrink-0 text-text-secondary transition-transform duration-200 ${timezoneOpen ? 'rotate-180' : ''}`}
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                                                >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+
+                                            {/* Dropdown panel */}
+                                            {timezoneOpen && (
+                                                <div
+                                                    className="absolute z-50 mt-1 w-full bg-surface border border-border rounded-button shadow-xl overflow-hidden"
+                                                    style={{ maxHeight: '260px', display: 'flex', flexDirection: 'column' }}
+                                                >
+                                                    {/* Search inside dropdown */}
+                                                    <div className="p-2 border-b border-border flex-shrink-0">
+                                                        <input
+                                                            type="text"
+                                                            autoFocus
+                                                            value={timezoneSearch}
+                                                            onChange={e => setTimezoneSearch(e.target.value)}
+                                                            placeholder="Search timezone…"
+                                                            className="w-full px-3 py-2 text-sm border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                                                        />
+                                                    </div>
+                                                    {/* Options list */}
+                                                    <ul className="overflow-y-auto flex-1">
+                                                        {filteredTimezones.length === 0 ? (
+                                                            <li className="px-4 py-3 text-sm text-text-secondary italic">No timezones found.</li>
+                                                        ) : filteredTimezones.map(tz => (
+                                                            <li
+                                                                key={tz.value}
+                                                                onMouseDown={e => e.preventDefault()}
+                                                                onClick={() => {
+                                                                    setTimezone(tz.value);
+                                                                    setTimezoneOpen(false);
+                                                                    setTimezoneSearch('');
+                                                                }}
+                                                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center gap-2 ${
+                                                                    tz.value === timezone
+                                                                        ? 'bg-primary text-white font-medium'
+                                                                        : 'text-text-primary hover:bg-background'
+                                                                }`}
+                                                            >
+                                                                {tz.value === timezone && (
+                                                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                )}
+                                                                <span>{tz.label}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* ── Invoice Contact Details ── */}
@@ -480,6 +591,23 @@ function GHLLocationManagement() {
                                                 className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
                                             />
                                         </div>
+                                    </div>
+
+                                    {/* ── Refund Policy ── */}
+                                    <div className="border border-border rounded-button p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold text-text-primary">📋 Refund &amp; Cancellation Policy</span>
+                                        </div>
+                                        <p className="text-xs text-text-secondary">
+                                            This text will appear on every invoice email sent to customers.
+                                        </p>
+                                        <textarea
+                                            value={refundPolicy}
+                                            onChange={e => setRefundPolicy(e.target.value)}
+                                            placeholder="e.g. All sales are final. No refunds after 24 hours of booking..."
+                                            rows={5}
+                                            className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary text-sm resize-y"
+                                        />
                                     </div>
 
                                     {/* ── Company Logo Section ── */}
@@ -627,6 +755,9 @@ function GHLLocationManagement() {
                                                 Logo
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Refund Policy
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Timezone
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -664,6 +795,18 @@ function GHLLocationManagement() {
                                                         />
                                                     ) : (
                                                         <span className="text-xs text-text-secondary italic">No logo</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    {location.refund_policy ? (
+                                                        <button
+                                                            onClick={() => setViewPolicyLocation(location)}
+                                                            className="text-xs text-primary hover:underline hover:text-primary-light transition-colors flex items-center gap-1 whitespace-nowrap"
+                                                        >
+                                                            📋 Click to view
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-text-secondary italic">Not set</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-text-secondary">
