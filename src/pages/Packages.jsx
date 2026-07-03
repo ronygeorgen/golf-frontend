@@ -434,10 +434,16 @@ function Packages() {
                                                         )}
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
-                                                        <p className="text-xs text-text-secondary mt-0.5">
-                                                            {pkg.is_membership ? 'Per Month' : 'One-time'}
-                                                        </p>
+                                                        {pkg.hide_price_on_card ? (
+                                                            <p className="text-sm font-bold text-accent leading-none pt-1">Price on select</p>
+                                                        ) : (
+                                                            <>
+                                                                <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
+                                                                <p className="text-xs text-text-secondary mt-0.5">
+                                                                    {pkg.is_membership ? 'Per Month' : 'One-time'}
+                                                                </p>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -588,8 +594,14 @@ function Packages() {
                                                         )}
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
-                                                        <p className="text-xs text-text-secondary mt-0.5">{pkg.is_membership ? 'Per Month' : 'One-time'}</p>
+                                                        {pkg.hide_price_on_card ? (
+                                                            <p className="text-sm font-bold text-accent leading-none pt-1">Price on select</p>
+                                                        ) : (
+                                                            <>
+                                                                <p className="text-2xl font-bold text-accent leading-none">${pkg.price}</p>
+                                                                <p className="text-xs text-text-secondary mt-0.5">{pkg.is_membership ? 'Per Month' : 'One-time'}</p>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
 

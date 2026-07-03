@@ -19,7 +19,7 @@ import Button from './ui/Button';
 import useToast from '../hooks/useToast';
 import Toast from './ui/Toast';
 import { TableSkeleton } from './skeletons/SkeletonLoader';
-import { Edit2, Trash2, Power, PowerOff, X, Plus, Minus } from 'lucide-react';
+import { Edit2, Trash2, Power, PowerOff, X, Plus, Minus, UserPlus, CheckSquare, Square, ChevronDown } from 'lucide-react';
 
 // ─── field-set helpers ───────────────────────────────────────────────────────
 
@@ -49,6 +49,7 @@ const emptySession = {
     monthly_sessions: 0,
     monthly_simulator_hours: 0,
     monthly_category_hours: 0,
+    hide_price_on_card: false,
 };
 
 const emptyHours = {
@@ -63,6 +64,7 @@ const emptyHours = {
     is_active: true,
     is_membership: false,
     monthly_hours: 0,
+    hide_price_on_card: false,
 };
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -95,6 +97,7 @@ function buildPayload(form, cat) {
         is_active: form.is_active,
         service_category: form.service_category || null,
         is_membership: form.is_membership || false,
+        hide_price_on_card: form.hide_price_on_card || false,
     };
 
     if (isHoursBased(cat)) {
@@ -260,6 +263,17 @@ export default function UnifiedPackagesPage() {
     const [toggling, setToggling] = useState({});
     const [deleting, setDeleting] = useState({});
 
+    // ── Quick Coach Assignment modal state ───────────────────────────────────
+    const [assignModalOpen, setAssignModalOpen] = useState(false);
+    const [assignStaffId, setAssignStaffId] = useState('');
+    const [assignSelectedPkgs, setAssignSelectedPkgs] = useState([]);
+    const [assignSaving, setAssignSaving] = useState(false);
+    const [assignError, setAssignError] = useState('');
+    const [assignStaffSearch, setAssignStaffSearch] = useState('');
+    const [assignPkgSearch, setAssignPkgSearch] = useState('');
+    const [assignCatFilter, setAssignCatFilter] = useState('');
+    const assignModalRef = useRef(null);
+
     // ── load everything ──────────────────────────────────────────────────────
 
     const loadAll = useCallback(async () => {
@@ -365,6 +379,7 @@ export default function UnifiedPackagesPage() {
                 is_active: item.is_active !== undefined ? item.is_active : true,
                 is_membership: item.is_membership || false,
                 monthly_hours: item.monthly_hours ?? 0,
+                hide_price_on_card: item.hide_price_on_card || false,
             });
         } else {
             const staffIds = (item.staff_members_details || item.staff_members || []).map((s) =>
@@ -388,6 +403,7 @@ export default function UnifiedPackagesPage() {
                 monthly_sessions: item.monthly_sessions ?? 0,
                 monthly_simulator_hours: item.monthly_simulator_hours ?? 0,
                 monthly_category_hours: item.monthly_category_hours ?? 0,
+                hide_price_on_card: item.hide_price_on_card || false,
             });
         }
         setModalOpen(true);
@@ -416,6 +432,7 @@ export default function UnifiedPackagesPage() {
                 price: prev.price,
                 redirect_url: prev.redirect_url,
                 is_active: prev.is_active,
+                hide_price_on_card: prev.hide_price_on_card,
             }));
         } else {
             setFormData((prev) => ({ ...prev, service_category: newCatId }));
@@ -524,6 +541,135 @@ export default function UnifiedPackagesPage() {
             time_restrictions: prev.time_restrictions.filter((_, i) => i !== index),
         }));
 
+    // ── Quick Coach Assignment helpers ────────────────────────────────────────
+
+    /** All coaching packages (session-based) — these are the ones that can have staff assigned. */
+    const assignablePackages = useMemo(
+        () => coachingPkgs.filter((p) => p._kind === 'coaching'),
+        [coachingPkgs]
+    );
+
+    const filteredAssignablePackages = useMemo(() => {
+        return assignablePackages.filter(p => {
+            if (assignCatFilter && p.service_category !== Number(assignCatFilter) && p.service_category_id !== Number(assignCatFilter)) return false;
+            if (assignPkgSearch) {
+                const q = assignPkgSearch.toLowerCase();
+                if (!p.title.toLowerCase().includes(q) && !(p.service_category_name || '').toLowerCase().includes(q)) return false;
+            }
+            return true;
+        });
+    }, [assignablePackages, assignCatFilter, assignPkgSearch]);
+
+    const filteredStaffForAssign = useMemo(() => {
+        if (!assignStaffSearch) return staff;
+        const lower = assignStaffSearch.toLowerCase();
+        return staff.filter(s => 
+            s.first_name?.toLowerCase().includes(lower) || 
+            s.last_name?.toLowerCase().includes(lower) || 
+            s.email?.toLowerCase().includes(lower)
+        );
+    }, [staff, assignStaffSearch]);
+
+    function openAssignModal() {
+        setAssignStaffId('');
+        setAssignSelectedPkgs([]);
+        setAssignError('');
+        setAssignStaffSearch('');
+        setAssignPkgSearch('');
+        setAssignCatFilter('');
+        setAssignModalOpen(true);
+    }
+
+    function closeAssignModal() {
+        setAssignModalOpen(false);
+        setAssignError('');
+    }
+
+    /** When a staff is picked, pre-select packages NOT already assigned to that coach. */
+    function handleAssignStaffChange(staffId) {
+        setAssignStaffId(staffId);
+        if (!staffId) {
+            setAssignSelectedPkgs([]);
+            return;
+        }
+        const sid = Number(staffId);
+        // Pre-select packages that do NOT yet have this staff member assigned
+        const toSelect = assignablePackages
+            .filter((p) => {
+                const ids = (p.staff_members_details || p.staff_members || []).map((s) =>
+                    typeof s === 'object' ? s.id : s
+                );
+                return !ids.includes(sid);
+            })
+            .map((p) => p.id);
+        setAssignSelectedPkgs(toSelect);
+    }
+
+    function toggleAssignPkg(pkgId) {
+        setAssignSelectedPkgs((prev) =>
+            prev.includes(pkgId) ? prev.filter((id) => id !== pkgId) : [...prev, pkgId]
+        );
+    }
+
+    function handleSelectAllAssign() {
+        let visibleIds = filteredAssignablePackages.map(p => p.id);
+        
+        if (assignStaffId) {
+            const sid = Number(assignStaffId);
+            visibleIds = filteredAssignablePackages.filter(p => {
+                const ids = (p.staff_members_details || p.staff_members || []).map((s) => typeof s === 'object' ? s.id : s);
+                return !ids.includes(sid);
+            }).map(p => p.id);
+        }
+
+        const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => assignSelectedPkgs.includes(id));
+        
+        if (allVisibleSelected) {
+            setAssignSelectedPkgs(prev => prev.filter(id => !visibleIds.includes(id)));
+        } else {
+            setAssignSelectedPkgs(prev => Array.from(new Set([...prev, ...visibleIds])));
+        }
+    }
+
+    async function handleAssignSave() {
+        if (!assignStaffId) {
+            setAssignError('Please select a coach / staff member.');
+            return;
+        }
+        if (assignSelectedPkgs.length === 0) {
+            setAssignError('Please select at least one package.');
+            return;
+        }
+        setAssignError('');
+        setAssignSaving(true);
+        const sid = Number(assignStaffId);
+        try {
+            await Promise.all(
+                assignSelectedPkgs.map((pkgId) => {
+                    const pkg = assignablePackages.find((p) => p.id === pkgId);
+                    const existingIds = (pkg?.staff_members_details || pkg?.staff_members || []).map((s) =>
+                        typeof s === 'object' ? s.id : s
+                    );
+                    const newIds = Array.from(new Set([...existingIds, sid]));
+                    return apiClient.patch(endpoints.admin.packages.detail(pkgId), {
+                        staff_members: newIds,
+                    });
+                })
+            );
+            showSuccess(`Coach assigned to ${assignSelectedPkgs.length} package${assignSelectedPkgs.length !== 1 ? 's' : ''} successfully.`);
+            closeAssignModal();
+            await loadAll();
+        } catch (err) {
+            const detail = err?.response?.data;
+            if (typeof detail === 'string') setAssignError(detail);
+            else if (detail && typeof detail === 'object')
+                setAssignError(Object.entries(detail).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | '));
+            else setAssignError('Failed to assign coach. Please try again.');
+        } finally {
+            setAssignSaving(false);
+        }
+    }
+
     // ── staff toggle ──────────────────────────────────────────────────────────
 
     const toggleStaff = (id) =>
@@ -553,25 +699,37 @@ export default function UnifiedPackagesPage() {
                 <p className="text-sm text-text-secondary">
                     Create and manage packages for every service category in one place.
                 </p>
-                <Button onClick={openCreate} variant="primary" className="flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Package
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Quick Coach Assignment */}
+                    <button
+                        id="quick-assign-coach-btn"
+                        onClick={openAssignModal}
+                        className="flex items-center gap-2 px-4 py-2 rounded-button border border-primary text-primary bg-primary/5 hover:bg-primary/15 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                        title="Quickly assign a coach to multiple coaching packages at once"
+                    >
+                        <UserPlus className="w-4 h-4" />
+                        Assign Coach to Packages
+                    </button>
+                    <Button onClick={openCreate} variant="primary" className="flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Add Package
+                    </Button>
+                </div>
             </div>
 
             {/* ── Filter bar ── */}
-            <div className="bg-surface rounded-card shadow-card p-4 flex flex-wrap gap-3 items-center">
+            <div className="bg-surface rounded-card shadow-card p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center">
                 <input
                     type="search"
                     placeholder="Search packages…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40 min-w-[180px] flex-1"
+                    className="w-full md:flex-[2] rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <select
                     value={filterCatId}
                     onChange={(e) => setFilterCatId(e.target.value)}
-                    className="rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full md:flex-1 rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                     <option value="">All categories</option>
                     {categories.map((c) => (
@@ -583,7 +741,7 @@ export default function UnifiedPackagesPage() {
                 <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full md:flex-1 rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                     <option value="all">All statuses</option>
                     <option value="active">Active only</option>
@@ -1019,6 +1177,18 @@ export default function UnifiedPackagesPage() {
                                 <span className="text-xs text-text-secondary">(inactive packages are hidden from customers)</span>
                             </label>
 
+                            {/* Hide Price on Card */}
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.hide_price_on_card}
+                                    onChange={(e) => setFormData((p) => ({ ...p, hide_price_on_card: e.target.checked }))}
+                                    className="w-4 h-4 rounded border-border text-primary"
+                                />
+                                <span className="text-sm text-text-primary font-medium">Hide Price on Card</span>
+                                <span className="text-xs text-text-secondary">(shows 'Price on select' instead of amount on main cards)</span>
+                            </label>
+
                             {/* Error */}
                             {formError && (
                                 <div className="rounded-button bg-error/10 border border-error/20 px-3 py-2 text-sm text-error">
@@ -1038,6 +1208,269 @@ export default function UnifiedPackagesPage() {
                                 </Button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Quick Coach Assignment Modal ── */}
+            {assignModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.40)', backdropFilter: 'blur(4px)' }}
+                    onClick={closeAssignModal}
+                >
+                    <div
+                        ref={assignModalRef}
+                        className="bg-surface rounded-card shadow-xl w-full max-w-xl max-h-[88vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="sticky top-0 bg-surface border-b border-border px-6 py-4 flex items-center justify-between z-10 rounded-t-card">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    <UserPlus className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-text-primary">Assign Coach to Packages</h3>
+                                    <p className="text-xs text-text-secondary mt-0.5">
+                                        Select a coach and the coaching packages to assign them to — all at once.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={closeAssignModal}
+                                className="text-text-secondary hover:text-text-primary transition-colors p-1"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+                            {/* Staff / Coach picker */}
+                            <div className="space-y-1">
+                                <label className="block text-sm font-semibold text-text-primary">
+                                    Select Coach / Staff Member <span className="text-error">*</span>
+                                </label>
+                                <p className="text-xs text-text-secondary">
+                                    After selecting a coach, packages they are not yet assigned to will be pre-selected below.
+                                </p>
+                                <div className="flex flex-col md:flex-row gap-2 items-start mt-1 relative">
+                                    <div className="relative w-full md:flex-1">
+                                        <input
+                                            type="search"
+                                            placeholder="Search staff..."
+                                            value={assignStaffSearch}
+                                            onChange={(e) => setAssignStaffSearch(e.target.value)}
+                                            className="w-full rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                        />
+                                        {assignStaffSearch && filteredStaffForAssign.length > 0 && (
+                                            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-button shadow-lg max-h-48 overflow-y-auto">
+                                                {filteredStaffForAssign.map((s) => (
+                                                    <button
+                                                        key={s.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            handleAssignStaffChange(s.id.toString());
+                                                            setAssignStaffSearch('');
+                                                        }}
+                                                        className="w-full text-left px-3 py-2 text-sm hover:bg-background transition-colors text-text-primary border-b border-border last:border-0"
+                                                    >
+                                                        <span className="font-medium">{s.first_name} {s.last_name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {assignStaffSearch && filteredStaffForAssign.length === 0 && (
+                                            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-button shadow-lg p-3 text-sm text-text-secondary text-center">
+                                                No coaches found.
+                                            </div>
+                                        )}
+                                    </div>
+                                    <select
+                                        id="assign-coach-select"
+                                        value={assignStaffId}
+                                        onChange={(e) => {
+                                            handleAssignStaffChange(e.target.value);
+                                            setAssignStaffSearch('');
+                                        }}
+                                        className="w-full md:w-auto md:flex-[2] rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                    >
+                                        <option value="">— Select a coach —</option>
+                                        {staff.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.first_name} {s.last_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Package Filters */}
+                            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+                                <input
+                                    type="search"
+                                    placeholder="Search packages..."
+                                    value={assignPkgSearch}
+                                    onChange={(e) => setAssignPkgSearch(e.target.value)}
+                                    className="w-full md:flex-[2] rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                />
+                                <select
+                                    value={assignCatFilter}
+                                    onChange={(e) => setAssignCatFilter(e.target.value)}
+                                    className="w-full md:flex-1 rounded-button border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                >
+                                    <option value="">All categories</option>
+                                    {categories.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Package list */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-sm font-semibold text-text-primary">
+                                        Coaching Packages
+                                        <span className="ml-2 text-xs font-normal text-text-secondary">
+                                            ({assignSelectedPkgs.length} selected, {filteredAssignablePackages.length} shown)
+                                        </span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        id="select-all-assign-btn"
+                                        onClick={handleSelectAllAssign}
+                                        className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-light transition-colors px-2 py-1 rounded hover:bg-primary/5"
+                                    >
+                                        <CheckSquare className="w-3.5 h-3.5" />
+                                        Toggle All Visible
+                                    </button>
+                                </div>
+
+                                {filteredAssignablePackages.length === 0 ? (
+                                    <div className="text-center py-8 text-text-secondary text-sm">
+                                        No coaching packages match your filters.
+                                    </div>
+                                ) : (
+                                    <div className="border border-border rounded-card overflow-hidden divide-y divide-border max-h-64 overflow-y-auto">
+                                        {[...filteredAssignablePackages]
+                                            .sort((a, b) => {
+                                                const sid = Number(assignStaffId);
+                                                if (!sid) return 0;
+                                                const aIds = (a.staff_members_details || a.staff_members || []).map((s) => typeof s === 'object' ? s.id : s);
+                                                const bIds = (b.staff_members_details || b.staff_members || []).map((s) => typeof s === 'object' ? s.id : s);
+                                                const aAssigned = aIds.includes(sid);
+                                                const bAssigned = bIds.includes(sid);
+                                                if (aAssigned === bAssigned) return 0;
+                                                return aAssigned ? 1 : -1;
+                                            })
+                                            .map((pkg) => {
+                                            const isChecked = assignSelectedPkgs.includes(pkg.id);
+                                            const currentStaffIds = (pkg.staff_members_details || pkg.staff_members || []).map((s) =>
+                                                typeof s === 'object' ? s.id : s
+                                            );
+                                            const selectedStaff = staff.find((s) => s.id === Number(assignStaffId));
+                                            const alreadyAssigned = selectedStaff && currentStaffIds.includes(selectedStaff.id);
+
+                                            return (
+                                                <label
+                                                    key={pkg.id}
+                                                    className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                                                        alreadyAssigned
+                                                            ? 'bg-surface opacity-75 cursor-default'
+                                                            : isChecked
+                                                                ? 'bg-primary/5 hover:bg-primary/10 cursor-pointer'
+                                                                : 'bg-surface hover:bg-background cursor-pointer'
+                                                    }`}
+                                                >
+                                                    {!alreadyAssigned ? (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => toggleAssignPkg(pkg.id)}
+                                                            className="w-4 h-4 rounded border-border text-primary mt-0.5 flex-shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-sm font-medium text-text-primary truncate">
+                                                                {pkg.title}
+                                                            </span>
+                                                            {pkg.is_membership && (
+                                                                <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                                                    Membership
+                                                                </span>
+                                                            )}
+                                                            {alreadyAssigned && (
+                                                                <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                                                    Already assigned
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-0.5 text-xs text-text-secondary">
+                                                            ${pkg.price} &bull;
+                                                            {pkg.is_membership
+                                                                ? ` ${pkg.monthly_sessions} sessions/mo`
+                                                                : ` ${pkg.session_count} sessions`}
+                                                            {pkg.service_category_name ? ` · ${pkg.service_category_name}` : ''}
+                                                        </div>
+                                                        {currentStaffIds.length > 0 && (
+                                                            <div className="mt-1 text-xs text-text-secondary">
+                                                                Currently assigned:
+                                                                {(pkg.staff_members_details || []).slice(0, 3).map((s, i) => (
+                                                                    <span key={typeof s === 'object' ? s.id : s} className="ml-1 font-medium text-text-primary">
+                                                                        {typeof s === 'object' ? `${s.first_name} ${s.last_name}` : `#${s}`}{i < Math.min((pkg.staff_members_details || []).length, 3) - 1 ? ',' : ''}
+                                                                    </span>
+                                                                ))}
+                                                                {(pkg.staff_members_details || []).length > 3 && (
+                                                                    <span className="ml-1 text-text-secondary">+{(pkg.staff_members_details || []).length - 3} more</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Error */}
+                            {assignError && (
+                                <div className="rounded-button bg-error/10 border border-error/20 px-3 py-2 text-sm text-error flex items-center gap-2">
+                                    <X className="w-4 h-4 flex-shrink-0" />
+                                    {assignError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="border-t border-border px-6 py-4 flex gap-3 bg-surface rounded-b-card flex-shrink-0">
+                            <Button
+                                type="button"
+                                variant="primary"
+                                disabled={assignSaving || !assignStaffId || assignSelectedPkgs.length === 0}
+                                onClick={handleAssignSave}
+                                className="flex-1"
+                            >
+                                {assignSaving
+                                    ? 'Assigning…'
+                                    : `Assign to ${assignSelectedPkgs.length} Package${assignSelectedPkgs.length !== 1 ? 's' : ''}`}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={closeAssignModal}
+                                className="flex-shrink-0"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 import {
@@ -13,7 +13,12 @@ import {
     Search,
     Filter,
     Users,
-    Activity
+    Activity,
+    Package,
+    ChevronRight,
+    X,
+    CheckSquare,
+    Square,
 } from 'lucide-react';
 import PopupMessage from './PopupMessage';
 
@@ -43,6 +48,7 @@ export default function CouponManagement() {
     });
 
     const [allPackages, setAllPackages] = useState([]);
+    const [allEvents, setAllEvents] = useState([]);
 
     // Modal states
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -62,6 +68,134 @@ export default function CouponManagement() {
 
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Package picker for per-package coupon restriction
+    const [pkgPickerOpen, setPkgPickerOpen] = useState(false);
+    const [pkgPickerSearch, setPkgPickerSearch] = useState('');
+    const pkgPickerRef = useRef(null);
+
+    // Event picker for per-event coupon restriction
+    const [evtPickerOpen, setEvtPickerOpen] = useState(false);
+    const [evtPickerSearch, setEvtPickerSearch] = useState('');
+
+    // Close picker when clicking outside (no longer used for modal, kept for safety)
+    useEffect(() => {
+        if (!pkgPickerOpen) return;
+        const handleClick = (e) => {
+            if (pkgPickerRef.current && !pkgPickerRef.current.contains(e.target)) {
+                setPkgPickerOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [pkgPickerOpen]);
+
+    // Derive which events are individually selected from applicable_to
+    const selectedEventIds = formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('event')
+        ? []
+        : formData.applicable_to.split(',').filter(t => t.startsWith('event:')).map(t => Number(t.split(':')[1]));
+
+    const allEvtChecked = formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('event');
+
+    function toggleEvent(evtId) {
+        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x && !x.startsWith('event:') && x !== 'event');
+        if (allEvtChecked) {
+            const allIds = allEvents.map(e => e.id).filter(id => id !== evtId);
+            setFormData({ ...formData, applicable_to: [...current, ...allIds.map(id => `event:${id}`)].join(',') });
+        } else {
+            const key = `event:${evtId}`;
+            let newSelected;
+            if (selectedEventIds.includes(evtId)) {
+                newSelected = selectedEventIds.filter(id => id !== evtId).map(id => `event:${id}`);
+            } else {
+                newSelected = [...selectedEventIds.map(id => `event:${id}`), key];
+            }
+            if (newSelected.length === allEvents.length && allEvents.length > 0) {
+                newSelected = [];
+                current.push('event');
+            }
+            setFormData({ ...formData, applicable_to: [...current, ...newSelected].join(',') });
+        }
+    }
+
+    function selectAllEvents() {
+        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x && !x.startsWith('event:') && x !== 'event');
+        current.push('event');
+        setFormData({ ...formData, applicable_to: current.join(',') });
+    }
+
+    function deselectAllEvents() {
+        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x && !x.startsWith('event:') && x !== 'event');
+        setFormData({ ...formData, applicable_to: current.join(',') });
+    }
+
+    const filteredPickerEvents = (() => {
+        const q = evtPickerSearch.toLowerCase();
+        if (!q) return allEvents;
+        const exact = [], prefix = [], contains = [];
+        for (const e of allEvents) {
+            const t = (e.title || '').toLowerCase();
+            if (t === q) exact.push(e);
+            else if (t.startsWith(q)) prefix.push(e);
+            else if (t.includes(q)) contains.push(e);
+        }
+        return [...exact, ...prefix, ...contains];
+    })();
+
+    // Derive which packages are individually selected from applicable_to
+    const selectedPackageIds = formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('package')
+        ? [] // All selected — no need to track individually
+        : formData.applicable_to.split(',').filter(t => t.startsWith('package:')).map(t => Number(t.split(':')[1]));
+
+    // Whether the "All packages" checkbox for packages is checked
+    const allPkgChecked = formData.applicable_to === 'all' || formData.applicable_to.split(',').includes('package');
+
+    function togglePackage(pkgId) {
+        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x && !x.startsWith('package:') && x !== 'package');
+        
+        if (allPkgChecked) {
+            // Transition from "all" to explicit individual selections minus the toggled one
+            const allIds = allPackages.map(p => p.id).filter(id => id !== pkgId);
+            setFormData({ ...formData, applicable_to: [...current, ...allIds.map(id => `package:${id}`)].join(',') });
+        } else {
+            const key = `package:${pkgId}`;
+            if (selectedPackageIds.includes(pkgId)) {
+                current = [...current, ...selectedPackageIds.filter(id => id !== pkgId).map(id => `package:${id}`)];
+            } else {
+                current = [...current, ...selectedPackageIds.map(id => `package:${id}`), key];
+            }
+            // Optional: If this action causes ALL packages to be selected explicitly, we could auto-convert to 'package' token
+            if (current.filter(c => c.startsWith('package:')).length === allPackages.length && allPackages.length > 0) {
+                current = current.filter(c => !c.startsWith('package:'));
+                current.push('package');
+            }
+            setFormData({ ...formData, applicable_to: current.join(',') });
+        }
+    }
+
+    function selectAllPackages() {
+        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x && !x.startsWith('package:') && x !== 'package');
+        current.push('package');
+        setFormData({ ...formData, applicable_to: current.join(',') });
+    }
+
+    function deselectAllPackages() {
+        let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x && !x.startsWith('package:') && x !== 'package');
+        setFormData({ ...formData, applicable_to: current.join(',') });
+    }
+
+    const filteredPickerPackages = (() => {
+        const q = pkgPickerSearch.toLowerCase();
+        if (!q) return allPackages;
+        const exact = [], prefix = [], contains = [];
+        for (const p of allPackages) {
+            const t = (p.title || '').toLowerCase();
+            if (t === q) exact.push(p);
+            else if (t.startsWith(q)) prefix.push(p);
+            else if (t.includes(q)) contains.push(p);
+        }
+        return [...exact, ...prefix, ...contains];
+    })();
+
     // Preload assets to resolve names in usage history
     useEffect(() => {
         const preloadAssets = async () => {
@@ -75,6 +209,12 @@ export default function CouponManagement() {
                     apiClient.get(endpoints.coaching.simulatorPackagesActive)
                 ]);
                 setAllPackages([...(cPackages.data || []), ...(sPackages.data || [])]);
+
+                // Fetch special events for coupon restriction picker
+                try {
+                    const evRes = await apiClient.get(endpoints.specialEvents.list);
+                    setAllEvents(evRes.data?.results || evRes.data || []);
+                } catch (_) { /* non-critical */ }
             } catch (err) {
                 console.error('Failed to preload assets:', err);
             }
@@ -353,18 +493,31 @@ export default function CouponManagement() {
                                                 <span className="text-[10px] font-semibold text-text-secondary uppercase">
                                                     {coupon.applicable_to === 'all' ? 'Global Coupon' :
                                                         coupon.applicable_to.split(',').map(t => {
-                                                            const map = {
-                                                                'simulator': 'Simulator',
-                                                                'package': 'Packages',
-                                                                'event': 'Events',
-                                                                'asset': 'All Assets'
-                                                            };
-                                                            if (t.trim().startsWith('asset:')) {
-                                                                const aid = t.trim().split(':')[1];
+                                                            const tok = t.trim();
+                                                            // top-level generic tokens
+                                                            if (tok === 'simulator') return 'Simulator';
+                                                            if (tok === 'package') return 'All Packages';
+                                                            if (tok === 'event') return 'All Events';
+                                                            if (tok === 'asset') return 'All Assets';
+                                                            // specific asset
+                                                            if (tok.startsWith('asset:')) {
+                                                                const aid = tok.split(':')[1];
                                                                 const asset = assets.find(a => a.id.toString() === aid);
                                                                 return asset ? `Asset: ${asset.name}` : `Asset #${aid}`;
                                                             }
-                                                            return map[t.trim()] || t;
+                                                            // specific package
+                                                            if (tok.startsWith('package:')) {
+                                                                const pid = tok.split(':')[1];
+                                                                const pkg = allPackages.find(p => p.id.toString() === pid);
+                                                                return pkg ? `Pkg: ${pkg.title}` : `Package #${pid}`;
+                                                            }
+                                                            // specific event
+                                                            if (tok.startsWith('event:')) {
+                                                                const eid = tok.split(':')[1];
+                                                                const evt = allEvents.find(e => e.id.toString() === eid);
+                                                                return evt ? `Event: ${evt.title}` : `Event #${eid}`;
+                                                            }
+                                                            return tok;
                                                         }).join(' | ')
                                                     }
                                                 </span>
@@ -660,31 +813,300 @@ export default function CouponManagement() {
                                                     { id: 'package', label: 'Package Purchases' },
                                                     { id: 'event', label: 'Special Events' },
                                                 ].map((opt) => (
-                                                    <div key={opt.id} className="flex items-center gap-3">
-                                                        <input
-                                                            type="checkbox"
-                                                            id={`purpose_${opt.id}`}
-                                                            disabled={formData.applicable_to === 'all'}
-                                                            checked={formData.applicable_to === 'all' || formData.applicable_to.split(',').includes(opt.id)}
-                                                            onChange={(e) => {
-                                                                let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x);
-                                                                if (e.target.checked) {
-                                                                    current.push(opt.id);
-                                                                } else {
-                                                                    current = current.filter(k => k !== opt.id);
-                                                                }
-                                                                setFormData({ ...formData, applicable_to: current.join(',') });
-                                                            }}
-                                                            className="w-4 h-4 text-primary rounded border-border focus:ring-primary disabled:opacity-40"
-                                                        />
-                                                        <label
-                                                            htmlFor={`purpose_${opt.id}`}
-                                                            className={`text-sm ${formData.applicable_to === 'all' ? 'text-text-secondary opacity-60' : 'text-text-primary'}`}
-                                                        >
-                                                            {opt.label}
-                                                        </label>
+                                                    <div key={opt.id} className="flex flex-col gap-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                id={`purpose_${opt.id}`}
+                                                                disabled={formData.applicable_to === 'all'}
+                                                                checked={formData.applicable_to === 'all' || formData.applicable_to.split(',').includes(opt.id)}
+                                                                onChange={(e) => {
+                                                                    let current = formData.applicable_to === 'all' ? [] : formData.applicable_to.split(',').filter(x => x);
+                                                                    if (e.target.checked) {
+                                                                        if (opt.id === 'package') {
+                                                                            // Remove any individual package:ID tokens when checking "all packages"
+                                                                            current = current.filter(k => !k.startsWith('package:'));
+                                                                        }
+                                                                        current.push(opt.id);
+                                                                    } else {
+                                                                        current = current.filter(k => k !== opt.id);
+                                                                        if (opt.id === 'package') {
+                                                                            // Also remove individual package:ID tokens
+                                                                            current = current.filter(k => !k.startsWith('package:'));
+                                                                        }
+                                                                        if (opt.id === 'event') {
+                                                                            // Also remove individual event:ID tokens
+                                                                            current = current.filter(k => !k.startsWith('event:'));
+                                                                        }
+                                                                    }
+                                                                    setFormData({ ...formData, applicable_to: current.join(',') });
+                                                                }}
+                                                                className="w-4 h-4 text-primary rounded border-border focus:ring-primary disabled:opacity-40"
+                                                            />
+                                                            <label
+                                                                htmlFor={`purpose_${opt.id}`}
+                                                                className={`text-sm ${formData.applicable_to === 'all' ? 'text-text-secondary opacity-60' : 'text-text-primary'}`}
+                                                            >
+                                                                {opt.label}
+                                                            </label>
+                                                        </div>
+
+                                                        {/* "View Packages" button — only shown for the 'package' option */}
+
+                                                        {opt.id === 'package' && formData.applicable_to !== 'all' && (
+                                                            <div className="relative w-full mt-1" ref={opt.id === 'package' ? pkgPickerRef : null}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setPkgPickerOpen(v => !v)}
+                                                                    className="flex items-center justify-between w-full text-xs font-medium text-primary border border-primary/20 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-md transition-all"
+                                                                >
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <Package className="w-3.5 h-3.5" />
+                                                                        <span>
+                                                                            {allPkgChecked
+                                                                                ? `View (${allPackages.length})`
+                                                                                : selectedPackageIds.length > 0
+                                                                                    ? `View (${selectedPackageIds.length})`
+                                                                                    : 'View'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <ChevronRight className={`w-3.5 h-3.5 transition-transform ${pkgPickerOpen ? 'rotate-90' : ''}`} />
+                                                                </button>
+
+                                                                {/* Package Picker Modal */}
+                                                                {pkgPickerOpen && (
+                                                                    <div
+                                                                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                                                                        onClick={() => setPkgPickerOpen(false)}
+                                                                    >
+                                                                        <div
+                                                                            className="w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                                                                            onClick={e => e.stopPropagation()}
+                                                                            style={{ maxHeight: '80vh' }}
+                                                                        >
+                                                                            {/* Picker header */}
+                                                                            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
+                                                                                <span className="text-sm font-bold text-text-primary uppercase tracking-wide">Select Packages</span>
+                                                                                <button type="button" onClick={() => setPkgPickerOpen(false)} className="text-text-secondary hover:text-text-primary">
+                                                                                    <X className="w-5 h-5" />
+                                                                                </button>
+                                                                            </div>
+
+                                                                            {/* Hint */}
+                                                                            <div className="px-4 py-3 bg-surface">
+                                                                                <p className="text-xs text-text-secondary leading-relaxed">
+                                                                                    Check the <span className="font-semibold text-text-primary">"Package Purchases"</span> box in the main form to apply to all packages, or select individual ones below.
+                                                                                </p>
+                                                                            </div>
+
+                                                                            {/* Search */}
+                                                                            <div className="px-4 pb-3">
+                                                                                <div className="relative">
+                                                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+                                                                                    <input
+                                                                                        type="search"
+                                                                                        placeholder="Search packages..."
+                                                                                        value={pkgPickerSearch}
+                                                                                        onChange={e => setPkgPickerSearch(e.target.value)}
+                                                                                        className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Select All Checkbox */}
+                                                                            <div className="px-4 py-2 border-y border-border bg-background/50">
+                                                                                <label className="flex items-center gap-3 cursor-pointer hover:opacity-80">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={allPkgChecked || (filteredPickerPackages.length > 0 && filteredPickerPackages.every(p => selectedPackageIds.includes(p.id)))}
+                                                                                        onChange={(e) => {
+                                                                                            if (e.target.checked) selectAllPackages();
+                                                                                            else deselectAllPackages();
+                                                                                        }}
+                                                                                        className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                                                                                    />
+                                                                                    <span className="text-sm font-semibold text-text-primary">Select All</span>
+                                                                                </label>
+                                                                            </div>
+
+                                                                            {/* Package list */}
+                                                                            <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                                                                                {filteredPickerPackages.length === 0 ? (
+                                                                                    <div className="py-8 text-sm text-text-secondary text-center">No packages found.</div>
+                                                                                ) : filteredPickerPackages.map(pkg => {
+                                                                                    const isSelected = allPkgChecked || selectedPackageIds.includes(pkg.id);
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={pkg.id}
+                                                                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                                                                                                isSelected ? 'bg-primary/5' : 'hover:bg-background'
+                                                                                            }`}
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isSelected}
+                                                                                                onChange={() => togglePackage(pkg.id)}
+                                                                                                className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                                                                                            />
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="text-sm font-medium text-text-primary truncate">{pkg.title}</div>
+                                                                                                {pkg.price && <div className="text-xs text-text-secondary mt-0.5">${pkg.price}</div>}
+                                                                                            </div>
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+
+                                                                            {/* Footer */}
+                                                                            <div className="px-4 py-3 border-t border-border bg-background flex justify-between items-center">
+                                                                                <div className="text-xs text-text-secondary font-medium">
+                                                                                    {!allPkgChecked && selectedPackageIds.length > 0
+                                                                                        ? <span className="text-primary bg-primary/10 px-2 py-1 rounded-md">{selectedPackageIds.length} selected</span>
+                                                                                        : 'No packages selected individually'}
+                                                                                </div>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setPkgPickerOpen(false)}
+                                                                                    className="px-4 py-1.5 bg-primary text-white text-sm font-semibold rounded-md hover:bg-primary-hover transition-colors"
+                                                                                >
+                                                                                    Done
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* "View Events" button — only shown for the 'event' option */}
+
+                                                        {opt.id === 'event' && formData.applicable_to !== 'all' && (
+                                                            <div className="relative w-full mt-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEvtPickerOpen(v => !v)}
+                                                                    className="flex items-center justify-between w-full text-xs font-medium text-primary border border-primary/20 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-md transition-all"
+                                                                >
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <Calendar className="w-3.5 h-3.5" />
+                                                                        <span>
+                                                                            {allEvtChecked
+                                                                                ? `View (${allEvents.length})`
+                                                                                : selectedEventIds.length > 0
+                                                                                    ? `View (${selectedEventIds.length})`
+                                                                                    : 'View'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <ChevronRight className={`w-3.5 h-3.5 transition-transform ${evtPickerOpen ? 'rotate-90' : ''}`} />
+                                                                </button>
+
+                                                                {/* Event Picker Modal */}
+                                                                {evtPickerOpen && (
+                                                                    <div
+                                                                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                                                                        onClick={() => setEvtPickerOpen(false)}
+                                                                    >
+                                                                        <div
+                                                                            className="w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                                                                            onClick={e => e.stopPropagation()}
+                                                                            style={{ maxHeight: '80vh' }}
+                                                                        >
+                                                                            {/* Header */}
+                                                                            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
+                                                                                <span className="text-sm font-bold text-text-primary uppercase tracking-wide">Select Special Events</span>
+                                                                                <button type="button" onClick={() => setEvtPickerOpen(false)} className="text-text-secondary hover:text-text-primary">
+                                                                                    <X className="w-5 h-5" />
+                                                                                </button>
+                                                                            </div>
+
+                                                                            {/* Hint */}
+                                                                            <div className="px-4 py-3 bg-surface">
+                                                                                <p className="text-xs text-text-secondary leading-relaxed">
+                                                                                    Check the <span className="font-semibold text-text-primary">"Special Events"</span> box in the main form to apply to all events, or select individual ones below.
+                                                                                </p>
+                                                                            </div>
+
+                                                                            {/* Search */}
+                                                                            <div className="px-4 pb-3">
+                                                                                <div className="relative">
+                                                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+                                                                                    <input
+                                                                                        type="search"
+                                                                                        placeholder="Search events..."
+                                                                                        value={evtPickerSearch}
+                                                                                        onChange={e => setEvtPickerSearch(e.target.value)}
+                                                                                        className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Select All Checkbox */}
+                                                                            <div className="px-4 py-2 border-y border-border bg-background/50">
+                                                                                <label className="flex items-center gap-3 cursor-pointer hover:opacity-80">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={allEvtChecked || (filteredPickerEvents.length > 0 && filteredPickerEvents.every(e => selectedEventIds.includes(e.id)))}
+                                                                                        onChange={(e) => {
+                                                                                            if (e.target.checked) selectAllEvents();
+                                                                                            else deselectAllEvents();
+                                                                                        }}
+                                                                                        className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                                                                                    />
+                                                                                    <span className="text-sm font-semibold text-text-primary">Select All</span>
+                                                                                </label>
+                                                                            </div>
+
+                                                                            {/* Event list */}
+                                                                            <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                                                                                {filteredPickerEvents.length === 0 ? (
+                                                                                    <div className="py-8 text-sm text-text-secondary text-center">No events found.</div>
+                                                                                ) : filteredPickerEvents.map(evt => {
+                                                                                    const isSelected = allEvtChecked || selectedEventIds.includes(evt.id);
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={evt.id}
+                                                                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                                                                                                isSelected ? 'bg-primary/5' : 'hover:bg-background'
+                                                                                            }`}
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isSelected}
+                                                                                                onChange={() => toggleEvent(evt.id)}
+                                                                                                className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                                                                                            />
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="text-sm font-medium text-text-primary truncate">{evt.title}</div>
+                                                                                                {evt.price && <div className="text-xs text-text-secondary mt-0.5">${evt.price}</div>}
+                                                                                            </div>
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+
+                                                                            {/* Footer */}
+                                                                            <div className="px-4 py-3 border-t border-border bg-background flex justify-between items-center">
+                                                                                <div className="text-xs text-text-secondary font-medium">
+                                                                                    {!allEvtChecked && selectedEventIds.length > 0
+                                                                                        ? <span className="text-primary bg-primary/10 px-2 py-1 rounded-md">{selectedEventIds.length} selected</span>
+                                                                                        : 'No events selected individually'}
+                                                                                </div>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setEvtPickerOpen(false)}
+                                                                                    className="px-4 py-1.5 bg-primary text-white text-sm font-semibold rounded-md hover:bg-primary-hover transition-colors"
+                                                                                >
+                                                                                    Done
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
+
                                             </div>
 
                                             <div className="pt-3 border-t border-border/50">

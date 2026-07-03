@@ -23,6 +23,12 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
     const cardContainerRef = useRef(null);
     const paymentsRef = useRef(null);
 
+    // ---- Coupon states --------------------------------------------------
+    const [couponCode, setCouponCode] = useState('');
+    const [validatingCoupon, setValidatingCoupon] = useState(false);
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponError, setCouponError] = useState('');
+
     // Fetch Square config (application_id, location_id, environment)
     useEffect(() => {
         if (!isOpen || !locationId) return;
@@ -82,6 +88,32 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
     }, [squareLoaded, sqAppId, sqLocationId, step]);
 
 
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim() || !pkg) return;
+        setValidatingCoupon(true);
+        setCouponError('');
+        setAppliedCoupon(null);
+        try {
+            const response = await apiClient.post(endpoints.coupons.validate, {
+                code: couponCode,
+                amount: Number(pkg.price || 0),
+                payment_type: 'package',
+                package_id: pkg.id,
+            });
+            setAppliedCoupon(response.data);
+        } catch (err) {
+            setCouponError(err.response?.data?.error || 'Invalid coupon code.');
+        } finally {
+            setValidatingCoupon(false);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponCode('');
+        setCouponError('');
+    };
+
     const handleSubscribe = async () => {
         if (!squareCard) return;
         setPaymentError('');
@@ -97,6 +129,7 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
                 source_id: result.token,
                 package_id: pkg.id,
                 location_id: locationId,
+                ...(appliedCoupon ? { coupon_code: appliedCoupon.code } : {}),
             }));
             if (subscribeMembership.fulfilled.match(res)) {
                 dispatch(getMyMemberships());
@@ -116,14 +149,19 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
         setSquareLoaded(false);
         setSquareCard(null);
         setPaymentError('');
+        setCouponCode('');
+        setAppliedCoupon(null);
+        setCouponError('');
         onClose();
     };
 
     if (!isOpen || !pkg) return null;
 
     const basePrice = Number(pkg.price || 0);
-    const taxAmount = Math.round(basePrice * 0.14 * 100) / 100;
-    const totalMonthlyPrice = Math.round((basePrice + taxAmount) * 100) / 100;
+    const TAX_RATE = 0.14;
+    const discountedBase = appliedCoupon ? appliedCoupon.final_amount : basePrice;
+    const taxAmount = Math.round(discountedBase * TAX_RATE * 100) / 100;
+    const totalMonthlyPrice = Math.round((discountedBase + taxAmount) * 100) / 100;
 
     const renderSuccessDetails = () => {
         const details = [];
@@ -182,6 +220,12 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
                                     <span className="text-sm text-text-secondary">Base Price</span>
                                     <span className="text-sm font-medium text-text-primary">${basePrice.toFixed(2)}/mo</span>
                                 </div>
+                                {appliedCoupon && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-green-600">Coupon Discount</span>
+                                        <span className="text-sm font-semibold text-green-600">-${Number(appliedCoupon.discount_amount).toFixed(2)}</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm text-text-secondary">HST (14%)</span>
                                     <span className="text-sm font-medium text-text-primary">+${taxAmount.toFixed(2)}/mo</span>
@@ -227,6 +271,39 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
                                     You can cancel anytime from your memberships panel. Unused hours and sessions do not carry over.
                                 </p>
                             </div>
+                            {/* Coupon Section */}
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Have a coupon?</p>
+                                {appliedCoupon ? (
+                                    <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
+                                        <div>
+                                            <span className="text-sm font-bold text-green-700">{appliedCoupon.code}</span>
+                                            <span className="text-xs text-green-600 ml-2">-${Number(appliedCoupon.discount_amount).toFixed(2)} off</span>
+                                        </div>
+                                        <button onClick={handleRemoveCoupon} className="text-xs text-green-600 hover:text-red-500 font-medium transition-colors">Remove</button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={couponCode}
+                                            onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                                            onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                                            placeholder="Coupon code"
+                                            className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background text-text-primary outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
+                                        />
+                                        <button
+                                            onClick={handleApplyCoupon}
+                                            disabled={validatingCoupon || !couponCode.trim()}
+                                            className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
+                                        >
+                                            {validatingCoupon ? '...' : 'Apply'}
+                                        </button>
+                                    </div>
+                                )}
+                                {couponError && <p className="text-xs text-red-500">{couponError}</p>}
+                            </div>
+
                             <button
                                 onClick={() => setStep('payment')}
                                 className="w-full py-3 bg-primary text-white rounded-button font-semibold hover:bg-primary/90 transition-all"

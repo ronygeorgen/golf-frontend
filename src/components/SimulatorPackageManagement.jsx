@@ -35,6 +35,7 @@ function SimulatorPackageManagement() {
         service_category: '',
         is_membership: false,
         monthly_hours: '',
+        hide_price_on_card: false,
     };
     const [formData, setFormData] = useState(emptyForm);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -172,6 +173,7 @@ function SimulatorPackageManagement() {
             service_category: pkg.service_category_id ?? pkg.service_category ?? '',
             is_membership: pkg.is_membership || false,
             monthly_hours: pkg.monthly_hours !== null && pkg.monthly_hours !== undefined ? parseFloat(pkg.monthly_hours) : '',
+            hide_price_on_card: pkg.hide_price_on_card || false,
         });
         setShowForm(true);
     };
@@ -680,6 +682,17 @@ function SimulatorPackageManagement() {
                                         />
                                         <label className="ml-2 text-sm font-medium text-text-primary">
                                             Active
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.hide_price_on_card}
+                                            onChange={(e) => setFormData({...formData, hide_price_on_card: e.target.checked})}
+                                            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                                        />
+                                        <label className="ml-2 text-sm font-medium text-text-primary">
+                                            Hide Price on Card (Show only in details)
                                         </label>
                                     </div>
                                 </div>

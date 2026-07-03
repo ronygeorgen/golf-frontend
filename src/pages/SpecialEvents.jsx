@@ -337,6 +337,7 @@ function SpecialEvents() {
                 paymentType="event"
                 description={squarePayment.eventTitle}
                 disableCoupons={!user}
+                eventId={squarePayment.eventId}
             />
         </div>
     );

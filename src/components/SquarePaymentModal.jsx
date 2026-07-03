@@ -37,6 +37,8 @@ export default function SquarePaymentModal({
     paymentType,
     description = 'Payment',
     disableCoupons = false,  // set true for guest flows where coupons are not offered
+    packageId = null,        // pass the specific package ID so per-package coupon restrictions work
+    eventId = null,          // pass the specific event ID so per-event coupon restrictions work
 }) {
     const cardContainerRef = useRef(null);
     const paymentsRef = useRef(null);
@@ -171,11 +173,20 @@ export default function SquarePaymentModal({
         setAppliedCoupon(null);
 
         try {
-            const response = await apiClient.post(endpoints.coupons.validate, {
+            const payload = {
                 code: couponCode,
                 amount: amount,
                 payment_type: paymentType,
-            });
+            };
+            // Include the specific package ID so per-package coupon restrictions are enforced
+            if (paymentType === 'package' && packageId) {
+                payload.package_id = packageId;
+            }
+            // Include the specific event ID so per-event coupon restrictions are enforced
+            if (paymentType === 'event' && eventId) {
+                payload.event_id = eventId;
+            }
+            const response = await apiClient.post(endpoints.coupons.validate, payload);
             setAppliedCoupon(response.data);
         } catch (err) {
             const msg = err.response?.data?.error || 'Invalid coupon code.';

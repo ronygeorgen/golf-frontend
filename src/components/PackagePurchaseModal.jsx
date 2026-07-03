@@ -570,6 +570,7 @@ function PackagePurchaseModal({
                 amount={squarePayment.amount}
                 currency="CAD"
                 paymentType="package"
+                packageId={packageId}
                 description={squarePayment.packageTitle}
                 disableCoupons={!user}
             />
