@@ -502,7 +502,7 @@ function AdminLayout() {
                                                         className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-text-primary hover:bg-background transition-colors"
                                                     >
                                                         <Link2 className="w-4 h-4" />
-                                                        <span>Onboard GHL</span>
+                                                        <span>Onboard Perform</span>
                                                     </button>
                                                 )}
                                                 <button
