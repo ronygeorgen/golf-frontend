@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import apiClient from '../../api/axios';
+import { apiClientSilent as apiClient } from '../../api/axios';
 import { endpoints } from '../../api/endpoints';
 
 // Helper function to trim location_id (remove leading/trailing whitespace and '+' characters)

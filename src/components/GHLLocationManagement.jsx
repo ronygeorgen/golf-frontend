@@ -96,6 +96,9 @@ function GHLLocationManagement() {
 
     // Tax rate field (stored/sent as decimal 0–1, displayed/edited as percentage 0–100)
     const [taxRatePercent, setTaxRatePercent] = useState('14');
+    
+    // Status
+    const [locationStatus, setLocationStatus] = useState('active');
 
     // Logo upload state
     const [logoPreview, setLogoPreview] = useState(null);      // data URL for preview
@@ -175,6 +178,7 @@ function GHLLocationManagement() {
         // Convert decimal to percentage for display (e.g. 0.14 → "14")
         const rate = location.tax_rate != null ? parseFloat(location.tax_rate) : 0.14;
         setTaxRatePercent(String(parseFloat((rate * 100).toFixed(4))));
+        setLocationStatus(location.status || 'active');
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -200,6 +204,7 @@ function GHLLocationManagement() {
                     business_id: businessId,
                     refund_policy: refundPolicy,
                     tax_rate: taxRateDecimal,
+                    status: locationStatus,
                 }
             );
 
@@ -215,6 +220,7 @@ function GHLLocationManagement() {
                             business_id: businessId,
                             refund_policy: refundPolicy,
                             tax_rate: taxRateDecimal,
+                            status: locationStatus,
                           }
                         : loc
                 ));
@@ -466,6 +472,31 @@ function GHLLocationManagement() {
                                             disabled
                                             className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary cursor-not-allowed"
                                         />
+                                    </div>
+
+                                    {/* Status Toggle */}
+                                    <div className="flex items-center justify-between p-4 border border-border rounded-button bg-surface">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-text-primary">Location Status</h3>
+                                            <p className="text-xs text-text-secondary mt-0.5">Toggle whether this location is active or disabled.</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-sm font-medium ${locationStatus === 'active' ? 'text-primary' : 'text-text-secondary'}`}>
+                                                {locationStatus === 'active' ? 'Active' : 'Inactive'}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setLocationStatus(prev => prev === 'active' ? 'inactive' : 'active')}
+                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${locationStatus === 'active' ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}
+                                                role="switch"
+                                                aria-checked={locationStatus === 'active'}
+                                            >
+                                                <span
+                                                    aria-hidden="true"
+                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${locationStatus === 'active' ? 'translate-x-5' : 'translate-x-0'}`}
+                                                />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Company Name */}

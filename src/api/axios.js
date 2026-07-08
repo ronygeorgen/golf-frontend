@@ -1,99 +1,108 @@
 import axios from 'axios';
+import toastEmitter from '../utils/toastEmitter';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-// Create axios instance
-const apiClient = axios.create({
-    baseURL: API_URL,
-    headers: {
-        'Content-Type': 'application/json',
-        // 'ngrok-skip-browser-warning': 'true',
-    },
-});
+// ─── Shared request interceptor (auth token + location_id) ───────────────────
+const attachAuthAndLocation = (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Token ${token}`;
+    }
 
-// Request interceptor
-apiClient.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Token ${token}`;
-        }
-        
-        // Add location_id to all requests (GET, POST, PUT, DELETE, PATCH)
-        const locationId = localStorage.getItem('locationId');
-        if (locationId) {
-            // Trim location_id to remove leading/trailing whitespace and '+' characters
-            const trimmedLocationId = locationId.trim().replace(/\+$/, '').trim();
-            
-            // Only add if location_id is not empty after trimming
-            if (trimmedLocationId) {
-                // For GET requests, add as query parameter
-                if (config.method === 'get' || config.method === 'GET') {
+    const locationId = localStorage.getItem('locationId');
+    if (locationId) {
+        const trimmedLocationId = locationId.trim().replace(/\+$/, '').trim();
+        if (trimmedLocationId) {
+            if (config.method === 'get' || config.method === 'GET') {
+                config.params = config.params || {};
+                config.params.location_id = trimmedLocationId;
+            } else {
+                if (Array.isArray(config.data) || config.data instanceof FormData) {
                     config.params = config.params || {};
                     config.params.location_id = trimmedLocationId;
+                } else if (typeof config.data === 'object' && config.data !== null) {
+                    config.data.location_id = trimmedLocationId;
                 } else {
-                    // For POST, PUT, DELETE, PATCH, add to request body
-                    // But if data is a list or FormData, add as query parameter instead
-                    if (Array.isArray(config.data) || config.data instanceof FormData) {
-                        // If data is a list or FormData, add location_id as query parameter
-                        config.params = config.params || {};
-                        config.params.location_id = trimmedLocationId;
-                    } else if (typeof config.data === 'object' && config.data !== null) {
-                        // If data is an object (dict), add location_id to the body
-                        config.data.location_id = trimmedLocationId;
-                    } else {
-                        // If data is null/undefined, create an object with location_id
-                        config.data = { location_id: trimmedLocationId };
-                    }
+                    config.data = { location_id: trimmedLocationId };
                 }
             }
         }
-        
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
     }
-);
 
-// Response interceptor
+    return config;
+};
+
+const rejectRequest = (error) => Promise.reject(error);
+
+// ─── Shared 401 logout handler ────────────────────────────────────────────────
+const handle401 = (error) => {
+    const isGuestBookingPage = window.location.pathname === '/guest-booking';
+    if (error.response?.status === 401 && !isGuestBookingPage) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/signin';
+    }
+};
+
+// =============================================================================
+// apiClient — default client for direct component calls.
+// Shows a global toast on 403 / 500 errors.
+// =============================================================================
+const apiClient = axios.create({
+    baseURL: API_URL,
+    headers: { 'Content-Type': 'application/json' },
+});
+
+apiClient.interceptors.request.use(attachAuthAndLocation, rejectRequest);
+
 apiClient.interceptors.response.use(
-    (response) => {
-        return response;
-    },
+    (response) => response,
     (error) => {
-        // Handle 401 Unauthorized - logout user
-        // Don't redirect if we're on a guest booking page (they don't need auth)
-        const isGuestBookingPage = window.location.pathname === '/guest-booking';
-        if (error.response?.status === 401 && !isGuestBookingPage) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/signin';
+        handle401(error);
+
+        // If the caller set skipGlobalToast: true on the config, skip the toast.
+        const skipGlobalToast = error.config?.skipGlobalToast === true;
+
+        if (!skipGlobalToast && error.response?.status === 403) {
+            const msg =
+                error.response.data?.detail ||
+                error.response.data?.error ||
+                error.response.data?.message ||
+                'Access denied. Your location may be inactive.';
+            toastEmitter.emit('error', msg);
         }
-        
-        // Handle 403 Forbidden
-        if (error.response?.status === 403) {
-            console.error('Access forbidden:', error.response.data);
+
+        if (!skipGlobalToast && error.response?.status >= 500) {
+            const msg =
+                error.response.data?.detail ||
+                error.response.data?.error ||
+                'A server error occurred. Please try again.';
+            toastEmitter.emit('error', msg);
         }
-        
-        // Handle 500 Server Error
-        if (error.response?.status >= 500) {
-            console.error('Server error:', error.response.data);
-        }
-        
+
         return Promise.reject(error);
     }
 );
 
 export default apiClient;
 
+// =============================================================================
+// apiClientSilent — for Redux slices (createAsyncThunk).
+// Identical auth/location logic but never shows the global 403/500 toast,
+// because thunks use rejectWithValue and components show their own errors.
+// =============================================================================
+export const apiClientSilent = axios.create({
+    baseURL: API_URL,
+    headers: { 'Content-Type': 'application/json' },
+});
 
+apiClientSilent.interceptors.request.use(attachAuthAndLocation, rejectRequest);
 
-
-
-
-
-
-
-
-
+apiClientSilent.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        handle401(error);
+        return Promise.reject(error);
+    }
+);

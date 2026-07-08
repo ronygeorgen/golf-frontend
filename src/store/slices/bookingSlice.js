@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import apiClient from '../../api/axios';
+import { apiClientSilent as apiClient } from '../../api/axios';
 import { endpoints } from '../../api/endpoints';
 import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../../constants/bookingCopy';
 

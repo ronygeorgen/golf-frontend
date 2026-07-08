@@ -47,7 +47,7 @@ function Toast({ message, type = 'info', onClose, duration = 5000 }) {
     }, [duration, onClose]);
 
     return (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+        <div className="fixed top-4 right-4 z-[9999] animate-slide-in-right">
             <div className={`${config.bgColor} ${config.borderColor} border-l-4 p-4 rounded-lg shadow-lg max-w-md`}>
                 <div className="flex items-start">
                     <div className="flex-shrink-0">

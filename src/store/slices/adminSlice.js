@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import apiClient from '../../api/axios';
+import { apiClientSilent as apiClient } from '../../api/axios';
 import { endpoints } from '../../api/endpoints';
 
 // Dashboard thunks

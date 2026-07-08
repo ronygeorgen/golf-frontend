@@ -45,6 +45,7 @@ import StaffCoachingSessionsCalendarAdmin from './pages/StaffCoachingSessionsCal
 import StaffReferrals from './pages/StaffReferrals';
 import Profile from './pages/Profile';
 import MemberList from './pages/MemberList';
+import GlobalToast from './components/GlobalToast';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -267,6 +268,7 @@ function App() {
     return (
         <Router>
             <div className="App">
+                <GlobalToast />
                 <AppContent />
             </div>
         </Router>
