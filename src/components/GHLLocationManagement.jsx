@@ -4,7 +4,7 @@ import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
-import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle, Phone, Mail, Building2, Percent } from 'lucide-react';
+import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle, Phone, Mail, Building2, Percent, Bell } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
@@ -99,6 +99,9 @@ function GHLLocationManagement() {
     
     // Status
     const [locationStatus, setLocationStatus] = useState('active');
+    
+    // Notifications routing
+    const [notificationsLocationId, setNotificationsLocationId] = useState('');
 
     // Logo upload state
     const [logoPreview, setLogoPreview] = useState(null);      // data URL for preview
@@ -171,6 +174,7 @@ function GHLLocationManagement() {
         setCompanyName(location.company_name || '');
         setTimezone(location.timezone || 'America/Halifax');
         setTimezoneSearch('');
+        setNotificationsLocationId(location.notifications_location_id || '');
         setContactPhone(location.contact_phone || '');
         setSupportEmail(location.support_email || '');
         setBusinessId(location.business_id || '');
@@ -199,6 +203,7 @@ function GHLLocationManagement() {
                 {
                     company_name: companyName,
                     timezone,
+                    notifications_location_id: notificationsLocationId,
                     contact_phone: contactPhone,
                     support_email: supportEmail,
                     business_id: businessId,
@@ -215,6 +220,7 @@ function GHLLocationManagement() {
                             ...loc,
                             company_name: companyName,
                             timezone,
+                            notifications_location_id: notificationsLocationId,
                             contact_phone: contactPhone,
                             support_email: supportEmail,
                             business_id: businessId,
@@ -237,6 +243,7 @@ function GHLLocationManagement() {
                 setEditingLocation(null);
                 setCompanyName('');
                 setTimezone('America/Halifax');
+                setNotificationsLocationId('');
             }
         } catch (error) {
             console.error('Failed to update location settings:', error);
@@ -258,6 +265,7 @@ function GHLLocationManagement() {
         setCompanyName('');
         setTimezone('America/Halifax');
         setTimezoneSearch('');
+        setNotificationsLocationId('');
         setContactPhone('');
         setSupportEmail('');
         setBusinessId('');
@@ -592,6 +600,29 @@ function GHLLocationManagement() {
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+
+                                    {/* GHL Notifications Account Dropdown */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-text-primary mb-1">
+                                            <Bell className="inline w-4 h-4 mr-1 -mt-0.5" />
+                                            GHL Notifications Account
+                                        </label>
+                                        <p className="text-xs text-text-secondary mb-2">
+                                            Select which subaccount handles all notification pushes (OTPs, bookings) for this center.
+                                        </p>
+                                        <select
+                                            value={notificationsLocationId}
+                                            onChange={(e) => setNotificationsLocationId(e.target.value)}
+                                            className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                                        >
+                                            <option value="">— Use own account (default) —</option>
+                                            {locations.map(loc => (
+                                                <option key={loc.location_id} value={loc.location_id}>
+                                                    {loc.company_name || loc.location_id} ({loc.location_id})
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     {/* ── Invoice Contact Details ── */}
