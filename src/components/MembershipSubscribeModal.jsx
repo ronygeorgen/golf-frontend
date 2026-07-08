@@ -18,6 +18,7 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
     const [sqAppId, setSqAppId] = useState('');
     const [sqLocationId, setSqLocationId] = useState('');
     const [sqEnvironment, setSqEnvironment] = useState('sandbox');
+    const [taxRate, setTaxRate] = useState(0.14);
     const [paymentError, setPaymentError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const cardContainerRef = useRef(null);
@@ -37,6 +38,7 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
                 setSqAppId(data.application_id || data.app_id || '');
                 setSqLocationId(data.location_id || '');
                 setSqEnvironment(data.environment || 'sandbox');
+                if (data.tax_rate !== undefined) setTaxRate(data.tax_rate);
             })
             .catch(() => {});
     }, [isOpen, locationId]);
@@ -158,9 +160,8 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
     if (!isOpen || !pkg) return null;
 
     const basePrice = Number(pkg.price || 0);
-    const TAX_RATE = 0.14;
     const discountedBase = appliedCoupon ? appliedCoupon.final_amount : basePrice;
-    const taxAmount = Math.round(discountedBase * TAX_RATE * 100) / 100;
+    const taxAmount = Math.round(discountedBase * taxRate * 100) / 100;
     const totalMonthlyPrice = Math.round((discountedBase + taxAmount) * 100) / 100;
 
     const renderSuccessDetails = () => {
@@ -227,7 +228,7 @@ function MembershipSubscribeModal({ isOpen, onClose, package: pkg, locationId, o
                                     </div>
                                 )}
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm text-text-secondary">HST (14%)</span>
+                                    <span className="text-sm text-text-secondary">Tax ({(taxRate * 100).toFixed(2).replace(/\.00$/, '')}%)</span>
                                     <span className="text-sm font-medium text-text-primary">+${taxAmount.toFixed(2)}/mo</span>
                                 </div>
                                 <div className="flex items-center justify-between border-t border-primary/20 pt-2">

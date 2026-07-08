@@ -4,7 +4,7 @@ import { TableSkeleton } from './skeletons/SkeletonLoader';
 import PopupMessage from './PopupMessage';
 import usePopup from '../hooks/usePopup';
 import Button from './ui/Button';
-import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle, Phone, Mail, Building2 } from 'lucide-react';
+import { Edit, X, Globe, Upload, Trash2, Image as ImageIcon, CheckCircle, Phone, Mail, Building2, Percent } from 'lucide-react';
 import apiClient from '../api/axios';
 import { endpoints } from '../api/endpoints';
 
@@ -94,6 +94,9 @@ function GHLLocationManagement() {
     const [supportEmail, setSupportEmail] = useState('');
     const [businessId, setBusinessId] = useState('');
 
+    // Tax rate field (stored/sent as decimal 0–1, displayed/edited as percentage 0–100)
+    const [taxRatePercent, setTaxRatePercent] = useState('14');
+
     // Logo upload state
     const [logoPreview, setLogoPreview] = useState(null);      // data URL for preview
     const [logoBlob, setLogoBlob] = useState(null);             // resized Blob ready to upload
@@ -169,6 +172,9 @@ function GHLLocationManagement() {
         setSupportEmail(location.support_email || '');
         setBusinessId(location.business_id || '');
         setRefundPolicy(location.refund_policy || '');
+        // Convert decimal to percentage for display (e.g. 0.14 → "14")
+        const rate = location.tax_rate != null ? parseFloat(location.tax_rate) : 0.14;
+        setTaxRatePercent(String(parseFloat((rate * 100).toFixed(4))));
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -182,15 +188,34 @@ function GHLLocationManagement() {
 
         setSubmitLoading(true);
         try {
+            // Convert percentage to decimal for API (e.g. "14" → 0.14)
+            const taxRateDecimal = parseFloat(taxRatePercent) / 100;
             const response = await apiClient.put(
                 endpoints.ghl.admin.updateCompanyName(editingLocation.location_id),
-                { company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId, refund_policy: refundPolicy }
+                {
+                    company_name: companyName,
+                    timezone,
+                    contact_phone: contactPhone,
+                    support_email: supportEmail,
+                    business_id: businessId,
+                    refund_policy: refundPolicy,
+                    tax_rate: taxRateDecimal,
+                }
             );
 
             if (response.data) {
                 setLocations(locations.map(loc =>
                     loc.location_id === editingLocation.location_id
-                        ? { ...loc, company_name: companyName, timezone, contact_phone: contactPhone, support_email: supportEmail, business_id: businessId, refund_policy: refundPolicy }
+                        ? {
+                            ...loc,
+                            company_name: companyName,
+                            timezone,
+                            contact_phone: contactPhone,
+                            support_email: supportEmail,
+                            business_id: businessId,
+                            refund_policy: refundPolicy,
+                            tax_rate: taxRateDecimal,
+                          }
                         : loc
                 ));
 
@@ -231,6 +256,7 @@ function GHLLocationManagement() {
         setSupportEmail('');
         setBusinessId('');
         setRefundPolicy('');
+        setTaxRatePercent('14');
         setLogoPreview(null);
         setLogoBlob(null);
         setLogoBlobSize(null);
@@ -593,6 +619,31 @@ function GHLLocationManagement() {
                                         </div>
                                     </div>
 
+                                    {/* ── Tax Rate ── */}
+                                    <div className="border border-border rounded-button p-4 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Percent className="w-4 h-4 text-primary" />
+                                            <span className="text-sm font-semibold text-text-primary">Tax Rate</span>
+                                        </div>
+                                        <p className="text-xs text-text-secondary">
+                                            Applied to all Square payments at this location. Enter as a percentage (e.g. <strong>14</strong> for 14% HST).
+                                        </p>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                value={taxRatePercent}
+                                                onChange={(e) => setTaxRatePercent(e.target.value)}
+                                                placeholder="e.g. 14"
+                                                className="w-full px-4 py-3 pr-10 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                                required
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary font-medium text-sm">%</span>
+                                        </div>
+                                    </div>
+
                                     {/* ── Refund Policy ── */}
                                     <div className="border border-border rounded-button p-4 space-y-3">
                                         <div className="flex items-center gap-2">
@@ -758,6 +809,9 @@ function GHLLocationManagement() {
                                                 Refund Policy
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                                Tax Rate
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                                                 Timezone
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -807,6 +861,16 @@ function GHLLocationManagement() {
                                                         </button>
                                                     ) : (
                                                         <span className="text-xs text-text-secondary italic">Not set</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-text-secondary">
+                                                    {location.tax_rate != null ? (
+                                                        <span className="inline-flex items-center gap-1 font-medium text-text-primary">
+                                                            
+                                                            {parseFloat((parseFloat(location.tax_rate) * 100).toFixed(4))}%
+                                                        </span>
+                                                    ) : (
+                                                        <span className="italic text-xs">14% (default)</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-text-secondary">

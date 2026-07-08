@@ -16,8 +16,8 @@
  *   description    {string}   - Human-friendly label shown in the modal (e.g. "Simulator Booking - 2 hrs").
  *
  * Tax note:
- *   Nova Scotia HST (14%, effective April 1 2025) is added by the backend on top of the
- *   post-coupon base price.  This modal displays the tax breakdown for transparency.
+ *   Tax rate is configured per location in the admin panel and fetched via the Square config endpoint.
+ *   This modal displays the tax breakdown for transparency.
  *   The `amount` prop must always be the PRE-TAX base price.
  */
 import React, { useEffect, useRef, useState } from 'react';
@@ -58,18 +58,23 @@ export default function SquarePaymentModal({
     const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount_amount, final_amount, ... }
     const [couponError, setCouponError] = useState('');
 
-    // ---- Tax calculation (Nova Scotia HST 14%, effective Apr 1 2025) ------
+    // ---- Tax calculation (Configurable per location) ------
     // Tax is always applied to the post-coupon base by the backend.
-    // We compute it here only for display purposes.
-    const TAX_RATE = 0.14;
+    // We compute it here only for display purposes, using the rate returned by square config.
+    const taxRate = squareConfig?.tax_rate !== undefined ? squareConfig.tax_rate : 0.14;
     const discountedBase = appliedCoupon ? appliedCoupon.final_amount : Number(amount);
-    const taxAmount = Math.round(discountedBase * TAX_RATE * 100) / 100;
+    const taxAmount = Math.round(discountedBase * taxRate * 100) / 100;
     const finalChargeAmount = Math.round((discountedBase + taxAmount) * 100) / 100;
 
     // ---- Step 1: Fetch Square config from backend -----------------------
     useEffect(() => {
         if (!isOpen) return;
-        apiClient.get(endpoints.square.config)
+        
+        const params = new URLSearchParams();
+        if (tempId) params.append('temp_id', tempId);
+        if (paymentType) params.append('payment_type', paymentType);
+        
+        apiClient.get(`${endpoints.square.config}?${params.toString()}`)
             .then(res => {
                 setSquareConfig(res.data);
                 setConfigLoaded(true);
@@ -293,7 +298,7 @@ export default function SquarePaymentModal({
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
                                 </svg>
-                                HST (14%) — Nova Scotia
+                                Tax ({(taxRate * 100).toFixed(2).replace(/\.00$/, '')}%)
                             </span>
                             <span className="text-text-primary font-medium">+${taxAmount.toFixed(2)}</span>
                         </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signup, verifyOTP, requestOTP, clearError, clearOTP, getActiveWaiver, checkWaiverAcceptance } from '../store/slices/authSlice';
 // import logo from '../assets/hole9golf-logo.png';
@@ -15,6 +15,9 @@ function SignUp() {
     const { loading, error, otpSent, otpMessage, user, locationLogoUrl } = useAppSelector((state) => state.auth);
     // Logo is no longer shown on this page
 
+    const [searchParams] = useSearchParams();
+    const locationIdParam = searchParams.get('locationid');
+
     const [showWaiverPopup, setShowWaiverPopup] = useState(false);
     const [activeWaiver, setActiveWaiver] = useState(null);
 
@@ -24,7 +27,7 @@ function SignUp() {
         first_name: '',
         last_name: '',
         role: 'client',
-        ghl_location_id: '',
+        ghl_location_id: locationIdParam || '',
         date_of_birth: ''
     });
 
@@ -232,30 +235,32 @@ function SignUp() {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-text-primary mb-2">
-                                Select Location <span className="text-danger">*</span>
-                            </label>
-                            {loadingLocations ? (
-                                <div className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary text-center">
-                                    Loading locations...
-                                </div>
-                            ) : (
-                                <select
-                                    value={formData.ghl_location_id}
-                                    onChange={(e) => setFormData({ ...formData, ghl_location_id: e.target.value })}
-                                    className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
-                                    required
-                                >
-                                    <option value="">Select a location</option>
-                                    {locations.map((location) => (
-                                        <option key={location.location_id} value={location.location_id}>
-                                            {location.display_name}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
+                        {!locationIdParam && (
+                            <div>
+                                <label className="block text-sm font-medium text-text-primary mb-2">
+                                    Select Location <span className="text-danger">*</span>
+                                </label>
+                                {loadingLocations ? (
+                                    <div className="w-full px-4 py-3 border border-border rounded-button bg-background text-text-secondary text-center">
+                                        Loading locations...
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={formData.ghl_location_id}
+                                        onChange={(e) => setFormData({ ...formData, ghl_location_id: e.target.value })}
+                                        className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                        required
+                                    >
+                                        <option value="">Select a location</option>
+                                        {locations.map((location) => (
+                                            <option key={location.location_id} value={location.location_id}>
+                                                {location.display_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-text-primary mb-2">
