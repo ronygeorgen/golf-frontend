@@ -72,6 +72,14 @@ export default {
         // DANGER
         danger: "#DC2626",
         "danger-light": "#EF4444",
+
+        // SUCCESS
+        success: "#16A34A",
+        "success-light": "#22C55E",
+
+        // WARNING
+        warning: "#D97706",
+        "warning-light": "#F59E0B",
       },
 
       borderRadius: {

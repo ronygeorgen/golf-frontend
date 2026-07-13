@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { signupWithoutOTP } from '../store/slices/authSlice';
 import { createTempPurchase } from '../store/slices/coachingSlice';
@@ -15,6 +15,7 @@ import SquarePaymentModal from '../components/SquarePaymentModal';
 
 function GuestLanding() {
     const navigate = useNavigate();
+    const reactLocation = useLocation();
     const dispatch = useAppDispatch();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { popup, openPopup, closePopup } = usePopup();
@@ -41,6 +42,7 @@ function GuestLanding() {
     const [registering, setRegistering] = useState(false);
     const [registeredPhone, setRegisteredPhone] = useState(null); // Store phone after successful registration
     const [phoneError, setPhoneError] = useState(''); // Phone validation error
+    const [lockedLocationId, setLockedLocationId] = useState(null);
 
     // Square payment modal state
     const [squarePayment, setSquarePayment] = useState({
@@ -68,6 +70,27 @@ function GuestLanding() {
         };
         fetchLocations();
     }, []);
+
+    // Check location_id on mount or when url changes
+    useEffect(() => {
+        const params = new URLSearchParams(reactLocation.search);
+        const locIdParam = params.get('location_id') || params.get('locationid');
+        
+        let initialLocId = '';
+        if (locIdParam) {
+            localStorage.setItem('selected_location_id', locIdParam);
+            initialLocId = locIdParam;
+            setLockedLocationId(locIdParam);
+        } else {
+            const storedLocId = localStorage.getItem('selected_location_id');
+            if (storedLocId) {
+                initialLocId = storedLocId;
+                setLockedLocationId(storedLocId);
+            }
+        }
+        
+        setRegistrationData(prev => ({ ...prev, ghl_location_id: initialLocId }));
+    }, [reactLocation.search]);
 
     // Fetch TPI assessment packages
     const fetchTpiPackages = async () => {
@@ -540,7 +563,8 @@ function GuestLanding() {
                                                     ...registrationData,
                                                     ghl_location_id: e.target.value
                                                 })}
-                                                className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                                disabled={!!lockedLocationId}
+                                                className={`w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary ${!!lockedLocationId ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 required
                                             >
                                                 <option value="">Select a location</option>

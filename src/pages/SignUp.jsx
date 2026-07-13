@@ -16,10 +16,12 @@ function SignUp() {
     // Logo is no longer shown on this page
 
     const [searchParams] = useSearchParams();
-    const locationIdParam = searchParams.get('locationid');
+    const locationIdParam = searchParams.get('location_id') || searchParams.get('locationid');
+    const initialLocationId = locationIdParam || localStorage.getItem('selected_location_id') || '';
 
     const [showWaiverPopup, setShowWaiverPopup] = useState(false);
     const [activeWaiver, setActiveWaiver] = useState(null);
+    const [lockedLocationId, setLockedLocationId] = useState(initialLocationId || null);
 
     const [formData, setFormData] = useState({
         email: '',
@@ -27,7 +29,7 @@ function SignUp() {
         first_name: '',
         last_name: '',
         role: 'client',
-        ghl_location_id: locationIdParam || '',
+        ghl_location_id: initialLocationId,
         date_of_birth: ''
     });
 
@@ -235,7 +237,6 @@ function SignUp() {
                             />
                         </div>
 
-                        {!locationIdParam && (
                             <div>
                                 <label className="block text-sm font-medium text-text-primary mb-2">
                                     Select Location <span className="text-danger">*</span>
@@ -248,7 +249,8 @@ function SignUp() {
                                     <select
                                         value={formData.ghl_location_id}
                                         onChange={(e) => setFormData({ ...formData, ghl_location_id: e.target.value })}
-                                        className="w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary"
+                                        disabled={!!lockedLocationId}
+                                        className={`w-full px-4 py-3 border border-border rounded-button focus:ring-2 focus:ring-primary focus:border-primary bg-background text-text-primary ${!!lockedLocationId ? 'opacity-70 cursor-not-allowed' : ''}`}
                                         required
                                     >
                                         <option value="">Select a location</option>
@@ -260,7 +262,6 @@ function SignUp() {
                                     </select>
                                 )}
                             </div>
-                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-text-primary mb-2">

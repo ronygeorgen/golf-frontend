@@ -26,6 +26,7 @@ import {
     Layers,
     Building2,
     CreditCard,
+    Database,
 } from 'lucide-react';
 
 
@@ -108,6 +109,7 @@ function AdminLayout() {
                 { path: '/admin/liability-waiver', label: 'Manage Liability Waiver', icon: ShieldCheck },
                 { path: '/admin/coupons', label: 'Manage Coupons', icon: Ticket },
                 { path: '/admin/square-connect', label: 'Square Connect', icon: CreditCard },
+                ...(isSuperadmin ? [{ path: '/admin/bulk-onboarding', label: 'Bulk Data Onboarding', icon: Database }] : []),
                 ...(isSuperadmin ? [{ path: '/admin/ghl-locations', label: 'Manage GHL Locations', icon: MapPin }] : []),
             ]
         },

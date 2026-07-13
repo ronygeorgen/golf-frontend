@@ -46,6 +46,7 @@ import StaffReferrals from './pages/StaffReferrals';
 import Profile from './pages/Profile';
 import MemberList from './pages/MemberList';
 import GlobalToast from './components/GlobalToast';
+import BulkDataOnboarding from './components/BulkDataOnboarding';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
@@ -93,6 +94,15 @@ function ProtectedRoute({ children, allowedRoles }) {
         }
     }
 
+    return children;
+}
+
+function SuperAdminRoute({ children }) {
+    const { user } = useAppSelector((state) => state.auth);
+    // Explicitly check for superadmin role
+    if (!user || user.role !== 'superadmin') {
+        return <Navigate to="/admin" replace />;
+    }
     return children;
 }
 
@@ -257,6 +267,11 @@ function AppContent() {
                 <Route path="bookings" element={<BookingManagement />} />
                 <Route path="calendar" element={<CalendarView />} />
                 <Route path="overrides" element={<AdminOverrides />} />
+                <Route path="bulk-onboarding" element={
+                    <SuperAdminRoute>
+                        <BulkDataOnboarding />
+                    </SuperAdminRoute>
+                } />
             </Route>
 
             <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center"><div className="text-red-500 text-xl">Unauthorized Access</div></div>} />
