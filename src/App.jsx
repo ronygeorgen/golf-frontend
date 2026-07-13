@@ -50,6 +50,7 @@ import BulkDataOnboarding from './components/BulkDataOnboarding';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const dispatch = useAppDispatch();
+    const location = useLocation();
     const { user, token, loading } = useAppSelector((state) => state.auth);
 
     // Fetch fresh user profile if token exists but user data might be stale
@@ -69,7 +70,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     }
 
     if (!user || !token) {
-        return <Navigate to="/guest" />;
+        return <Navigate to={{ pathname: "/guest", search: location.search }} replace />;
     }
 
     if (allowedRoles) {
