@@ -125,6 +125,22 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [slotsLoading, setSlotsLoading] = useState(false);
     const [showBookForClientModal, setShowBookForClientModal] = useState(false);
 
+    // Change Coach State
+    const [changeCoachState, setChangeCoachState] = useState({
+        open: false,
+        booking: null,
+        coaches: [],
+        selectedCoachId: null,
+        availabilityStatus: null,  // null | 'checking' | 'available' | 'working_hours' | 'booking_conflict'
+        availabilityMessage: null,
+        loadingCoaches: false,
+        submitting: false,
+        error: null,
+    });
+
+    // Booking Details Modal State (Apple UI style)
+    const [selectedDetailsEvent, setSelectedDetailsEvent] = useState(null);
+
     const canViewSpecialEvents = user && (user.role === 'admin' || user.role === 'staff' || user.is_superuser);
     // For calendar pages (/calendar, /admin/calendar): only superadmins and admins can book for clients
     // For coaching-sessions calendar (/coaching-sessions/calendar): superadmins, admins, and staffs can book
@@ -457,6 +473,91 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         }
     };
 
+    // ── Change Coach Handlers ─────────────────────────────────────────────────
+    const openChangeCoachModal = async (event) => {
+        setChangeCoachState({
+            open: true,
+            booking: event,
+            coaches: [],
+            selectedCoachId: null,
+            availabilityStatus: null,
+            availabilityMessage: null,
+            loadingCoaches: true,
+            submitting: false,
+            error: null,
+        });
+        try {
+            const res = await axios.get(endpoints.bookings.availableCoaches(event.id));
+            setChangeCoachState(prev => ({ ...prev, loadingCoaches: false, coaches: res.data.coaches || [] }));
+        } catch {
+            setChangeCoachState(prev => ({ ...prev, loadingCoaches: false, error: 'Failed to load coaches.' }));
+        }
+    };
+
+    const handleSelectCoach = async (coachId) => {
+        setChangeCoachState(prev => ({
+            ...prev,
+            selectedCoachId: coachId,
+            availabilityStatus: 'checking',
+            availabilityMessage: null,
+            error: null,
+        }));
+        try {
+            const res = await axios.get(
+                endpoints.bookings.checkCoachAvailability(changeCoachState.booking.id),
+                { params: { new_coach_id: coachId } }
+            );
+            if (res.data.available) {
+                setChangeCoachState(prev => ({ ...prev, availabilityStatus: 'available', availabilityMessage: null }));
+            } else {
+                setChangeCoachState(prev => ({
+                    ...prev,
+                    availabilityStatus: res.data.conflict_type, // 'working_hours' | 'booking_conflict'
+                    availabilityMessage: res.data.message,
+                }));
+            }
+        } catch {
+            setChangeCoachState(prev => ({
+                ...prev,
+                availabilityStatus: null,
+                error: 'Failed to check availability.',
+            }));
+        }
+    };
+
+    const handleChangeCoachConfirm = async (forceOverride = false) => {
+        if (!changeCoachState.selectedCoachId) return;
+        setChangeCoachState(prev => ({ ...prev, submitting: true, error: null }));
+        try {
+            await axios.post(
+                endpoints.bookings.changeCoach(changeCoachState.booking.id),
+                { new_coach_id: changeCoachState.selectedCoachId, force_override: forceOverride }
+            );
+            setChangeCoachState({
+                open: false, booking: null, coaches: [], selectedCoachId: null,
+                availabilityStatus: null, availabilityMessage: null,
+                loadingCoaches: false, submitting: false, error: null,
+            });
+            openPopup({
+                type: 'success',
+                title: 'Coach Changed',
+                message: 'The coach has been successfully changed for this booking.',
+            });
+            // Refresh the calendar
+            dispatch(getCalendarBookings({
+                startDate: moment(date).startOf('month').toDate(),
+                endDate: moment(date).endOf('month').toDate(),
+                bookingType: calendarType === 'all' ? null : calendarType,
+                coachId: coachId,
+                status: showCancelledOnly ? 'cancelled' : null
+            }));
+        } catch (err) {
+            const msg = err.response?.data?.error || 'Failed to change coach.';
+            setChangeCoachState(prev => ({ ...prev, submitting: false, error: msg }));
+        }
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
     const handleCancelBooking = async (bookingId) => {
         // Confirmation is handled in handleSelectEvent's "Cancel" button action
         // This function performs the actual API call
@@ -526,7 +627,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             }
                         },
                         {
-                            label: 'Cancel',
+                            label: 'Back',
                             variant: 'secondary',
                             shouldClose: true
                         }
@@ -642,138 +743,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     };
 
     const handleSelectEvent = (event) => {
-        if (event.is_special_event) {
-            const details = (
-                <div className="space-y-1 text-sm leading-5">
-                    <p><span className="font-semibold">Title:</span> {event.original_event.title}</p>
-                    <p><span className="font-semibold">Type:</span> {event.original_event.event_type.replace('_', ' ')}</p>
-                    <p>
-                        <span className="font-semibold">Time:</span>{' '}
-                        {moment(event.start).format('MMM Do YYYY, h:mm a')} - {moment(event.end).format('h:mm a')}
-                    </p>
-                    <p><span className="font-semibold">Capacity:</span> {event.original_event.registered_count || 0} / {event.original_event.max_capacity}</p>
-                    {event.original_event.is_private && <p className="text-amber-600 font-semibold">Private Event</p>}
-                </div>
-            );
-
-            openPopup({
-                type: 'info',
-                title: 'Special Event Details',
-                message: details,
-                confirmText: 'Close',
-            });
-            return;
-        }
-
-        const details = (
-            <div className="space-y-1 text-sm leading-5">
-                {event.client && (
-                    <p>
-                        <span className="font-semibold">Client:</span>{' '}
-                        {event.client?.first_name || 'N/A'} {event.client?.last_name || ''}
-                    </p>
-                )}
-                <p>
-                    <span className="font-semibold">Type:</span>{' '}
-                    {event.type === 'simulator'
-                        ? 'Simulator'
-                        : (event.service_category_name || 'Coaching')}
-                </p>
-                <p>
-                    <span className="font-semibold">Time:</span>{' '}
-                    {moment(event.start).format('MMM Do YYYY, h:mm a')} - {moment(event.end).format('h:mm a')}
-                </p>
-                <p>
-                    <span className="font-semibold">Status:</span> {event.status}
-                </p>
-                {event.type === 'simulator' ? (
-                    <p>
-                        <span className="font-semibold">Simulator:</span> {event.simulator?.name || `Bay ${event.simulator?.bay_number || 'N/A'}`}
-                    </p>
-                ) : (
-                    <>
-                        {/* Hide coach row for asset-only dynamic category bookings (needs_staff=false) */}
-                        {(event.is_legacy_category || !event.category_asset_name || event.coach) && (
-                        <p>
-                            <span className="font-semibold">Coach:</span> {event.coach?.first_name || 'Any'} {event.coach?.last_name || ''}
-                        </p>
-                        )}
-                        {/* Only show Assigned Bay for legacy coaching bookings, not dynamic category ones */}
-                        {event.simulator && event.is_legacy_category && (
-                            <p>
-                                <span className="font-semibold">Assigned Bay:</span> {event.simulator.name}
-                            </p>
-                        )}
-                        {event.category_asset_name && (
-                            <p>
-                                <span className="font-semibold">Asset:</span> {event.category_asset_name}
-                            </p>
-                        )}
-                    </>
-                )}
-                {event.package && (
-                    <p>
-                        <span className="font-semibold">Package:</span> {event.package.title || 'N/A'}
-                    </p>
-                )}
-                {event.total_price !== undefined && (
-                    <p>
-                        <span className="font-semibold">Price:</span> ${event.total_price || 0}
-                    </p>
-                )}
-            </div>
-        );
-
-        openPopup({
-            type: 'info',
-            title: isUserView ? 'My Booking Details' : 'Booking Details',
-            message: (
-                <div className="flex flex-col gap-4">
-                    {details}
-                    {canManageBooking(event) && event.status !== 'cancelled' && event.status !== 'completed' && (
-                        <div className="flex gap-2 justify-end pt-2 border-t border-border mt-2">
-                            {(user.role === 'admin' || user.role === 'staff' || user.is_superuser) && (
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => {
-                                        closePopup(); // Close details popup
-                                        setRescheduleState({
-                                            open: true,
-                                            booking: event,
-                                            date: moment(event.start).format('YYYY-MM-DD'),
-                                            selectedSlot: null,
-                                            loading: false,
-                                            error: null
-                                        });
-                                    }}
-                                    className="text-sm px-3 py-1"
-                                >
-                                    Change Time
-                                </Button>
-                            )}
-                            <Button
-                                variant="danger"
-                                onClick={() => {
-                                    closePopup();
-                                    openPopup({
-                                        type: 'warning',
-                                        title: 'Cancel Booking?',
-                                        message: 'Are you sure you want to cancel this booking? Credits will be refunded to the client.',
-                                        confirmText: 'Yes, Cancel',
-                                        showCancel: true,
-                                        onConfirm: () => handleCancelBooking(event.id)
-                                    });
-                                }}
-                                className="text-sm px-3 py-1"
-                            >
-                                Cancel Booking
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            ),
-            confirmText: 'Close',
-        });
+        setSelectedDetailsEvent(event);
     };
 
     const handleNavigate = (newDate) => {
@@ -1483,6 +1453,404 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                 </Button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Change Coach Modal */}
+            {changeCoachState.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+                        onClick={() => setChangeCoachState(prev => ({ ...prev, open: false }))}
+                    />
+                    <div className="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold mb-1 text-text-primary">Change Coach</h3>
+                        {changeCoachState.booking && (
+                            <p className="text-sm text-text-muted mb-4">
+                                Booking on {moment(changeCoachState.booking.start).format('MMM Do YYYY, h:mm a')}
+                                {changeCoachState.booking.coach && (
+                                    <> · Current coach: <span className="font-semibold text-text-primary">
+                                        {changeCoachState.booking.coach.first_name} {changeCoachState.booking.coach.last_name || ''}
+                                    </span></>
+                                )}
+                            </p>
+                        )}
+
+                        {changeCoachState.loadingCoaches ? (
+                            <div className="py-10 flex justify-center text-text-secondary">Loading coaches...</div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-2">Select New Coach</label>
+                                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                                        {changeCoachState.coaches.length === 0 ? (
+                                            <p className="py-4 text-text-secondary italic text-sm">No active coaches found at this location.</p>
+                                        ) : changeCoachState.coaches.map(coach => {
+                                            const isCurrent = changeCoachState.booking?.coach?.id === coach.id;
+                                            const isSelected = changeCoachState.selectedCoachId === coach.id;
+                                            return (
+                                                <button
+                                                    key={coach.id}
+                                                    onClick={() => !isCurrent && handleSelectCoach(coach.id)}
+                                                    disabled={isCurrent}
+                                                    className={`w-full text-left px-4 py-2.5 rounded-xl border transition-all text-sm ${
+                                                        isCurrent
+                                                            ? 'bg-surface-light border-border text-text-muted cursor-not-allowed opacity-60'
+                                                            : isSelected
+                                                                ? 'bg-primary/10 border-primary text-text-primary font-medium'
+                                                                : 'bg-background border-border hover:border-primary/50 text-text-primary'
+                                                    }`}
+                                                >
+                                                    <span>{coach.first_name} {coach.last_name}</span>
+                                                    {isCurrent && <span className="ml-2 text-xs bg-surface-light px-1.5 py-0.5 rounded-full border border-border">Current</span>}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Availability Status Banner */}
+                                {changeCoachState.availabilityStatus === 'checking' && (
+                                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-xl">
+                                        <svg className="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                        </svg>
+                                        Checking availability...
+                                    </div>
+                                )}
+                                {changeCoachState.availabilityStatus === 'available' && (
+                                    <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl">
+                                        <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                                        </svg>
+                                        <span>Coach is available at this time.</span>
+                                    </div>
+                                )}
+                                {changeCoachState.availabilityStatus === 'working_hours' && (
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                                        <div className="flex items-start gap-2 text-amber-700 text-sm">
+                                            <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                                            </svg>
+                                            <span>{changeCoachState.availabilityMessage}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleChangeCoachConfirm(true)}
+                                            disabled={changeCoachState.submitting}
+                                            className="w-full py-2 px-4 text-sm font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-60"
+                                        >
+                                            {changeCoachState.submitting ? 'Applying override...' : '⚡ Force Override & Change Coach'}
+                                        </button>
+                                    </div>
+                                )}
+                                {changeCoachState.availabilityStatus === 'booking_conflict' && (
+                                    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 text-danger text-sm rounded-xl">
+                                        <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                                        </svg>
+                                        <span>{changeCoachState.availabilityMessage}</span>
+                                    </div>
+                                )}
+
+                                {changeCoachState.error && (
+                                    <div className="p-3 bg-red-50 text-danger text-sm rounded-xl border border-red-200">
+                                        {changeCoachState.error}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-3 pt-3 border-t border-border">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setChangeCoachState(prev => ({ ...prev, open: false }))}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        disabled={
+                                            !changeCoachState.selectedCoachId ||
+                                            changeCoachState.availabilityStatus === 'checking' ||
+                                            changeCoachState.availabilityStatus === 'booking_conflict' ||
+                                            changeCoachState.availabilityStatus === 'working_hours' ||
+                                            changeCoachState.submitting
+                                        }
+                                        onClick={() => handleChangeCoachConfirm(false)}
+                                    >
+                                        {changeCoachState.submitting ? 'Changing...' : 'Confirm Change'}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Apple-Style Booking/Event Details Modal */}
+            {selectedDetailsEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    {/* Backdrop blur overlay */}
+                    <div
+                        className="absolute inset-0 bg-black/35 backdrop-blur-[3px] transition-opacity duration-300"
+                        onClick={() => setSelectedDetailsEvent(null)}
+                    />
+
+                    {/* Centered clean Apple card */}
+                    <div className="relative w-full max-w-lg rounded-[24px] bg-surface p-6 sm:p-7 shadow-2xl transition-all duration-300 transform scale-100 max-h-[85vh] overflow-y-auto border border-border/40">
+                        {/* Title header */}
+                        <div className="flex items-start justify-between mb-5">
+                            <div>
+                                <h3 className="text-xl font-bold tracking-tight text-text-primary">
+                                    {selectedDetailsEvent.is_special_event ? 'Special Event Details' : 'Booking Details'}
+                                </h3>
+                                {!selectedDetailsEvent.is_special_event && (
+                                    <p className="text-xs text-text-muted mt-0.5">Booking ID: #{selectedDetailsEvent.id}</p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setSelectedDetailsEvent(null)}
+                                className="flex items-center justify-center w-7 h-7 rounded-full bg-surface-light border border-border text-text-secondary hover:text-text-primary hover:bg-border/30 transition-all"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Event Hero Info */}
+                        <div className="mb-5 p-4 rounded-2xl bg-surface-light border border-border/30 flex items-start gap-3">
+                            <div className={`p-2.5 rounded-xl text-white ${
+                                selectedDetailsEvent.status === 'cancelled'
+                                    ? 'bg-danger'
+                                    : selectedDetailsEvent.status === 'completed'
+                                        ? 'bg-text-secondary'
+                                        : 'bg-primary'
+                            }`}>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-base font-bold text-text-primary truncate">
+                                        {moment(selectedDetailsEvent.start).format('dddd, MMMM D, YYYY')}
+                                    </span>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                        selectedDetailsEvent.status === 'cancelled'
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : selectedDetailsEvent.status === 'completed'
+                                                ? 'bg-gray-50 text-gray-700 border-gray-200'
+                                                : 'bg-green-50 text-green-700 border-green-200'
+                                    }`}>
+                                        {selectedDetailsEvent.status?.toUpperCase()}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-text-secondary mt-0.5 font-semibold">
+                                    {moment(selectedDetailsEvent.start).format('h:mm a')} – {moment(selectedDetailsEvent.end).format('h:mm a')}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Grid details list */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                            {/* Client */}
+                            {selectedDetailsEvent.client && (
+                                <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Client</p>
+                                        <p className="text-sm font-semibold text-text-primary truncate">
+                                            {selectedDetailsEvent.client?.first_name || 'N/A'} {selectedDetailsEvent.client?.last_name || ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Session Type */}
+                            <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Session Type</p>
+                                    <p className="text-sm font-semibold text-text-primary truncate">
+                                        {selectedDetailsEvent.is_special_event
+                                            ? selectedDetailsEvent.original_event?.event_type?.replace('_', ' ') || 'Special Event'
+                                            : selectedDetailsEvent.type === 'simulator'
+                                                ? 'Simulator'
+                                                : (selectedDetailsEvent.service_category_name || 'Coaching')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Coach */}
+                            {!selectedDetailsEvent.is_special_event && (selectedDetailsEvent.is_legacy_category || !selectedDetailsEvent.category_asset_name || selectedDetailsEvent.coach) && selectedDetailsEvent.type !== 'simulator' && (
+                                <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Coach</p>
+                                        <p className="text-sm font-semibold text-text-primary truncate">
+                                            {selectedDetailsEvent.coach?.first_name || 'Any'} {selectedDetailsEvent.coach?.last_name || ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Resource / Bay / Asset */}
+                            {!selectedDetailsEvent.is_special_event && (
+                                <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Resource</p>
+                                        <p className="text-sm font-semibold text-text-primary truncate">
+                                            {selectedDetailsEvent.type === 'simulator'
+                                                ? (selectedDetailsEvent.simulator?.name || `Bay ${selectedDetailsEvent.simulator?.bay_number || 'N/A'}`)
+                                                : selectedDetailsEvent.category_asset_name || selectedDetailsEvent.simulator?.name || 'N/A'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Capacity (Special Events Only) */}
+                            {selectedDetailsEvent.is_special_event && (
+                                <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Capacity</p>
+                                        <p className="text-sm font-semibold text-text-primary truncate">
+                                            {selectedDetailsEvent.original_event?.registered_count || 0} / {selectedDetailsEvent.original_event?.max_capacity || 0}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Price */}
+                            {!selectedDetailsEvent.is_special_event && selectedDetailsEvent.total_price !== undefined && (
+                                <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M12 16a4.897 4.897 0 01-3.001-1.001M12 16v1m0-1V7" />
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Price</p>
+                                        <p className="text-sm font-bold text-text-primary truncate">
+                                            ${selectedDetailsEvent.total_price || 0}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Package */}
+                            {!selectedDetailsEvent.is_special_event && selectedDetailsEvent.package && (
+                                <div className="p-3.5 rounded-xl bg-background border border-border/40 flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-surface-light text-text-secondary">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Package</p>
+                                        <p className="text-sm font-semibold text-text-primary truncate">
+                                            {selectedDetailsEvent.package.title || 'N/A'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer action buttons - Apple style */}
+                        {canManageBooking(selectedDetailsEvent) && selectedDetailsEvent.status !== 'cancelled' && selectedDetailsEvent.status !== 'completed' && !selectedDetailsEvent.is_special_event ? (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-5 border-t border-border/60">
+                                <div>
+                                    <button
+                                        onClick={() => {
+                                            const bookingId = selectedDetailsEvent.id;
+                                            setSelectedDetailsEvent(null);
+                                            openPopup({
+                                                type: 'warning',
+                                                title: 'Cancel Booking?',
+                                                message: 'Are you sure you want to cancel this booking? Credits will be refunded to the client.',
+                                                confirmText: 'Yes, Cancel',
+                                                cancelText: 'Back',
+                                                showCancel: true,
+                                                onConfirm: () => handleCancelBooking(bookingId)
+                                            });
+                                        }}
+                                        className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-danger hover:text-red-700 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-200/40 text-center"
+                                    >
+                                        Cancel Booking
+                                    </button>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    {(user.role === 'admin' || user.role === 'staff' || user.is_superuser) && (
+                                        <button
+                                            onClick={() => {
+                                                const event = selectedDetailsEvent;
+                                                setSelectedDetailsEvent(null);
+                                                setRescheduleState({
+                                                    open: true,
+                                                    booking: event,
+                                                    date: moment(event.start).format('YYYY-MM-DD'),
+                                                    selectedSlot: null,
+                                                    loading: false,
+                                                    error: null
+                                                });
+                                            }}
+                                            className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border hover:border-primary/50 hover:bg-surface-light rounded-xl transition-all text-center"
+                                        >
+                                            Change Time
+                                        </button>
+                                    )}
+                                    {(user.role === 'admin' || user.is_superuser) && selectedDetailsEvent.type === 'coaching' && (
+                                        <button
+                                            onClick={() => {
+                                                const event = selectedDetailsEvent;
+                                                setSelectedDetailsEvent(null);
+                                                openChangeCoachModal(event);
+                                            }}
+                                            className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-text-primary bg-background border border-border hover:border-primary/50 hover:bg-surface-light rounded-xl transition-all text-center"
+                                        >
+                                            Change Coach
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setSelectedDetailsEvent(null)}
+                                        className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary-light rounded-xl transition-all shadow-sm text-center"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-end pt-5 border-t border-border/60">
+                                <button
+                                    onClick={() => setSelectedDetailsEvent(null)}
+                                    className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary-light rounded-xl transition-all shadow-sm text-center"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

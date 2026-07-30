@@ -154,6 +154,10 @@ export const endpoints = {
         availableSimulatorHours: '/bookings/available-simulator-hours/',
         staffDailySchedule: '/bookings/staff-daily-schedule/',
         guestCreate: '/bookings/guest-create/',
+        // Change-coach actions (admin / superadmin only)
+        availableCoaches: (id) => `/bookings/${id}/available_coaches/`,
+        checkCoachAvailability: (id) => `/bookings/${id}/check_coach_availability/`,
+        changeCoach: (id) => `/bookings/${id}/change_coach/`,
     },
 
     // Simulator endpoints (public)
