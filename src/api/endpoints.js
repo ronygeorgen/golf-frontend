@@ -266,6 +266,7 @@ export const endpoints = {
         list: '/coupons/',
         detail: (id) => `/coupons/${id}/`,
         validate: '/coupons/validate/',
+        quickCreate: '/coupons/quick-create/',
         usages: '/coupons/usages/',
     },
 };

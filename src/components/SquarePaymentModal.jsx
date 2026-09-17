@@ -39,6 +39,8 @@ export default function SquarePaymentModal({
     disableCoupons = false,  // set true for guest flows where coupons are not offered
     packageId = null,        // pass the specific package ID so per-package coupon restrictions work
     eventId = null,          // pass the specific event ID so per-event coupon restrictions work
+    preAppliedCoupon = null, // { code, discount_amount, final_amount, ... } from Quick Checkout
+    forQuickCheckout = false, // allow quick_checkout_only coupons (staff Quick Checkout only)
 }) {
     const cardContainerRef = useRef(null);
     const paymentsRef = useRef(null);
@@ -162,8 +164,11 @@ export default function SquarePaymentModal({
             setCouponCode('');
             setAppliedCoupon(null);
             setCouponError('');
+        } else if (preAppliedCoupon) {
+            setAppliedCoupon(preAppliedCoupon);
+            setCouponCode(preAppliedCoupon.code || '');
         }
-    }, [isOpen]);
+    }, [isOpen, preAppliedCoupon]);
 
     // ---- Coupon validation handler -------------------------------------
     const handleApplyCoupon = async () => {
@@ -185,6 +190,9 @@ export default function SquarePaymentModal({
             // Include the specific event ID so per-event coupon restrictions are enforced
             if (paymentType === 'event' && eventId) {
                 payload.event_id = eventId;
+            }
+            if (forQuickCheckout) {
+                payload.for_quick_checkout = true;
             }
             const response = await apiClient.post(endpoints.coupons.validate, payload);
             setAppliedCoupon(response.data);
@@ -228,6 +236,7 @@ export default function SquarePaymentModal({
                 amount: amount,
                 currency: currency,
                 coupon_code: appliedCoupon ? appliedCoupon.code : null,
+                ...(forQuickCheckout ? { for_quick_checkout: true } : {}),
             });
 
             setSuccessMsg('Payment successful! Your booking is confirmed.');

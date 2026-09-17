@@ -9,6 +9,11 @@ import SquarePaymentModal from '../components/SquarePaymentModal';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
+/** Digits only (whole non-negative). Avoids type=number spinners / scroll-wheel. */
+function wholeNumberValue(raw) {
+    return String(raw ?? '').replace(/\D/g, '');
+}
+
 /**
  * Staff Quick Checkout wizard:
  * 1) Select / create member
@@ -36,19 +41,28 @@ export default function QuickCheckout() {
         service_category_id: '',
         title: '',
         price: '',
-        session_count: 1,
-        simulator_hours: 0,
+        session_count: '1',
+        simulator_hours: '',
         session_duration_minutes: 60,
-        category_hours: 0,
+        category_hours: '',
     });
     const [categories, setCategories] = useState([]);
 
-    const [pending, setPending] = useState(null); // { temp_id, price, title, package_id, package_type }
+    const [pending, setPending] = useState(null); // { temp_id, price, title, package_id, package_type, is_catalog }
     const [showPay, setShowPay] = useState(false);
     const [linkEmail, setLinkEmail] = useState('');
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState(null);
     const [error, setError] = useState(null);
+
+    // Catalog package discount (existing code or custom one-time coupon)
+    const [discountMode, setDiscountMode] = useState('none'); // none | existing | custom
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponBusy, setCouponBusy] = useState(false);
+    const [couponError, setCouponError] = useState(null);
+    const [customDiscountType, setCustomDiscountType] = useState('percentage');
+    const [customDiscountValue, setCustomDiscountValue] = useState('');
 
     const selectedOneOffCat = categories.find((c) => String(c.id) === String(oneOff.service_category_id));
     const oneOffMode = !selectedOneOffCat
@@ -151,7 +165,13 @@ export default function QuickCheckout() {
                 title: res.data.title,
                 package_id: res.data.package_id,
                 package_type: res.data.package_type,
+                is_catalog: true,
             });
+            setDiscountMode('none');
+            setCouponCode('');
+            setAppliedCoupon(null);
+            setCouponError(null);
+            setCustomDiscountValue('');
             setStep(3);
         } catch (e) {
             setError(e.response?.data?.error || 'Failed to create checkout.');
@@ -170,12 +190,19 @@ export default function QuickCheckout() {
             setError('Title is required.');
             return;
         }
+        const priceInt = parseInt(oneOff.price, 10);
+        if (!(priceInt >= 1)) {
+            setError('Enter a whole positive price.');
+            return;
+        }
         if (oneOffMode !== 'simulator' && !(parseInt(oneOff.session_count, 10) >= 1)) {
             setError('Enter number of sessions.');
             return;
         }
-        if (oneOffMode === 'simulator' && !(parseFloat(oneOff.simulator_hours) > 0)) {
-            setError('Enter simulator hours.');
+        const simHours = parseInt(oneOff.simulator_hours, 10) || 0;
+        const catHours = parseInt(oneOff.category_hours, 10) || 0;
+        if (oneOffMode === 'simulator' && !(simHours >= 1)) {
+            setError('Enter whole positive simulator hours.');
             return;
         }
         setBusy(true);
@@ -185,18 +212,18 @@ export default function QuickCheckout() {
                 buyer_phone: selectedMember.phone,
                 service_category_id: oneOff.service_category_id,
                 title: oneOff.title.trim(),
-                price: oneOff.price,
+                price: priceInt,
                 session_duration_minutes: oneOff.session_duration_minutes,
                 referral_id: user?.id,
             };
             if (oneOffMode === 'simulator') {
-                payload.simulator_hours = oneOff.simulator_hours;
+                payload.simulator_hours = simHours;
             } else if (oneOffMode === 'coaching') {
-                payload.session_count = oneOff.session_count;
-                payload.simulator_hours = oneOff.simulator_hours || 0;
+                payload.session_count = parseInt(oneOff.session_count, 10);
+                payload.simulator_hours = simHours;
             } else {
-                payload.session_count = oneOff.session_count;
-                payload.category_hours = oneOff.category_hours || 0;
+                payload.session_count = parseInt(oneOff.session_count, 10);
+                payload.category_hours = catHours;
             }
             const res = await apiClient.post(endpoints.coaching.quickCheckoutOneOff, payload);
             setPending({
@@ -205,12 +232,83 @@ export default function QuickCheckout() {
                 title: res.data.title,
                 package_id: res.data.package_id,
                 package_type: res.data.package_type,
+                is_catalog: false,
             });
+            setDiscountMode('none');
+            setAppliedCoupon(null);
             setStep(3);
         } catch (e) {
             setError(e.response?.data?.error || 'Failed to create one-off package.');
         } finally {
             setBusy(false);
+        }
+    };
+
+    const clearCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponError(null);
+        setCouponCode('');
+        setCustomDiscountValue('');
+    };
+
+    const applyExistingCoupon = async () => {
+        if (!pending || !couponCode.trim()) return;
+        setCouponBusy(true);
+        setCouponError(null);
+        try {
+            const res = await apiClient.post(endpoints.coupons.validate, {
+                code: couponCode.trim(),
+                amount: pending.price,
+                payment_type: 'package',
+                package_id: pending.package_id,
+                // Per-user limits must use the member, not the logged-in staff
+                customer_phone: selectedMember?.phone || '',
+                customer_email: selectedMember?.email || linkEmail || '',
+                for_quick_checkout: true,
+            });
+            setAppliedCoupon(res.data);
+            if (!(Number(res.data.final_amount) > 0)) {
+                setAppliedCoupon(null);
+                setCouponError('Discount cannot bring the price to $0. Use a smaller discount.');
+                return;
+            }
+            setDiscountMode('existing');
+        } catch (e) {
+            setAppliedCoupon(null);
+            setCouponError(e.response?.data?.error || 'Invalid coupon code.');
+        } finally {
+            setCouponBusy(false);
+        }
+    };
+
+    const createCustomCoupon = async () => {
+        if (!pending) return;
+        const value = parseInt(customDiscountValue, 10);
+        if (!(value >= 1)) {
+            setCouponError('Enter a whole positive discount value.');
+            return;
+        }
+        setCouponBusy(true);
+        setCouponError(null);
+        try {
+            const res = await apiClient.post(endpoints.coupons.quickCreate, {
+                discount_type: customDiscountType,
+                discount_value: value,
+                package_id: pending.package_id,
+                amount: pending.price,
+            });
+            if (!(Number(res.data.final_amount) > 0)) {
+                setCouponError('Discount cannot bring the price to $0. Use a smaller discount.');
+                return;
+            }
+            setAppliedCoupon(res.data);
+            setCouponCode(res.data.code || '');
+            setDiscountMode('custom');
+        } catch (e) {
+            setAppliedCoupon(null);
+            setCouponError(e.response?.data?.error || 'Failed to create discount.');
+        } finally {
+            setCouponBusy(false);
         }
     };
 
@@ -223,13 +321,18 @@ export default function QuickCheckout() {
         setError(null);
         setMessage(null);
         try {
-                    const res = await apiClient.post(endpoints.square.paymentLink, {
+            const payload = {
                 temp_id: pending.temp_id,
                 payment_type: 'package',
                 amount: pending.price,
                 buyer_email: linkEmail,
                 item_description: pending.title,
-            });
+            };
+            if (appliedCoupon?.code) {
+                payload.coupon_code = appliedCoupon.code;
+                payload.for_quick_checkout = true;
+            }
+            const res = await apiClient.post(endpoints.square.paymentLink, payload);
             setMessage(
                 res.data.email_sent
                     ? `Payment link emailed to ${linkEmail}. Do not also take card for this sale unless the customer says they did not pay.`
@@ -253,6 +356,8 @@ export default function QuickCheckout() {
         setMessage(null);
         setError(null);
         setSearch('');
+        clearCoupon();
+        setDiscountMode('none');
     };
 
     const goBack = () => {
@@ -262,6 +367,8 @@ export default function QuickCheckout() {
             setPending(null);
             setShowPay(false);
             setSelectedPackage(null);
+            clearCoupon();
+            setDiscountMode('none');
             setStep(2);
             return;
         }
@@ -495,9 +602,9 @@ export default function QuickCheckout() {
                                         setOneOff((o) => ({
                                             ...o,
                                             service_category_id: e.target.value,
-                                            simulator_hours: 0,
-                                            category_hours: 0,
-                                            session_count: 1,
+                                            simulator_hours: '',
+                                            category_hours: '',
+                                            session_count: '1',
                                         }))
                                     }
                                 >
@@ -536,14 +643,17 @@ export default function QuickCheckout() {
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1">Price (pre-tax)</label>
                                 <input
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    autoComplete="off"
                                     required
                                     className="w-full px-3 py-2 border border-border rounded-lg"
-                                    placeholder="0.00"
+                                    placeholder="e.g. 100"
                                     value={oneOff.price}
-                                    onChange={(e) => setOneOff((o) => ({ ...o, price: e.target.value }))}
+                                    onChange={(e) =>
+                                        setOneOff((o) => ({ ...o, price: wholeNumberValue(e.target.value) }))
+                                    }
                                 />
                             </div>
 
@@ -553,13 +663,19 @@ export default function QuickCheckout() {
                                         Simulator hours
                                     </label>
                                     <input
-                                        type="number"
-                                        min="0.25"
-                                        step="0.25"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        autoComplete="off"
                                         className="w-full px-3 py-2 border border-border rounded-lg"
                                         placeholder="e.g. 2"
                                         value={oneOff.simulator_hours}
-                                        onChange={(e) => setOneOff((o) => ({ ...o, simulator_hours: e.target.value }))}
+                                        onChange={(e) =>
+                                            setOneOff((o) => ({
+                                                ...o,
+                                                simulator_hours: wholeNumberValue(e.target.value),
+                                            }))
+                                        }
                                     />
                                 </div>
                             )}
@@ -571,15 +687,17 @@ export default function QuickCheckout() {
                                             Number of sessions
                                         </label>
                                         <input
-                                            type="number"
-                                            min="1"
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            autoComplete="off"
                                             className="w-full px-3 py-2 border border-border rounded-lg"
                                             placeholder="e.g. 5"
                                             value={oneOff.session_count}
                                             onChange={(e) =>
                                                 setOneOff((o) => ({
                                                     ...o,
-                                                    session_count: parseInt(e.target.value || '0', 10),
+                                                    session_count: wholeNumberValue(e.target.value),
                                                 }))
                                             }
                                         />
@@ -590,14 +708,18 @@ export default function QuickCheckout() {
                                                 Simulator hours (optional — set &gt; 0 for combo)
                                             </label>
                                             <input
-                                                type="number"
-                                                min="0"
-                                                step="0.25"
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                autoComplete="off"
                                                 className="w-full px-3 py-2 border border-border rounded-lg"
                                                 placeholder="0"
                                                 value={oneOff.simulator_hours}
                                                 onChange={(e) =>
-                                                    setOneOff((o) => ({ ...o, simulator_hours: e.target.value }))
+                                                    setOneOff((o) => ({
+                                                        ...o,
+                                                        simulator_hours: wholeNumberValue(e.target.value),
+                                                    }))
                                                 }
                                             />
                                         </div>
@@ -608,14 +730,18 @@ export default function QuickCheckout() {
                                                 Category asset hours (optional — set &gt; 0 for combo)
                                             </label>
                                             <input
-                                                type="number"
-                                                min="0"
-                                                step="0.25"
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                autoComplete="off"
                                                 className="w-full px-3 py-2 border border-border rounded-lg"
                                                 placeholder="0"
                                                 value={oneOff.category_hours}
                                                 onChange={(e) =>
-                                                    setOneOff((o) => ({ ...o, category_hours: e.target.value }))
+                                                    setOneOff((o) => ({
+                                                        ...o,
+                                                        category_hours: wholeNumberValue(e.target.value),
+                                                    }))
                                                 }
                                             />
                                         </div>
@@ -643,12 +769,126 @@ export default function QuickCheckout() {
                     <div className="text-sm text-text-secondary">
                         <div><strong className="text-text-primary">{pending.title}</strong></div>
                         <div>Pre-tax: ${pending.price.toFixed(2)} (HST added at checkout)</div>
+                        {appliedCoupon && (
+                            <div className="text-green-700 mt-1">
+                                Coupon {appliedCoupon.code}: −${Number(appliedCoupon.discount_amount || 0).toFixed(2)}
+                                {' → '}
+                                <strong>${Number(appliedCoupon.final_amount).toFixed(2)}</strong> pre-tax
+                            </div>
+                        )}
                         <div>
                             Member:{' '}
                             {[selectedMember?.first_name, selectedMember?.last_name].filter(Boolean).join(' ') ||
                                 selectedMember?.phone}
                         </div>
                     </div>
+
+                    {pending.is_catalog && (
+                        <div className="border border-border rounded-lg p-3 space-y-3">
+                            <p className="text-sm font-medium text-text-primary">Discount coupon (optional)</p>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { id: 'none', label: 'None' },
+                                    { id: 'existing', label: 'Existing code' },
+                                    { id: 'custom', label: 'Custom new' },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setDiscountMode(opt.id);
+                                            if (opt.id === 'none') clearCoupon();
+                                            setCouponError(null);
+                                        }}
+                                        className={`px-2 py-2 rounded-lg text-xs border ${
+                                            discountMode === opt.id
+                                                ? 'bg-primary text-white border-primary'
+                                                : 'border-border text-text-secondary'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {discountMode === 'existing' && !appliedCoupon && (
+                                <div className="flex gap-2">
+                                    <input
+                                        className="flex-1 px-3 py-2 border border-border rounded-lg uppercase"
+                                        placeholder="Coupon code"
+                                        value={couponCode}
+                                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                    />
+                                    <Button
+                                        type="button"
+                                        disabled={couponBusy || !couponCode.trim()}
+                                        onClick={applyExistingCoupon}
+                                    >
+                                        {couponBusy ? '…' : 'Apply'}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {discountMode === 'custom' && !appliedCoupon && (
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <select
+                                            className="px-3 py-2 border border-border rounded-lg bg-background"
+                                            value={customDiscountType}
+                                            onChange={(e) => setCustomDiscountType(e.target.value)}
+                                        >
+                                            <option value="percentage">Percent %</option>
+                                            <option value="fixed">Fixed $</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            className="px-3 py-2 border border-border rounded-lg"
+                                            placeholder={customDiscountType === 'percentage' ? 'e.g. 10' : 'e.g. 25'}
+                                            value={customDiscountValue}
+                                            onChange={(e) =>
+                                                setCustomDiscountValue(wholeNumberValue(e.target.value))
+                                            }
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        disabled={couponBusy || !customDiscountValue}
+                                        onClick={createCustomCoupon}
+                                        className="w-full"
+                                    >
+                                        {couponBusy ? 'Creating…' : 'Create & apply one-time coupon'}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {appliedCoupon && (
+                                <div className="flex items-center justify-between gap-2 text-sm bg-green-50 text-green-800 border border-green-200 rounded-lg px-3 py-2">
+                                    <span>
+                                        Applied <strong>{appliedCoupon.code}</strong>
+                                        {appliedCoupon.discount_type === 'percentage'
+                                            ? ` (${appliedCoupon.discount_value}% off)`
+                                            : ` (−$${Number(appliedCoupon.discount_value).toFixed(2)})`}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="underline text-xs"
+                                        onClick={() => {
+                                            clearCoupon();
+                                            setDiscountMode('none');
+                                        }}
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            )}
+
+                            {couponError && (
+                                <div className="text-sm text-red-600">{couponError}</div>
+                            )}
+                        </div>
+                    )}
 
                     <Button
                         type="button"
@@ -700,6 +940,9 @@ export default function QuickCheckout() {
                     paymentType="package"
                     description={pending.title}
                     packageId={pending.package_id}
+                    preAppliedCoupon={pending.is_catalog ? appliedCoupon : null}
+                    disableCoupons={Boolean(pending.is_catalog)}
+                    forQuickCheckout={Boolean(pending.is_catalog)}
                 />
             )}
         </div>

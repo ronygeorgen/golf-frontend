@@ -16,13 +16,14 @@ const REFUND_LABELS = {
 
 /**
  * Admin calendar "Block time" modal — staff, simulator bay, or category asset.
- * Step 1: choose resource/time → preview affected bookings
+ * Supports multi-select (e.g. block several coaches at once).
+ * Step 1: choose resource(s)/time → preview affected bookings
  * Step 2: confirm → create block + cancel + email
  */
 export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }) {
     const [resourceType, setResourceType] = useState('staff');
     const [resources, setResources] = useState([]);
-    const [resourceId, setResourceId] = useState('');
+    const [resourceIds, setResourceIds] = useState([]);
     const [date, setDate] = useState(defaultDate || '');
     const [fullDay, setFullDay] = useState(true);
     const [startTime, setStartTime] = useState('09:00');
@@ -46,12 +47,13 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
         setPreview(null);
         setReason('');
         setFullDay(true);
+        setResourceIds([]);
     }, [isOpen, defaultDate]);
 
     useEffect(() => {
         if (!isOpen) return;
         const load = async () => {
-            setResourceId('');
+            setResourceIds([]);
             resetPreview();
             try {
                 if (resourceType === 'staff') {
@@ -110,10 +112,26 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
 
     if (!isOpen) return null;
 
+    const toggleResource = (id) => {
+        setResourceIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+        resetPreview();
+    };
+
+    const toggleAll = () => {
+        if (resourceIds.length === resources.length) {
+            setResourceIds([]);
+        } else {
+            setResourceIds(resources.map((r) => r.id));
+        }
+        resetPreview();
+    };
+
     const buildBody = (withPreview) => {
         const body = {
             resource_type: resourceType,
-            resource_id: parseInt(resourceId, 10),
+            resource_ids: resourceIds.map((id) => parseInt(id, 10)),
             date,
             reason,
         };
@@ -127,6 +145,10 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
 
     const handlePreview = async (e) => {
         e.preventDefault();
+        if (!resourceIds.length) {
+            setError('Select at least one resource.');
+            return;
+        }
         setLoading(true);
         setError(null);
         try {
@@ -157,6 +179,9 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
     const windowLabel = fullDay
         ? `${date} (full day)`
         : `${date} · ${startTime} – ${endTime}`;
+
+    const resourcePlural =
+        resourceType === 'staff' ? 'coaches' : resourceType === 'simulator' ? 'bays' : 'assets';
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -194,20 +219,51 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium text-text-secondary">Resource</label>
-                            <select
-                                required
-                                value={resourceId}
-                                onChange={(e) => setResourceId(e.target.value)}
-                                className="w-full mt-1 px-3 py-2 border border-border rounded-lg bg-background"
-                            >
-                                <option value="">Select…</option>
-                                {resources.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.label}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                                <label className="text-sm font-medium text-text-secondary">
+                                    Select {resourcePlural}
+                                    {resourceIds.length > 0 ? (
+                                        <span className="text-text-muted font-normal">
+                                            {' '}
+                                            ({resourceIds.length} selected)
+                                        </span>
+                                    ) : null}
+                                </label>
+                                {resources.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleAll}
+                                        className="text-xs text-primary hover:underline"
+                                    >
+                                        {resourceIds.length === resources.length ? 'Clear all' : 'Select all'}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="mt-1 max-h-48 overflow-y-auto border border-border rounded-lg divide-y divide-border bg-background">
+                                {resources.length === 0 ? (
+                                    <div className="px-3 py-3 text-sm text-text-muted">No options loaded.</div>
+                                ) : (
+                                    resources.map((r) => {
+                                        const checked = resourceIds.includes(r.id);
+                                        return (
+                                            <label
+                                                key={r.id}
+                                                className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-surface ${
+                                                    checked ? 'bg-primary/5' : ''
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => toggleResource(r.id)}
+                                                    className="rounded border-border"
+                                                />
+                                                <span className="text-text-primary">{r.label}</span>
+                                            </label>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </div>
 
                         <div>
@@ -260,7 +316,7 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
                             />
                         </div>
 
-                        <Button type="submit" disabled={loading || !resourceId || !date} className="w-full">
+                        <Button type="submit" disabled={loading || !resourceIds.length || !date} className="w-full">
                             {loading ? 'Checking…' : 'Review affected bookings'}
                         </Button>
                     </form>
