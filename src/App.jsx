@@ -7,6 +7,7 @@ import SignUp from './pages/SignUp';
 import GuestLanding from './pages/GuestLanding';
 import PaymentSuccess from './pages/PaymentSuccess';
 import GuestCoachingBooking from './pages/GuestCoachingBooking';
+import QuickCheckout from './pages/QuickCheckout';
 import Booking from './pages/Booking';
 import ClientPortal from './pages/ClientPortal';
 import AdminDashboard from './pages/AdminDashboard';
@@ -218,6 +219,14 @@ function AppContent() {
                 <Route path="transfers/sessions" element={<TransferSessions />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="member-list" element={<MemberList />} />
+                <Route
+                    path="quick-checkout"
+                    element={
+                        <ProtectedRoute allowedRoles={['admin', 'staff', 'superadmin']}>
+                            <QuickCheckout />
+                        </ProtectedRoute>
+                    }
+                />
             </Route>
 
             {/* Admin Routes with AdminLayout */}

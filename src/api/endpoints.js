@@ -35,6 +35,7 @@ export const endpoints = {
             referrals: (id) => `/admin/staff/${id}/referrals/`,
             categories: (id) => `/admin/staff/${id}/categories/`,
         },
+        calendarBlocks: '/admin/calendar-blocks/',
         simulators: {
             list: '/admin/simulators/',
             detail: (id) => `/admin/simulators/${id}/`,
@@ -201,6 +202,8 @@ export const endpoints = {
         simulatorTransfersPending: '/coaching/simulator-transfers/pending/',
         simulatorTransferClaim: (id) => `/coaching/simulator-transfers/${id}/claim/`,
         guestPackages: '/coaching/guest-packages/',
+        quickCheckoutOneOff: '/coaching/quick-checkout/one-off/',
+        quickCheckoutTemp: '/coaching/quick-checkout/temp-purchase/',
     },
 
     ghl: {
@@ -249,6 +252,7 @@ export const endpoints = {
     square: {
         config: '/square/config/',
         initiatePayment: '/square/initiate-payment/',
+        paymentLink: '/square/payment-link/',
         webhook: '/square/webhook/',
         memberships: {
             subscribe: '/square/memberships/subscribe/',
