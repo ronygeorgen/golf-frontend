@@ -14,7 +14,8 @@ import { SPECIAL_EVENT_AVAILABILITY_MESSAGE } from '../constants/bookingCopy';
 import Button from './ui/Button';
 import DateInput from './ui/DateInput';
 import BookForClientModal from './BookForClientModal';
-import { UserPlus, ChevronDown } from 'lucide-react';
+import BlockTimeModal from './BlockTimeModal';
+import { UserPlus, ChevronDown, Ban } from 'lucide-react';
 
 // Palette for dynamic (non-legacy) service categories — one colour per category ID
 const DYNAMIC_CAT_COLORS = [
@@ -124,6 +125,8 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
     const [availableSlots, setAvailableSlots] = useState([]);
     const [slotsLoading, setSlotsLoading] = useState(false);
     const [showBookForClientModal, setShowBookForClientModal] = useState(false);
+    const [showBlockTimeModal, setShowBlockTimeModal] = useState(false);
+    const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
 
     // Change Coach State
     const [changeCoachState, setChangeCoachState] = useState({
@@ -149,6 +152,12 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
         isCoachingSessionsCalendar
             ? (user.role === 'admin' || user.role === 'staff' || user.is_superuser) // coaching-sessions calendar
             : (user.role === 'admin' || user.is_superuser) // regular calendar pages
+    );
+    const canBlockTime = user && (
+        user.role === 'admin' ||
+        user.role === 'staff' ||
+        user.role === 'superadmin' ||
+        user.is_superuser
     );
 
     // Check if user can manage bookings (Admin, Staff, or the Client of the booking)
@@ -290,7 +299,7 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
             }));
         }
 
-    }, [dispatch, date, calendarType, coachId, view, showCancelledOnly]);
+    }, [dispatch, date, calendarType, coachId, view, showCancelledOnly, calendarRefreshKey]);
 
     // Fetch slots when reschedule date changes
     useEffect(() => {
@@ -1084,6 +1093,17 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                                     <span className="sm:hidden">+Book</span>
                                 </Button>
                             )}
+                            {canBlockTime && (
+                                <Button
+                                    onClick={() => setShowBlockTimeModal(true)}
+                                    variant="secondary"
+                                    className="flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <Ban className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Block time</span>
+                                    <span className="sm:hidden">Block</span>
+                                </Button>
+                            )}
                             <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 bg-background/40 backdrop-blur-md rounded-2xl p-1.5 shadow-sm border border-border/40">
                                 {/* Type Toggles */}
                                 <div className="flex items-center gap-1 p-1 bg-surface/30 rounded-xl border border-border/20">
@@ -1869,6 +1889,27 @@ function CalendarView({ isUserView = false, coachId = null, staffName = null }) 
                             coachId: coachId,
                             status: showCancelledOnly ? 'cancelled' : null
                         }));
+                    }}
+                />
+            )}
+
+            {canBlockTime && (
+                <BlockTimeModal
+                    isOpen={showBlockTimeModal}
+                    onClose={() => setShowBlockTimeModal(false)}
+                    defaultDate={moment(date).format('YYYY-MM-DD')}
+                    onSaved={(result) => {
+                        const n = result?.cancelled_bookings ?? 0;
+                        const emailed = result?.emails_sent ?? 0;
+                        setCalendarRefreshKey((k) => k + 1);
+                        openPopup({
+                            type: 'success',
+                            title: 'Time blocked',
+                            message:
+                                n > 0
+                                    ? `Blocked. Cancelled ${n} overlapping booking(s) and refunded credits. Emailed ${emailed} client(s).`
+                                    : 'That time is now unavailable for booking. No overlapping bookings to cancel.',
+                        });
                     }}
                 />
             )}

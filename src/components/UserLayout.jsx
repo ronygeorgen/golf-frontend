@@ -31,7 +31,8 @@ function UserLayout() {
 
     const isAdmin = user?.role === 'admin' || user?.is_superuser === true;
     const isStaff = user?.role === 'staff';
-    const isStaffOrAdmin = isStaff || isAdmin;
+    const isSuperadmin = user?.role === 'superadmin';
+    const isStaffOrAdmin = isStaff || isAdmin || isSuperadmin;
 
     const isClientBooking = location.pathname === '/booking' && location.state?.client;
 
@@ -145,6 +146,7 @@ function UserLayout() {
         if (path === '/profile') return 'Profile';
         if (path === '/coaching-sessions' || path.startsWith('/coaching-sessions')) return 'My Coaching Sessions';
         if (path === '/member-list') return 'Member List';
+        if (path === '/quick-checkout') return 'Quick Checkout';
         return 'Dashboard';
     };
 
@@ -216,7 +218,7 @@ function UserLayout() {
                                     <div className="relative" ref={coachingSessionsMenuRef}>
                                         <button
                                             onClick={() => setCoachingSessionsMenuOpen(!coachingSessionsMenuOpen)}
-                                            className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions') || location.pathname === '/member-list'
+                                            className={`flex items-center space-x-1 px-3 py-2 rounded-button text-sm font-medium transition-colors ${location.pathname === '/coaching-sessions' || location.pathname.startsWith('/coaching-sessions') || location.pathname === '/member-list' || location.pathname === '/quick-checkout'
                                                 ? 'bg-primary-light text-white'
                                                 : 'text-text-secondary hover:bg-background'
                                                 }`}
@@ -248,6 +250,16 @@ function UserLayout() {
                                                 >
                                                     <UserCheck className="w-4 h-4" />
                                                     <span>Member List</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleNavigation('/quick-checkout')}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/quick-checkout'
+                                                        ? 'bg-primary-light/10 text-primary font-semibold'
+                                                        : 'text-text-primary hover:bg-background'
+                                                        }`}
+                                                >
+                                                    <Package className="w-4 h-4" />
+                                                    <span>Quick Checkout</span>
                                                 </button>
                                                 {/* Button Removed */}
                                             </div>
@@ -407,6 +419,16 @@ function UserLayout() {
                                                         >
                                                             <UserCheck className="w-4 h-4" />
                                                             <span>Member List</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleNavigation('/quick-checkout')}
+                                                            className={`w-full flex items-center space-x-3 px-4 py-2 text-sm transition-colors ${location.pathname === '/quick-checkout'
+                                                                ? 'bg-primary-light text-white font-medium'
+                                                                : 'text-text-primary hover:bg-background'
+                                                                }`}
+                                                        >
+                                                            <Package className="w-4 h-4" />
+                                                            <span>Quick Checkout</span>
                                                         </button>
                                                         {/* Button Removed */}
                                                     </>
