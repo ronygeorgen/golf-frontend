@@ -24,8 +24,12 @@ function SimulatorManagement() {
     const { popup, openPopup, closePopup } = usePopup();
     const { toast, showSuccess, showError, hideToast } = useToast();
     const { list: simulators, loading } = useAppSelector((state) => state.admin.simulators);
-    const { locationTimezone } = useAppSelector((state) => state.auth);
+    const { locationTimezone, user } = useAppSelector((state) => state.auth);
     const modalRef = useRef(null);
+    const canManageBays =
+        user?.role === 'admin' ||
+        user?.role === 'superadmin' ||
+        user?.is_superuser === true;
 
     const [showForm, setShowForm] = useState(false);
     const [editingSimulator, setEditingSimulator] = useState(null);
@@ -356,12 +360,14 @@ function SimulatorManagement() {
         <div>
             <div className="bg-surface rounded-card shadow-card p-4 md:p-6 mb-6">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <Button
-                        onClick={() => setShowForm(true)}
-                        variant="primary"
-                    >
-                        Add Simulator
-                    </Button>
+                    {canManageBays && (
+                        <Button
+                            onClick={() => setShowForm(true)}
+                            variant="primary"
+                        >
+                            Add Simulator
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -584,6 +590,7 @@ function SimulatorManagement() {
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div className="flex gap-2 flex-wrap">
+                                                    {canManageBays && (
                                                     <div className="relative group">
                                                         <button
                                                             className="text-primary hover:text-primary-light transition-colors p-1 rounded-md hover:bg-background"
@@ -596,7 +603,8 @@ function SimulatorManagement() {
                                                             Edit
                                                         </span>
                                                     </div>
-                                                    {!simulator.is_coaching_bay && (
+                                                    )}
+                                                    {canManageBays && !simulator.is_coaching_bay && (
                                                         <div className="relative group">
                                                             <button
                                                                 className="text-status-personal-text hover:text-status-personal-text/80 transition-colors p-1 rounded-md hover:bg-background"
@@ -610,6 +618,7 @@ function SimulatorManagement() {
                                                             </span>
                                                         </div>
                                                     )}
+                                                    {canManageBays && (
                                                     <div className="relative group">
                                                         <button
                                                             type="button"
@@ -623,6 +632,8 @@ function SimulatorManagement() {
                                                             Reassign / deactivate
                                                         </span>
                                                     </div>
+                                                    )}
+                                                    {canManageBays && (
                                                     <div className="relative group">
                                                         <button
                                                             className={`${simulator.is_active
@@ -642,6 +653,8 @@ function SimulatorManagement() {
                                                             {simulator.is_active ? 'Deactivate' : 'Activate'}
                                                         </span>
                                                     </div>
+                                                    )}
+                                                    {canManageBays && (
                                                     <div className="relative group">
                                                         <button
                                                             className="text-danger hover:text-danger-light transition-colors p-1 rounded-md hover:bg-background"
@@ -654,6 +667,7 @@ function SimulatorManagement() {
                                                             Delete
                                                         </span>
                                                     </div>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

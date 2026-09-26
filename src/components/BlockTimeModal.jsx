@@ -83,12 +83,12 @@ export default function BlockTimeModal({ isOpen, onClose, onSaved, defaultDate }
                     const res = await apiClient.get(endpoints.admin.simulators.list);
                     const list = Array.isArray(res.data) ? res.data : res.data?.results || [];
                     setResources(
-                        list
-                            .filter((s) => s.is_active !== false)
-                            .map((s) => ({
-                                id: s.id,
-                                label: `Bay ${s.bay_number} — ${s.name}`,
-                            }))
+                        list.map((s) => ({
+                            id: s.id,
+                            label: `Bay ${s.bay_number} — ${s.name}${
+                                s.is_active === false ? ' (inactive)' : ''
+                            }`,
+                        }))
                     );
                 } else {
                     const res = await apiClient.get('/admin/category-assets/');
