@@ -55,6 +55,25 @@ function UserManagement() {
         setCurrentPage(1);
     };
 
+    const formatUserApiError = (errorData, fallback) => {
+        if (!errorData) return fallback;
+        if (typeof errorData === 'string') return errorData;
+        if (errorData.error) {
+            return Array.isArray(errorData.error) ? errorData.error.join(', ') : String(errorData.error);
+        }
+        if (errorData.detail) {
+            return Array.isArray(errorData.detail) ? errorData.detail.join(', ') : String(errorData.detail);
+        }
+        if (errorData.message) return String(errorData.message);
+        if (typeof errorData === 'object') {
+            const parts = Object.entries(errorData)
+                .map(([, value]) => (Array.isArray(value) ? value.join(', ') : String(value)))
+                .filter(Boolean);
+            if (parts.length) return parts.join('\n');
+        }
+        return fallback;
+    };
+
     const handleCreateUser = async (formData) => {
         try {
             const storedLocationId = localStorage.getItem('locationId');
@@ -72,7 +91,7 @@ function UserManagement() {
                     confirmText: 'OK',
                 });
             } else {
-                throw new Error(result.payload?.error || 'Failed to create user');
+                throw new Error(formatUserApiError(result.payload, 'Failed to create user'));
             }
         } catch (error) {
             // Error handling is done in the modal via error prop/state, but we can also show popup
@@ -91,16 +110,7 @@ function UserManagement() {
                     confirmText: 'OK',
                 });
             } else {
-                const errorData = result.payload;
-                let errorMessage = 'Failed to update user';
-                if (typeof errorData === 'object' && errorData !== null) {
-                    errorMessage = Object.entries(errorData)
-                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-                        .join('\n');
-                } else if (typeof errorData === 'string') {
-                    errorMessage = errorData;
-                }
-                throw new Error(errorMessage);
+                throw new Error(formatUserApiError(result.payload, 'Failed to update user'));
             }
         } catch (error) {
             throw error;
