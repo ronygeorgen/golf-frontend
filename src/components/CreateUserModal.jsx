@@ -56,7 +56,7 @@ function CreateUserModal({ isOpen, onClose, onSave }) {
 
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
                     {error && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm whitespace-pre-line">
                             {error}
                         </div>
                     )}
